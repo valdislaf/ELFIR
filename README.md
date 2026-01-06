@@ -120,7 +120,8 @@ fn main_d64() {
 
 - `auto` declares a variable (i64 in `main_i64`, d64 in `main_d64`). `auto` is not allowed in `main`.
 - `i64 x = <expr>;` and `d64 x = <expr>;` declare typed variables (required in `main`).
-- `print_i64(<expr>);` prints i64, `print_d64(<expr>);` prints d64.
+- `print_i64(<expr>);` prints i64, `print_d64(<expr>);` prints d64, `print_str("...");` prints a string literal.
+- `print_i64/print_d64/print_str` do not add a newline; use `\n` inside strings when needed.
 - `print_i64` is only allowed in `main`/`main_i64`; `print_d64` only in `main`/`main_d64`.
 - `ret <expr>;` returns the expression value in `rax` (i64) or `xmm0` (d64).
 - Operators: `+`, `-`, `*`, `/`, `%` with standard precedence and left associativity.
@@ -132,6 +133,7 @@ fn main_d64() {
 - Integer literals: decimal digits only; a leading `-` is parsed as unary minus.
 - Floating literals (d64 mode): digits with optional `.` and optional exponent `e|E[+|-]digits`.
 - d64 output format: scientific notation with trailing zeros trimmed (at least one digit after the dot).
+- String literals support escapes: `\\`, `\"`, `\n`, `\t`.
 - Comparison result: `0/1` in i64 mode, `0.0/1.0` in d64 mode.
 - i64 `sqrt`: integer result (truncates toward zero). Negative input yields `0`.
 - i64 `pow`: integer exponent. Negative exponent yields `0`.

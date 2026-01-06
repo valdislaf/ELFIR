@@ -1,5 +1,10 @@
 fn main() {
 i64 x =202; d64 y = pi;
-  print_i64(x);  print_d64(y);
+  print_i64(x);  print_str(" "); print_d64(y);print_str("\n");
+
+      print_str("x = ");
+      print_d64(y);
+      print_str("\n");
+
     ret 0;
 	}

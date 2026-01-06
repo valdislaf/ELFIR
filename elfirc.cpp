@@ -19,6 +19,7 @@ enum class TokKind {
     End,
     Ident,
     Number,
+    String,
 
     KwFn,
     KwAuto,
@@ -108,6 +109,37 @@ public:
             return t;
         }
 
+        // string literal
+        if (c == '"') {
+            i_++;
+            std::string out;
+            while (i_ < s_.size()) {
+                char ch = s_[i_++];
+                if (ch == '"') {
+                    t.text = std::move(out);
+                    t.kind = TokKind::String;
+                    return t;
+                }
+                if (ch == '\\') {
+                    if (i_ >= s_.size()) {
+                        throw Error("Unterminated escape sequence at position " + std::to_string(t.pos));
+                    }
+                    char esc = s_[i_++];
+                    switch (esc) {
+                        case 'n': out.push_back('\n'); break;
+                        case 't': out.push_back('\t'); break;
+                        case '"': out.push_back('"'); break;
+                        case '\\': out.push_back('\\'); break;
+                        default:
+                            throw Error("Unsupported escape sequence at position " + std::to_string(t.pos));
+                    }
+                } else {
+                    out.push_back(ch);
+                }
+            }
+            throw Error("Unterminated string literal at position " + std::to_string(t.pos));
+        }
+
         // operators and punctuators
         i_++;
         switch (c) {
@@ -155,15 +187,20 @@ private:
 
 // AST (минимально)
 struct Expr {
-    enum class Kind { Num, Var, Add, Sub, Mul, Div, Mod, Cmp, And, Sqrt, Pow, Min, Max, Abs, Sin, Cos, Tan } kind;
+    enum class Kind { Num, Str, Var, Add, Sub, Mul, Div, Mod, Cmp, And, Sqrt, Pow, Min, Max, Abs, Sin, Cos, Tan } kind;
     enum class CmpOp { Eq, Ne, Lt, Le, Gt, Ge } cmpOp;
     std::string numText;
+    std::string strText;
     std::string var;
     std::unique_ptr<Expr> lhs, rhs;
 
     static std::unique_ptr<Expr> makeNum(std::string v) {
         auto e = std::make_unique<Expr>();
         e->kind = Kind::Num; e->numText = std::move(v); return e;
+    }
+    static std::unique_ptr<Expr> makeStr(std::string v) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Str; e->strText = std::move(v); return e;
     }
     static std::unique_ptr<Expr> makeVar(std::string n) {
         auto e = std::make_unique<Expr>();
@@ -234,7 +271,7 @@ struct Expr {
 enum class Type { I64, D64 };
 
 struct Stmt {
-    enum class Kind { AutoAssign, TypedAssign, Ret, PrintI64, PrintD64 } kind;
+    enum class Kind { AutoAssign, TypedAssign, Ret, PrintI64, PrintD64, PrintStr } kind;
     Type declType = Type::I64;    // for TypedAssign
     std::string name;             // for AutoAssign
     std::unique_ptr<Expr> expr;   // for both
@@ -307,18 +344,29 @@ private:
             return st;
         }
 
-        if (cur_.kind == TokKind::Ident && (cur_.text == "print_i64" || cur_.text == "print_d64")) {
-            bool isI64 = (cur_.text == "print_i64");
-            advance();
-            expect(TokKind::LParen, "Expected '(' after print");
-            auto e = parseComparison();
-            expect(TokKind::RParen, "Expected ')' after print argument");
-            expect(TokKind::Semicolon, "Expected ';' after print");
-            Stmt st;
-            st.kind = isI64 ? Stmt::Kind::PrintI64 : Stmt::Kind::PrintD64;
-            st.expr = std::move(e);
-            return st;
-        }
+    if (cur_.kind == TokKind::Ident && (cur_.text == "print_i64" || cur_.text == "print_d64")) {
+        bool isI64 = (cur_.text == "print_i64");
+        advance();
+        expect(TokKind::LParen, "Expected '(' after print");
+        auto e = parseComparison();
+        expect(TokKind::RParen, "Expected ')' after print argument");
+        expect(TokKind::Semicolon, "Expected ';' after print");
+        Stmt st;
+        st.kind = isI64 ? Stmt::Kind::PrintI64 : Stmt::Kind::PrintD64;
+        st.expr = std::move(e);
+        return st;
+    }
+    if (cur_.kind == TokKind::Ident && cur_.text == "print_str") {
+        advance();
+        expect(TokKind::LParen, "Expected '(' after print_str");
+        auto e = parseComparison();
+        expect(TokKind::RParen, "Expected ')' after print_str argument");
+        expect(TokKind::Semicolon, "Expected ';' after print_str");
+        Stmt st;
+        st.kind = Stmt::Kind::PrintStr;
+        st.expr = std::move(e);
+        return st;
+    }
 
         if (cur_.kind == TokKind::KwRet) {
             advance();
@@ -339,6 +387,11 @@ private:
             std::string v = cur_.text;
             advance();
             return Expr::makeNum(std::move(v));
+        }
+        if (cur_.kind == TokKind::String) {
+            std::string v = cur_.text;
+            advance();
+            return Expr::makeStr(std::move(v));
         }
         if (cur_.kind == TokKind::Ident) {
             std::string n = cur_.text;
@@ -450,6 +503,7 @@ private:
         out->kind = e->kind;
         out->cmpOp = e->cmpOp;
         out->numText = e->numText;
+        out->strText = e->strText;
         out->var = e->var;
         out->lhs = cloneExpr(e->lhs);
         out->rhs = cloneExpr(e->rhs);
@@ -523,6 +577,12 @@ struct CodegenCtx {
     std::unordered_map<std::string, VarInfo> varToSlot; // slot index: 1 => [rbp-8], 2 => [rbp-16], ...
     int nextSlot = 1;
     int maxSlotUsed = 0;
+    struct StrLit {
+        std::string data;
+        std::string label;
+    };
+    std::vector<StrLit> strLits;
+    std::unordered_map<std::string, int> strToId;
 
     int allocSlot(const std::string& name, Type type) {
         if (varToSlot.contains(name)) {
@@ -541,6 +601,16 @@ struct CodegenCtx {
     }
 
     static int slotDisp(int slot) { return slot * 8; } // [rbp-8*slot]
+
+    const StrLit& getOrAddStr(const std::string& s) {
+        auto it = strToId.find(s);
+        if (it != strToId.end()) return strLits[it->second];
+        int id = (int)strLits.size();
+        std::string label = "str" + std::to_string(id);
+        strToId.emplace(s, id);
+        strLits.push_back(StrLit{s, label});
+        return strLits.back();
+    }
 };
 
 static int64_t parseI64Literal(const std::string& text) {
@@ -591,6 +661,8 @@ static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
         case K::Num:
             out << "    mov  rax, " << parseI64Literal(e.numText) << "\n";
             return;
+        case K::Str:
+            throw Error("Type error: string is not allowed in i64 expression");
         case K::Var: {
             auto v = cg.getVar(e.var);
             if (v.type != Type::I64) throw Error("Type error: expected i64 variable '" + e.var + "'");
@@ -750,6 +822,8 @@ static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             out << "    movq xmm0, rax\n";
             return;
         }
+        case K::Str:
+            throw Error("Type error: string is not allowed in d64 expression");
         case K::Var: {
             auto v = cg.getVar(e.var);
             if (v.type != Type::D64) throw Error("Type error: expected d64 variable '" + e.var + "'");
@@ -993,18 +1067,35 @@ static void emitPrintI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e,
     emitExprI64(out, cg, e, labelId);
     out << "    mov  rdi, rax\n";
     out << "    sub  rsp, 8\n";
-    out << "    call rt_print_i64\n";
+    out << "    call rt_print_i64_raw\n";
     out << "    add  rsp, 8\n";
 }
 
 static void emitPrintD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId) {
     emitExprD64(out, cg, e, labelId);
     out << "    sub  rsp, 8\n";
-    out << "    call rt_print_f64\n";
+    out << "    call rt_print_f64_raw\n";
     out << "    add  rsp, 8\n";
 }
 
-static std::string genFunctionAsm(const Func& f, Mode mode, Type retType) {
+static void emitPrintStr(std::ostringstream& out, CodegenCtx& cg, const Expr& e) {
+    if (e.kind != Expr::Kind::Str) {
+        throw Error("print_str expects a string literal");
+    }
+    const auto& lit = cg.getOrAddStr(e.strText);
+    out << "    lea  rdi, [rel " << lit.label << "]\n";
+    out << "    mov  rsi, " << lit.data.size() << "\n";
+    out << "    sub  rsp, 8\n";
+    out << "    call rt_print_bytes\n";
+    out << "    add  rsp, 8\n";
+}
+
+struct GenResult {
+    std::string text;
+    std::vector<CodegenCtx::StrLit> strLits;
+};
+
+static GenResult genFunctionAsm(const Func& f, Mode mode, Type retType) {
     // v0: generate body for entrypoint only
     CodegenCtx cg;
     bool hasRet = false;
@@ -1055,6 +1146,8 @@ static std::string genFunctionAsm(const Func& f, Mode mode, Type retType) {
                 throw Error("print_d64 is not allowed in main_i64");
             }
             emitPrintD64(body, cg, *st.expr, labelId);
+        } else if (st.kind == Stmt::Kind::PrintStr) {
+            emitPrintStr(body, cg, *st.expr);
         } else { // Ret
             if (retType == Type::D64) {
                 emitExprD64(body, cg, *st.expr, labelId);
@@ -1081,7 +1174,7 @@ static std::string genFunctionAsm(const Func& f, Mode mode, Type retType) {
     out << "    mov  rbp, rsp\n";
     if (rounded > 0) out << "    sub  rsp, " << rounded << "\n";
     out << body.str();
-    return out.str();
+    return GenResult{out.str(), cg.strLits};
 }
 
 enum class EntryKind { Main, MainI64, MainD64 };
@@ -1099,9 +1192,32 @@ static std::string genOutAsm(const Func& entry, EntryKind kind) {
     out << "extern rt_exit\n";
     out << "extern rt_print_i64\n";
     out << "extern rt_print_f64\n";
-    out << "\nsection .text\n\n";
+    out << "extern rt_print_i64_raw\n";
+    out << "extern rt_print_f64_raw\n";
+    out << "extern rt_print_bytes\n";
+    out << "\n";
 
-    out << genFunctionAsm(entry, mode, retType) << "\n";
+    auto gen = genFunctionAsm(entry, mode, retType);
+
+    if (!gen.strLits.empty()) {
+        out << "section .rodata\n\n";
+        for (const auto& lit : gen.strLits) {
+            out << lit.label << ": db ";
+            if (lit.data.empty()) {
+                out << "0";
+            } else {
+                for (size_t i = 0; i < lit.data.size(); ++i) {
+                    if (i) out << ", ";
+                    out << (int)(unsigned char)lit.data[i];
+                }
+            }
+            out << "\n";
+        }
+        out << "\n";
+    }
+
+    out << "section .text\n\n";
+    out << gen.text << "\n";
 
     out << "_start:\n";
     out << "    and  rsp, -16\n";
