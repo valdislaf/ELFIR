@@ -271,10 +271,11 @@ struct Expr {
 enum class Type { I64, D64 };
 
 struct Stmt {
-    enum class Kind { AutoAssign, TypedAssign, Ret, PrintI64, PrintD64, PrintStr } kind;
+    enum class Kind { AutoAssign, TypedAssign, Ret, PrintI64, PrintD64, PrintStr, PrintList } kind;
     Type declType = Type::I64;    // for TypedAssign
     std::string name;             // for AutoAssign
     std::unique_ptr<Expr> expr;   // for both
+    std::vector<std::unique_ptr<Expr>> exprs; // for PrintList
 };
 
 struct Func {
@@ -344,6 +345,24 @@ private:
             return st;
         }
 
+    if (cur_.kind == TokKind::Ident && cur_.text == "print") {
+        advance();
+        expect(TokKind::LParen, "Expected '(' after print");
+        if (cur_.kind == TokKind::RParen) {
+            throw Error("print expects at least one argument");
+        }
+        Stmt st;
+        st.kind = Stmt::Kind::PrintList;
+        st.exprs.push_back(parseComparison());
+        while (cur_.kind == TokKind::Comma) {
+            advance();
+            st.exprs.push_back(parseComparison());
+        }
+        expect(TokKind::RParen, "Expected ')' after print arguments");
+        expect(TokKind::Semicolon, "Expected ';' after print");
+        return st;
+    }
+
     if (cur_.kind == TokKind::Ident && (cur_.text == "print_i64" || cur_.text == "print_d64")) {
         bool isI64 = (cur_.text == "print_i64");
         advance();
@@ -378,7 +397,7 @@ private:
             return st;
         }
 
-        throw Error("Expected statement ('auto' or 'ret') at position " + std::to_string(cur_.pos));
+        throw Error("Expected statement ('auto', 'ret', or 'print') at position " + std::to_string(cur_.pos));
     }
 
     // primary := number | ident | '(' expr ')'
@@ -1090,6 +1109,93 @@ static void emitPrintStr(std::ostringstream& out, CodegenCtx& cg, const Expr& e)
     out << "    add  rsp, 8\n";
 }
 
+enum class ExprTypeTag { I64, D64, NumLiteral };
+
+static bool isFloatLiteralText(const std::string& text) {
+    return text.find_first_of(".eE") != std::string::npos;
+}
+
+static ExprTypeTag mergeNumericTags(ExprTypeTag a, ExprTypeTag b, const char* ctx) {
+    if (a == ExprTypeTag::D64 || b == ExprTypeTag::D64) {
+        if (a == ExprTypeTag::I64 || b == ExprTypeTag::I64) {
+            throw Error(std::string("Type error: mixed i64/d64 in ") + ctx);
+        }
+        return ExprTypeTag::D64;
+    }
+    if (a == ExprTypeTag::I64 || b == ExprTypeTag::I64) {
+        return ExprTypeTag::I64;
+    }
+    return ExprTypeTag::NumLiteral;
+}
+
+static ExprTypeTag inferExprTypeTag(const Expr& e, const CodegenCtx& cg, Mode mode) {
+    using K = Expr::Kind;
+    switch (e.kind) {
+        case K::Num:
+            if (isFloatLiteralText(e.numText)) {
+                if (mode == Mode::I64Only) {
+                    throw Error("Expected integer literal, got '" + e.numText + "'");
+                }
+                return ExprTypeTag::D64;
+            }
+            return ExprTypeTag::NumLiteral;
+        case K::Str:
+            throw Error("Type error: string is not allowed in numeric expression");
+        case K::Var: {
+            auto v = cg.getVar(e.var);
+            return (v.type == Type::D64) ? ExprTypeTag::D64 : ExprTypeTag::I64;
+        }
+        case K::Add:
+        case K::Sub:
+        case K::Mul:
+        case K::Div:
+        case K::Mod: {
+            auto lt = inferExprTypeTag(*e.lhs, cg, mode);
+            auto rt = inferExprTypeTag(*e.rhs, cg, mode);
+            return mergeNumericTags(lt, rt, "expression");
+        }
+        case K::Cmp:
+        case K::And: {
+            auto lt = inferExprTypeTag(*e.lhs, cg, mode);
+            auto rt = inferExprTypeTag(*e.rhs, cg, mode);
+            return mergeNumericTags(lt, rt, "comparison");
+        }
+        case K::Sqrt:
+        case K::Abs: {
+            return inferExprTypeTag(*e.lhs, cg, mode);
+        }
+        case K::Pow:
+        case K::Min:
+        case K::Max: {
+            auto lt = inferExprTypeTag(*e.lhs, cg, mode);
+            auto rt = inferExprTypeTag(*e.rhs, cg, mode);
+            return mergeNumericTags(lt, rt, "expression");
+        }
+        case K::Sin:
+        case K::Cos:
+        case K::Tan:
+            if (mode == Mode::I64Only) {
+                throw Error("sin/cos/tan are only available in d64 mode");
+            }
+            return ExprTypeTag::D64;
+    }
+    throw Error("Internal: unknown expr kind");
+}
+
+static Type resolvePrintType(const Expr& e, const CodegenCtx& cg, Mode mode) {
+    ExprTypeTag tag = inferExprTypeTag(e, cg, mode);
+    if (tag == ExprTypeTag::NumLiteral) {
+        return (mode == Mode::D64Only) ? Type::D64 : Type::I64;
+    }
+    if (tag == ExprTypeTag::D64 && mode == Mode::I64Only) {
+        throw Error("d64 expression is not allowed in main_i64");
+    }
+    if (tag == ExprTypeTag::I64 && mode == Mode::D64Only) {
+        throw Error("i64 expression is not allowed in main_d64");
+    }
+    return (tag == ExprTypeTag::D64) ? Type::D64 : Type::I64;
+}
+
 struct GenResult {
     std::string text;
     std::vector<CodegenCtx::StrLit> strLits;
@@ -1148,6 +1254,19 @@ static GenResult genFunctionAsm(const Func& f, Mode mode, Type retType) {
             emitPrintD64(body, cg, *st.expr, labelId);
         } else if (st.kind == Stmt::Kind::PrintStr) {
             emitPrintStr(body, cg, *st.expr);
+        } else if (st.kind == Stmt::Kind::PrintList) {
+            for (const auto& arg : st.exprs) {
+                if (arg->kind == Expr::Kind::Str) {
+                    emitPrintStr(body, cg, *arg);
+                    continue;
+                }
+                Type t = resolvePrintType(*arg, cg, mode);
+                if (t == Type::D64) {
+                    emitPrintD64(body, cg, *arg, labelId);
+                } else {
+                    emitPrintI64(body, cg, *arg, labelId);
+                }
+            }
         } else { // Ret
             if (retType == Type::D64) {
                 emitExprD64(body, cg, *st.expr, labelId);

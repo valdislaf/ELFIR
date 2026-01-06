@@ -121,6 +121,7 @@ fn main_d64() {
 - `auto` declares a variable (i64 in `main_i64`, d64 in `main_d64`). `auto` is not allowed in `main`.
 - `i64 x = <expr>;` and `d64 x = <expr>;` declare typed variables (required in `main`).
 - `print_i64(<expr>);` prints i64, `print_d64(<expr>);` prints d64, `print_str("...");` prints a string literal.
+- `print(<expr or "str">, ...);` prints each argument in order (string literal or i64/d64 expression).
 - `print_i64/print_d64/print_str` do not add a newline; use `\n` inside strings when needed.
 - `print_i64` is only allowed in `main`/`main_i64`; `print_d64` only in `main`/`main_d64`.
 - `ret <expr>;` returns the expression value in `rax` (i64) or `xmm0` (d64).
