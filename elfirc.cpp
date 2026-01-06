@@ -151,7 +151,7 @@ private:
 
 // AST (минимально)
 struct Expr {
-    enum class Kind { Num, Var, Add, Sub, Mul, Div, Mod, Cmp, And, Sqrt, Pow, Min, Max, Abs } kind;
+    enum class Kind { Num, Var, Add, Sub, Mul, Div, Mod, Cmp, And, Sqrt, Pow, Min, Max, Abs, Sin, Cos, Tan } kind;
     enum class CmpOp { Eq, Ne, Lt, Le, Gt, Ge } cmpOp;
     std::string numText;
     std::string var;
@@ -212,6 +212,18 @@ struct Expr {
     static std::unique_ptr<Expr> makeAbs(std::unique_ptr<Expr> a) {
         auto e = std::make_unique<Expr>();
         e->kind = Kind::Abs; e->lhs = std::move(a); return e;
+    }
+    static std::unique_ptr<Expr> makeSin(std::unique_ptr<Expr> a) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Sin; e->lhs = std::move(a); return e;
+    }
+    static std::unique_ptr<Expr> makeCos(std::unique_ptr<Expr> a) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Cos; e->lhs = std::move(a); return e;
+    }
+    static std::unique_ptr<Expr> makeTan(std::unique_ptr<Expr> a) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Tan; e->lhs = std::move(a); return e;
     }
 };
 
@@ -329,7 +341,25 @@ private:
                     expect(TokKind::RParen, "Expected ')' after abs argument");
                     return Expr::makeAbs(std::move(a));
                 }
+                if (n == "sin") {
+                    auto a = parseComparison();
+                    expect(TokKind::RParen, "Expected ')' after sin argument");
+                    return Expr::makeSin(std::move(a));
+                }
+                if (n == "cos") {
+                    auto a = parseComparison();
+                    expect(TokKind::RParen, "Expected ')' after cos argument");
+                    return Expr::makeCos(std::move(a));
+                }
+                if (n == "tan") {
+                    auto a = parseComparison();
+                    expect(TokKind::RParen, "Expected ')' after tan argument");
+                    return Expr::makeTan(std::move(a));
+                }
                 throw Error("Unknown function '" + n + "'");
+            }
+            if (n == "pi") {
+                return Expr::makeNum("3.14159265358979323846264338327950288");
             }
             return Expr::makeVar(n);
         }
@@ -660,6 +690,12 @@ static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             out << ".iabs_done_" << id << ":\n";
             return;
         }
+        case K::Sin:
+            throw Error("sin() is only available in d64 mode");
+        case K::Cos:
+            throw Error("cos() is only available in d64 mode");
+        case K::Tan:
+            throw Error("tan() is only available in d64 mode");
 
     }
     throw Error("Internal: unknown expr kind");
@@ -872,6 +908,37 @@ static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             out << "    mov  rax, 0x7fffffffffffffff\n";
             out << "    movq xmm1, rax\n";
             out << "    andpd xmm0, xmm1\n";
+            return;
+        case K::Sin:
+            emitExprD64(out, cg, *e.lhs, labelId);
+            out << "    sub  rsp, 8\n";
+            out << "    movsd [rsp], xmm0\n";
+            out << "    fld  qword [rsp]\n";
+            out << "    fsin\n";
+            out << "    fstp qword [rsp]\n";
+            out << "    movsd xmm0, [rsp]\n";
+            out << "    add  rsp, 8\n";
+            return;
+        case K::Cos:
+            emitExprD64(out, cg, *e.lhs, labelId);
+            out << "    sub  rsp, 8\n";
+            out << "    movsd [rsp], xmm0\n";
+            out << "    fld  qword [rsp]\n";
+            out << "    fcos\n";
+            out << "    fstp qword [rsp]\n";
+            out << "    movsd xmm0, [rsp]\n";
+            out << "    add  rsp, 8\n";
+            return;
+        case K::Tan:
+            emitExprD64(out, cg, *e.lhs, labelId);
+            out << "    sub  rsp, 8\n";
+            out << "    movsd [rsp], xmm0\n";
+            out << "    fld  qword [rsp]\n";
+            out << "    fptan\n";
+            out << "    fstp st0\n";
+            out << "    fstp qword [rsp]\n";
+            out << "    movsd xmm0, [rsp]\n";
+            out << "    add  rsp, 8\n";
             return;
     }
     throw Error("Internal: unknown expr kind");
