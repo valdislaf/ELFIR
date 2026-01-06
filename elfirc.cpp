@@ -26,7 +26,10 @@ enum class TokKind {
     LBrace, RBrace,
     Semicolon,
     Equal,
+    Star,
+    Slash,
     Plus,
+    Minus,
 };
 
 struct Tok {
@@ -94,7 +97,10 @@ public:
             case '}': t.kind = TokKind::RBrace; return t;
             case ';': t.kind = TokKind::Semicolon; return t;
             case '=': t.kind = TokKind::Equal; return t;
+            case '*': t.kind = TokKind::Star;  return t;
+            case '/': t.kind = TokKind::Slash; return t;
             case '+': t.kind = TokKind::Plus; return t;
+            case '-': t.kind = TokKind::Minus; return t;
             default:
                 throw Error(std::string("Unexpected character '") + c + "' at position " + std::to_string(t.pos));
         }
@@ -116,7 +122,7 @@ private:
 
 // AST (минимально)
 struct Expr {
-    enum class Kind { Num, Var, Add } kind;
+    enum class Kind { Num, Var, Add, Sub, Mul, Div } kind;
     int64_t num = 0;
     std::string var;
     std::unique_ptr<Expr> lhs, rhs;
@@ -129,9 +135,21 @@ struct Expr {
         auto e = std::make_unique<Expr>();
         e->kind = Kind::Var; e->var = std::move(n); return e;
     }
+    static std::unique_ptr<Expr> makeMul(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Mul; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeDiv(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Div; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
     static std::unique_ptr<Expr> makeAdd(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
         auto e = std::make_unique<Expr>();
         e->kind = Kind::Add; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeSub(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Sub; e->lhs = std::move(a); e->rhs = std::move(b); return e;
     }
 };
 
@@ -206,19 +224,8 @@ private:
         throw Error("Expected statement ('auto' or 'ret') at position " + std::to_string(cur_.pos));
     }
 
-    // expr := term { + term }
-    std::unique_ptr<Expr> parseExpr() {
-        auto left = parseTerm();
-        while (cur_.kind == TokKind::Plus) {
-            advance();
-            auto right = parseTerm();
-            left = Expr::makeAdd(std::move(left), std::move(right));
-        }
-        return left;
-    }
-
-    // term := number | ident
-    std::unique_ptr<Expr> parseTerm() {
+    // primary := number | ident | '(' expr ')'
+    std::unique_ptr<Expr> parsePrimary() {
         if (cur_.kind == TokKind::Number) {
             int64_t v = cur_.number;
             advance();
@@ -229,7 +236,49 @@ private:
             advance();
             return Expr::makeVar(n);
         }
-        throw Error("Expected number or identifier at position " + std::to_string(cur_.pos));
+        if (cur_.kind == TokKind::LParen) {
+            advance();
+            auto e = parseExpr();
+            expect(TokKind::RParen, "Expected ')'");
+            return e;
+        }
+        throw Error("Expected number, identifier, or '(' at position " + std::to_string(cur_.pos));
+    }
+
+    // unary := '-' unary | primary
+    std::unique_ptr<Expr> parseUnary() {
+        if (cur_.kind == TokKind::Minus) {
+            advance();
+            auto rhs = parseUnary();
+            return Expr::makeSub(Expr::makeNum(0), std::move(rhs));
+        }
+        return parsePrimary();
+    }
+
+    // term := unary { (*|/) unary }
+    std::unique_ptr<Expr> parseTerm() {
+        auto left = parseUnary();
+        while (cur_.kind == TokKind::Star || cur_.kind == TokKind::Slash) {
+            TokKind op = cur_.kind;
+            advance();
+            auto right = parseUnary();
+            if (op == TokKind::Star) left = Expr::makeMul(std::move(left), std::move(right));
+            else                    left = Expr::makeDiv(std::move(left), std::move(right));
+        }
+        return left;
+    }
+
+    // expr := term { (+|-) term }
+    std::unique_ptr<Expr> parseExpr() {
+        auto left = parseTerm();
+        while (cur_.kind == TokKind::Plus || cur_.kind == TokKind::Minus) {
+            TokKind op = cur_.kind;
+            advance();
+            auto right = parseTerm();
+            if (op == TokKind::Plus) left = Expr::makeAdd(std::move(left), std::move(right));
+            else                    left = Expr::makeSub(std::move(left), std::move(right));
+        }
+        return left;
     }
 
     void advance() { cur_ = lex_.next(); }
@@ -299,6 +348,22 @@ static void emitExpr(std::ostringstream& out, CodegenCtx& cg, const Expr& e) {
             out << "    mov  rax, [rbp-" << CodegenCtx::slotDisp(slot) << "]\n";
             return;
         }
+        case K::Mul:
+            emitExpr(out, cg, *e.lhs);
+            out << "    push rax\n";
+            emitExpr(out, cg, *e.rhs);
+            out << "    pop  rcx\n";
+            out << "    imul rax, rcx\n"; // rax = rhs * lhs
+            return;
+        case K::Div:
+            emitExpr(out, cg, *e.lhs);
+            out << "    push rax\n";
+            emitExpr(out, cg, *e.rhs);
+            out << "    pop  rcx\n";        // rcx = lhs, rax = rhs
+            out << "    xchg rax, rcx\n";   // rax = lhs, rcx = rhs (divisor)
+            out << "    cqo\n";             // sign-extend rax -> rdx:rax
+            out << "    idiv rcx\n";        // rax = lhs / rhs, rdx = lhs % rhs
+            return;
         case K::Add:
             // Evaluate lhs into rax, push, evaluate rhs into rax, pop rcx, add rax, rcx
             emitExpr(out, cg, *e.lhs);
@@ -307,6 +372,16 @@ static void emitExpr(std::ostringstream& out, CodegenCtx& cg, const Expr& e) {
             out << "    pop  rcx\n";
             out << "    add  rax, rcx\n";
             return;
+        case K::Sub:
+            // Evaluate lhs into rax, push, evaluate rhs into rax, pop rcx, compute (lhs - rhs) into rax
+            emitExpr(out, cg, *e.lhs);
+            out << "    push rax\n";
+            emitExpr(out, cg, *e.rhs);
+            out << "    pop  rcx\n";        // rcx = lhs, rax = rhs
+            out << "    sub  rcx, rax\n";   // rcx = lhs - rhs
+            out << "    mov  rax, rcx\n";   // rax = result
+            return;
+
     }
     throw Error("Internal: unknown expr kind");
 }

@@ -1,5 +1,8 @@
-fn main_i64() {
-    auto a = 1 + 2;
-    auto b = a + 10;
-    ret b + 5;
+fn main_i64() 
+{
+ auto a = -100;
+ auto b = 500 + a;
+ auto c = (1000*2/b-100+10)*10;
+ auto d = c/10;
+ ret -d; 
 }
