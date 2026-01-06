@@ -1,0 +1,3 @@
+nasm -felf64 prog.asm -o prog.o
+ld prog.o -o prog
+./prog

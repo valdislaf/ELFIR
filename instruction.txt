@@ -1,0 +1,526 @@
+sudo nano hello.asm
+nasm -f elf64 hello.asm -o hello.o
+gcc -o hello hello.o
+./hello
+Hello from NASM on WSL2 (Rayzen)!
+
+NASM: официальная документация — https://www.nasm.us/doc/
+System V x86-64 ABI: OSDev Wiki — https://wiki.osdev.org/System_V_x86-64_ABI
+PIE, PLT/GOT и общая концепция: статьи и руководства по PIE (например, The Green Dragon/GeeksforGeeks обзор PIE, а также AMD64 System V ABI Supplement на сайте Linux Foundation) и само руководство по ELF/настройке линкера:
+System V AMD64 ABI Supplement: https://refspecs.linuxfoundation.org/elf64-gen.pdf
+Обзор PIE/PLT: https://eli.thegreenplace.net/2013/08/04/position-independent-executables-plat-got/
+
+
+gdb -q ./hello \
+  -ex "starti" \
+  -ex "maint print reggroups" \
+  -ex "info registers" \
+  -ex "info registers all" \
+  -ex "quit"
+rax            0x0                 0
+rbx            0x0                 0
+rcx            0x0                 0
+rdx            0x0                 0
+rsi            0x0                 0
+rdi            0x0                 0
+rbp            0x0                 0x0
+rsp            0x7fffffffcad0      0x7fffffffcad0
+r8             0x0                 0
+r9             0x0                 0
+r10            0x0                 0
+r11            0x0                 0
+r12            0x0                 0
+r13            0x0                 0
+r14            0x0                 0
+r15            0x0                 0
+rip            0x7ffff7fe3290      0x7ffff7fe3290 <_start>
+eflags         0x200               [ IF ]
+cs             0x33                51
+ss             0x2b                43
+ds             0x0                 0
+es             0x0                 0
+fs             0x0                 0
+--Type <RET> for more, q to quit, c to continue without paging--
+gs             0x0                 0
+rax            0x0                 0
+rbx            0x0                 0
+rcx            0x0                 0
+rdx            0x0                 0
+rsi            0x0                 0
+rdi            0x0                 0
+rbp            0x0                 0x0
+rsp            0x7fffffffcad0      0x7fffffffcad0
+r8             0x0                 0
+r9             0x0                 0
+r10            0x0                 0
+r11            0x0                 0
+r12            0x0                 0
+r13            0x0                 0
+r14            0x0                 0
+r15            0x0                 0
+rip            0x7ffff7fe3290      0x7ffff7fe3290 <_start>
+eflags         0x200               [ IF ]
+cs             0x33                51
+ss             0x2b                43
+ds             0x0                 0
+es             0x0                 0
+fs             0x0                 0
+gs             0x0                 0
+st0            0                   (raw 0x00000000000000000000)
+st1            0                   (raw 0x00000000000000000000)
+st2            0                   (raw 0x00000000000000000000)
+st3            0                   (raw 0x00000000000000000000)
+st4            0                   (raw 0x00000000000000000000)
+st5            0                   (raw 0x00000000000000000000)
+st6            0                   (raw 0x00000000000000000000)
+st7            0                   (raw 0x00000000000000000000)
+fctrl          0x37f               895
+fstat          0x0                 0
+ftag           0xffff              65535
+--Type <RET> for more, q to quit, c to continue without paging--
+fiseg          0x0                 0
+fioff          0x0                 0
+foseg          0x0                 0
+fooff          0x0                 0
+fop            0x0                 0
+mxcsr          0x1f80              [ IM DM ZM OM UM PM ]
+ymm0           {v16_bfloat16 = {0x0 <repeats 16 times>}, v16_half = {0x0 <repeats 16 times>}, v8_float = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_double = {0x0, 0x0, 0x0, 0x0}, v32_int8 = {0x0 <repeats 32 times>}, v16_int16 = {0x0 <repeats 16 times>}, v8_int32 = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_int64 = {0x0, 0x0, 0x0, 0x0}, v2_int128 = {0x0, 0x0}}
+ymm1           {v16_bfloat16 = {0x0 <repeats 16 times>}, v16_half = {0x0 <repeats 16 times>}, v8_float = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_double = {0x0, 0x0, 0x0, 0x0}, v32_int8 = {0x0 <repeats 32 times>}, v16_int16 = {0x0 <repeats 16 times>}, v8_int32 = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_int64 = {0x0, 0x0, 0x0, 0x0}, v2_int128 = {0x0, 0x0}}
+ymm2           {v16_bfloat16 = {0x0 <repeats 16 times>}, v16_half = {0x0 <repeats 16 times>}, v8_float = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_double = {0x0, 0x0, 0x0, 0x0}, v32_int8 = {0x0 <repeats 32 times>}, v16_int16 = {0x0 <repeats 16 times>}, v8_int32 = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_int64 = {0x0, 0x0, 0x0, 0x0}, v2_int128 = {0x0, 0x0}}
+ymm3           {v16_bfloat16 = {0x0 <repeats 16 times>}, v16_half = {0x0 <repeats 16 times>}, v8_float = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_double = {0x0, 0x0, 0x0, 0x0}, v32_int8 = {0x0 <repeats 32 times>}, v16_int16 = {0x0 <repeats 16 times>}, v8_int32 = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_int64 = {0x0, 0x0, 0x0, 0x0}, v2_int128 = {0x0, 0x0}}
+ymm4           {v16_bfloat16 = {0x0 <repeats 16 times>}, v16_half = {0x0 <repeats 16 times>}, v8_float = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_double = {0x0, 0x0, 0x0, 0x0}, v32_int8 = {0x0 <repeats 32 times>}, v16_int16 = {0x0 <repeats 16 times>}, v8_int32 = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_int64 = {0x0, 0x0, 0x0, 0x0}, v2_int128 = {0x0, 0x0}}
+ymm5           {v16_bfloat16 = {0x0 <repeats 16 times>}, v16_half = {0x0 <repeats 16 times>}, v8_float = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_double = {0x0, 0x0, 0x0, 0x0}, v32_int8 = {0x0 <repeats 32 times>}, v16_int16 = {0x0 <repeats 16 times>}, v8_int32 = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_int64 = {0x0, 0x0, 0x0, 0x0}, v2_int128 = {0x0, 0x0}}
+ymm6           {v16_bfloat16 = {0x0 <repeats 16 times>}, v16_half = {0x0 <repeats 16 times>}, v8_float = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_double = {0x0, 0x0, 0x0, 0x0}, v32_int8 = {0x0 <repeats 32 times>}, v16_int16 = {0x0 <repeats 16 times>}, v8_int32 = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_int64 = {0x0, 0x0, 0x0, 0x0}, v2_int128 = {0x0, 0x0}}
+ymm7           {v16_bfloat16 = {0x0 <repeats 16 times>}, v16_half = {0x0 <repeats 16 times>}, v8_float = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_double = {0x0, 0x0, 0x0, 0x0}, v32_int8 = {0x0 <repeats 32 times>}, v16_int16 = {0x0 <repe--Type <RET> for more, q to quit, c to continue without paging--
+ats 16 times>}, v8_int32 = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_int64 = {0x0, 0x0, 0x0, 0x0}, v2_int128 = {0x0, 0x0}}
+ymm8           {v16_bfloat16 = {0x0 <repeats 16 times>}, v16_half = {0x0 <repeats 16 times>}, v8_float = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_double = {0x0, 0x0, 0x0, 0x0}, v32_int8 = {0x0 <repeats 32 times>}, v16_int16 = {0x0 <repeats 16 times>}, v8_int32 = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_int64 = {0x0, 0x0, 0x0, 0x0}, v2_int128 = {0x0, 0x0}}
+ymm9           {v16_bfloat16 = {0x0 <repeats 16 times>}, v16_half = {0x0 <repeats 16 times>}, v8_float = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_double = {0x0, 0x0, 0x0, 0x0}, v32_int8 = {0x0 <repeats 32 times>}, v16_int16 = {0x0 <repeats 16 times>}, v8_int32 = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_int64 = {0x0, 0x0, 0x0, 0x0}, v2_int128 = {0x0, 0x0}}
+ymm10          {v16_bfloat16 = {0x0 <repeats 16 times>}, v16_half = {0x0 <repeats 16 times>}, v8_float = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_double = {0x0, 0x0, 0x0, 0x0}, v32_int8 = {0x0 <repeats 32 times>}, v16_int16 = {0x0 <repeats 16 times>}, v8_int32 = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_int64 = {0x0, 0x0, 0x0, 0x0}, v2_int128 = {0x0, 0x0}}
+ymm11          {v16_bfloat16 = {0x0 <repeats 16 times>}, v16_half = {0x0 <repeats 16 times>}, v8_float = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_double = {0x0, 0x0, 0x0, 0x0}, v32_int8 = {0x0 <repeats 32 times>}, v16_int16 = {0x0 <repeats 16 times>}, v8_int32 = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_int64 = {0x0, 0x0, 0x0, 0x0}, v2_int128 = {0x0, 0x0}}
+ymm12          {v16_bfloat16 = {0x0 <repeats 16 times>}, v16_half = {0x0 <repeats 16 times>}, v8_float = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_double = {0x0, 0x0, 0x0, 0x0}, v32_int8 = {0x0 <repeats 32 times>}, v16_int16 = {0x0 <repeats 16 times>}, v8_int32 = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_int64 = {0x0, 0x0, 0x0, 0x0}, v2_int128 = {0x0, 0x0}}
+ymm13          {v16_bfloat16 = {0x0 <repeats 16 times>}, v16_half = {0x0 <repeats 16 times>}, v8_float = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_double = {0x0, 0x0, 0x0, 0x0}, v32_int8 = {0x0 <repeats 32 times>}, v16_int16 = {0x0 <repeats 16 times>}, v8_int32 = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_int64 = {0x0, 0x0, 0x0, 0x0}, v2_int128 = {0x0, 0x0}}
+ymm14          {v16_bfloat16 = {0x0 <repeats 16 times>}, v16_half = {0x0 <repeats 16 times>}, v8_float = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_double = {0x0, 0x0, 0x0, 0x0}, v32_int8 = {0x0 <repeats 32 times>}, v16_int16 = {0x0 <repeats 16 times>}, v8_int32 = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_int64 = {0x0, 0x0, 0x0, 0x0}, v2_int128 = {0x0, 0x0}}
+ymm15          {v16_bfloat16 = {0x0 <repeats 16 times>}, v16_half = {0x0 <repeats 16 times>}, v8_float = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_double = {0x0, 0x0, 0x0, 0x0}, v32_int8 = {0x0 <repeats 32 times>}, v16_int16 = {0x0 <repeats 16 times>}, v8_int32 = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, v4_int64 = {0x0, 0x0, 0x0, 0x0}, v2_int128 = {0x0, 0x0}}
+
+
+Ок, давай именно **с точки зрения практики ASM на твоём x86-64 (Ryzen 7 5700X) под Linux**: какие регистры “у тебя есть” и **для чего каждый**, включая **правила ABI**, чтобы не стрелять себе в ногу.
+
+Ниже — *то, чем ты реально пользуешься в user-space*.
+
+---
+
+## 1) 16 регистров общего назначения (GPR): что это и “персонально каждый”
+
+Все они 64-битные: `RAX RBX RCX RDX RSI RDI RBP RSP R8–R15`
+У каждого есть “младшие части”:
+
+* 32 бита: `EAX` … (запись в `EAX` **обнуляет верхние 32 бита** `RAX`)
+* 16 б: `AX`
+* 8 б: `AL/AH` (и ещё `SIL/DIL/BPL/SPL`, `R8B`… и т.д.)
+
+### RAX — аккумулятор + *return value*
+
+* Часто используется арифметикой/инструкциями по умолчанию.
+* **Возврат значения функции**: `RAX` (и иногда `RDX:RAX` для 128-битного результата).
+* Для `syscall` на Linux: **номер системного вызова** кладут в `RAX`.
+
+### RBX — “база”, **callee-saved**
+
+* По ABI (SysV): если функция использует `RBX`, она обязана **сохранить/восстановить**.
+* Удобен как “долгоживущий” регистр в функции.
+
+### RCX — счетчик / *4-й аргумент* / “cl”
+
+* Исторически “count register”: сдвиги типа `shl rax, cl`.
+* В SysV ABI: **4-й аргумент функции** идёт в `RCX`.
+* Но многие инструкции/ABI могут считать его “удобным временным”.
+
+### RDX — *3-й аргумент* / расширение результата / I/O
+
+* SysV: **3-й аргумент** в `RDX`.
+* Для умножения/деления часто используется парой с `RAX` (например, `mul/div`).
+
+### RSI — *2-й аргумент* / источник строковых инструкций
+
+* SysV: **2-й аргумент** в `RSI`.
+* В `rep movsb/stosb/cmpsb`: обычно **source**.
+
+### RDI — *1-й аргумент* / назначение строковых инструкций
+
+* SysV: **1-й аргумент** в `RDI`.
+* В строковых: обычно **destination**.
+
+### RBP — “frame pointer”, **callee-saved**
+
+* Традиционно база кадра стека (если компилятор/ты используешь frame pointer).
+* Можно использовать как обычный регистр, но если ты строишь стек-фрейм “по классике”, то это **якорь** для локальных/параметров.
+
+### RSP — указатель стека (stack pointer)
+
+* **Священный**. Почти любые вызовы/возвраты завязаны на него.
+* Выравнивание важно: на SysV x86-64 перед `call` обычно держат стек так, чтобы внутри вызываемой функции было удобно иметь 16-байтное выравнивание для SIMD.
+
+### R8, R9 — *5-й и 6-й аргументы*
+
+* SysV: **5-й → R8**, **6-й → R9**.
+
+### R10, R11 — временные, часто “рабочие” (caller-saved)
+
+* SysV: caller-saved → вызывающий обязан сохранять, если ему нужно значение после `call`.
+* На Linux `syscall`: `RCX` и `R11` **затираются** (это прям важное правило).
+
+### R12, R13, R14, R15 — “долгоживущие”, **callee-saved**
+
+* Отличные “персональные переменные” функции: сохранил в прологе → живут всю функцию.
+* ABI требует восстановить.
+
+---
+
+## 2) RIP и RFLAGS (EFLAGS): “где я” и “что произошло”
+
+### RIP — instruction pointer
+
+* Адрес текущей инструкции.
+* Нельзя “просто так” записать `mov rip, ...`, но можно менять через `jmp/call/ret` и RIP-relative адресацию (`lea rax, [rel label]` и т.п.).
+
+### RFLAGS / EFLAGS — флаги результата
+
+Самые практичные:
+
+* `ZF` (zero) — результат ноль? (`je/jz`)
+* `SF` (sign) — знак
+* `CF` (carry) — перенос/заём (важно для unsigned)
+* `OF` (overflow) — переполнение (важно для signed)
+* `PF` (parity) — редко нужно
+* `IF` — прерывания (в user-space не трогаешь)
+
+Ты их используешь не напрямую, а через:
+
+* условные переходы `jz/jnz/ja/jb/jg/jl/...`
+* `setcc` (записать 0/1 в байтовый регистр)
+* `cmovcc` (условное перемещение)
+
+---
+
+## 3) Сегментные регистры: CS/SS/DS/ES/FS/GS (в 64-битном режиме)
+
+В 64-битном Linux обычно:
+
+* `CS/SS` — технические селекторы режима.
+* `DS/ES` почти не используются.
+* **FS/GS реально важны**: через них ядро/рантайм держит TLS (thread-local storage).
+
+  * То есть `fs:[...]` или `gs:[...]` может быть “доступ к данным потока” (errno, pthread stuff и т.п.).
+  * Обычно руками их не меняют в обычном приложении.
+
+---
+
+## 4) SIMD / векторные регистры: XMM и YMM (у тебя точно есть)
+
+Твой CPU поддерживает SSE… и AVX2, значит:
+
+### XMM0–XMM15 (128-bit)
+
+* `xmm` — float/double/инт-векторные операции, ускорение.
+* В SysV ABI: **возврат float/double** часто идёт через `XMM0`.
+
+### YMM0–YMM15 (256-bit)
+
+* Это “расширение” XMM: нижние 128 бит YMM == XMM.
+* Для AVX/AVX2 (векторные int/float операции).
+
+**ABI-правило важное:** XMM/YMM в SysV обычно **caller-saved** (то есть если зовёшь функцию — не рассчитывай, что они сохранятся, если ты сам не сохранил).
+
+### MXCSR
+
+* Регистр управления SIMD-округлением/масками исключений для SSE/AVX.
+* Иногда нужен для контроля округления/denormals, но редко в прикладном ASM.
+
+---
+
+## 5) x87 FPU: ST0–ST7 (обычно не нужно, но существует)
+
+* `st0..st7` — стековый FPU.
+* Исторический, сейчас почти всё делают через SSE/AVX.
+* Но может встретиться в старом коде/инструкциях.
+
+---
+
+## 6) “Регистры, которые вроде есть, но в user-space ты ими не программируешь”
+
+Это уже уровень ОС/ядра/гипервизора:
+
+* `CR0..CR8` (control)
+* `DR0..DR7` (debug аппаратные брейкпоинты)
+* `GDTR/IDTR/LDTR/TR`
+* MSR (model-specific registers)
+
+Они есть у процессора, но обычная программа не имеет права ими рулить.
+
+---
+
+## 7) Самое прикладное: как запомнить “кто для чего” под SysV ABI (Linux)
+
+### Аргументы функции (целые/указатели):
+
+1. `RDI`
+2. `RSI`
+3. `RDX`
+4. `RCX`
+5. `R8`
+6. `R9`
+   Дальше — в стеке.
+
+### Возврат:
+
+* целое/указатель: `RAX`
+* float/double: `XMM0`
+
+### Кто обязан сохранять (callee-saved):
+
+`RBX RBP R12 R13 R14 R15` (и конечно `RSP`)
+
+### Кто считается “временным” (caller-saved):
+
+`RAX RCX RDX RSI RDI R8 R9 R10 R11` (+ обычно XMM/YMM)
+
+---
+
+## 8) Как тебе “полный список для твоей машины” вывести командами
+
+Ты уже видел через GDB. Можно просто получить **имена** регистров, которые знает GDB:
+
+```bash
+gdb -q ./hello -ex "starti" -ex "info registers all" -ex "quit"
+```
+
+А если хочешь именно “какие SIMD доступны”, то проще всего по флагам:
+
+* есть `avx2` → `ymm0-15`
+* нет `avx512*` → нет `zmm/k`
+
+---
+
+Если хочешь, я могу сделать для тебя **короткую “шпаргалку под NASM/GAS”**: таблица “регистр → роль в ABI → сохранять? → типичный юзкейс → примеры инструкций”, чтобы ты держал её рядом при написании своего ASM. Скажи только: ты пишешь под **NASM** или **GAS (AT&T/Intel syntax в as)**?
+
+Ок, тогда вот **практическая шпаргалка под NASM** именно для твоего случая: **Linux x86-64 (SysV ABI) + Ryzen 7 5700X (AVX2 есть)**.
+
+---
+
+## 0) “Какие регистры у меня есть” (в user-space)
+
+### Ты реально программируешь:
+
+**GPR (16):**
+`rax rbx rcx rdx rsi rdi rbp rsp r8 r9 r10 r11 r12 r13 r14 r15`
+
+**Управляющие/служебные:**
+`rip` (указатель инструкции), `rflags` (флаги)
+
+**Сегменты (почти всегда не трогаешь руками):**
+`cs ss ds es fs gs` (важны `fs/gs` для TLS)
+
+**SIMD:**
+
+* `xmm0..xmm15` (SSE, 128 бит)
+* `ymm0..ymm15` (AVX/AVX2, 256 бит) — у тебя **есть**
+* `zmm/k` (AVX-512) — у тебя **нет**
+
+**x87:**
+`st0..st7` + `fctrl/fstat/...` (обычно не нужен)
+
+### Что “есть в CPU”, но недоступно обычной программе:
+
+`cr0..cr8`, `dr0..dr7`, `gdtr/idtr/…`, MSR и т.д. — это ring0.
+
+---
+
+## 1) Самое важное для NASM: SysV ABI (Linux) — кто что делает
+
+### 1.1 Аргументы функции (целые/указатели)
+
+1. `rdi`
+2. `rsi`
+3. `rdx`
+4. `rcx`
+5. `r8`
+6. `r9`
+   Дальше — стек.
+
+### 1.2 Возврат значения
+
+* целое/указатель: `rax`
+* 128-бит (редко): `rdx:rax`
+* float/double: `xmm0`
+
+### 1.3 Кто обязан сохранять (callee-saved)
+
+Если **твоя функция** портит эти регистры — **сохрани и восстанови**:
+`rbx rbp r12 r13 r14 r15` (+ конечно, аккуратно с `rsp`)
+
+### 1.4 Кто “одноразовый” (caller-saved)
+
+Их может затереть любая вызванная функция:
+`rax rcx rdx rsi rdi r8 r9 r10 r11`
+`xmm0..xmm15` / `ymm0..ymm15` тоже считай caller-saved.
+
+---
+
+## 2) “Персонально каждый” GPR — роль и типичное применение
+
+### `rax` — результат / аккумулятор
+
+* return value из функции
+* многие инструкции по умолчанию используют `rax` (`mul/div` и т.п.)
+* часто лучший “рабочий” регистр
+
+### `rbx` — долгоживущий (callee-saved)
+
+* храни указатель/состояние, которое нужно всю функцию
+* **не забудь push/pop** если трогаешь
+
+### `rcx` — 4-й аргумент + “счётчик”
+
+* 4-й аргумент по ABI
+* `shl rax, cl` и подобные используют `cl`
+* в `rep`-инструкциях исторически счётчик — `rcx`
+
+### `rdx` — 3-й аргумент + старшая часть для mul/div
+
+* 3-й аргумент по ABI
+* в делении/умножении часто участвует как пара к `rax`
+
+### `rsi` — 2-й аргумент + source для строковых
+
+* 2-й аргумент
+* в `rep movsb`: источник (`rsi`)
+
+### `rdi` — 1-й аргумент + destination для строковых
+
+* 1-й аргумент
+* в `rep movsb`: назначение (`rdi`)
+
+### `rbp` — frame pointer (callee-saved)
+
+* если делаешь “классический” стек-фрейм: `push rbp / mov rbp,rsp`
+* можно использовать как обычный регистр, но удобен как база локальных
+
+### `rsp` — стек
+
+* должен всегда указывать на валидный стек
+* важно выравнивание (см. ниже)
+
+### `r8` / `r9` — 5-й / 6-й аргумент
+
+* просто дополнительные аргументные регистры
+
+### `r10` / `r11` — быстрые временные
+
+* удобны как scratch
+* часто используются в системных вызовах/плацдармах, поэтому не держи в них “ценное” через `call`
+
+### `r12` `r13` `r14` `r15` — долгоживущие (callee-saved)
+
+* идеальные “переменные” функции
+* но сохраняй/восстанавливай
+
+---
+
+## 3) Части регистров (важно в NASM)
+
+Пример на `rax`:
+
+* `rax` (64)
+* `eax` (32) — запись **обнуляет** старшие 32 бита `rax`
+* `ax` (16)
+* `al` (8 младших)
+* `ah` (8 старших из младших 16) — осторожно, с “high 8-bit” есть нюансы в некоторых кодогенераторах, но в NASM ок.
+
+Для `rsi/rdi/rbp/rsp` есть 8-битные имена: `sil dil bpl spl`.
+
+Для `r8..r15`: `r8d/r8w/r8b` и т.д.
+
+---
+
+## 4) RFLAGS: какие флаги тебе реально нужны
+
+* `ZF`: `je/jz` (равно/ноль)
+* `CF`: `ja/jb` для unsigned сравнений
+* `SF/OF`: `jg/jl` для signed сравнений
+
+Запомнить просто:
+
+* unsigned: `ja/jb/jae/jbe`
+* signed: `jg/jl/jge/jle`
+* равенство: `je/jne`
+
+---
+
+## 5) SIMD на твоём Ryzen: XMM/YMM — когда и как думать
+
+* `xmm0..xmm15` — 128-бит
+* `ymm0..ymm15` — 256-бит (AVX/AVX2)
+
+Если ты начнёшь писать AVX2-код, держи правило:
+
+* **не полагайся**, что `ymm` переживут вызов `call` (сохраняй сам, если нужно).
+* Если смешиваешь SSE и AVX, иногда вставляют `vzeroupper` перед вызовами/переходами, чтобы не словить штраф перехода (это тонкость производительности).
+
+---
+
+## 6) Выравнивание стека (очень практично)
+
+На SysV x86-64 обычно стараются, чтобы **перед `call`** стек был выровнен на 16 байт.
+Мини-правило для себя:
+
+* Если делаешь пролог `push rbp` — `rsp` сдвинулся на 8.
+* Значит, если ты потом делаешь ещё `push` (каждый тоже -8) или `sub rsp, N`, следи, чтобы к моменту `call` выравнивание было корректным.
+
+Если ты пока не зовёшь чужие функции и не используешь инструкции, требующие строгого выравнивания — можно жить проще, но лучше сразу привыкать правильно.
+
+---
+
+## 7) Мини-пример NASM: функция с правильным обращением к регистрам
+
+```nasm
+; SysV: a in rdi, b in rsi, return in rax
+global add2
+add2:
+    ; caller-saved regs можно портить свободно
+    mov     rax, rdi
+    add     rax, rsi
+    ret
+```
+
+Пример с callee-saved:
+
+```nasm
+global f
+f:
+    push    rbx            ; сохраняем callee-saved
+    mov     rbx, rdi       ; используем rbx как долгоживущий
+    ; ...
+    mov     rax, rbx
+    pop     rbx
+    ret
+```
+
+---
+
+## 8) Как “в один взгляд” увидеть у себя все регистры в GDB (то, что доступно потоку)
+
+Ты уже сделал, но вот коротко:
+
+```bash
+gdb -q ./hello -ex "starti" -ex "info registers all" -ex "quit"
+```
+
+Это и есть полный набор **для программирования в user-space**, плюс векторные/x87.
+
+---
+
+Если хочешь — я сделаю **идеальную шпаргалку на 1 экран** (в стиле “таблица регистров” + “ABI правила” + “части регистров” + “условные переходы”), чтобы ты прямо рядом с NASM держал.
+Скажи только: ты хочешь шпаргалку **под функции (ABI)** или **под syscalls (Linux syscall ABI)** — или обе?
+
+
+g++ -O2 -S -masm=intel -fverbose-asm hello.cpp

@@ -1,0 +1,7 @@
+.git/
+
+# build artifacts
+*.o
+
+# windows binaries
+*.exe

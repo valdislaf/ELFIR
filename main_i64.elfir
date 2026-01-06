@@ -1,0 +1,5 @@
+fn main_i64() {
+    auto a = 1 + 2;
+    auto b = a + 10;
+    ret b + 5;
+}

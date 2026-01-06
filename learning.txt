@@ -1,0 +1,473 @@
+I. Архитектура и платформа
+
+x86-64 / AMD64
+
+64-битная архитектура процессоров AMD и Intel
+
+регистры: RAX–R15, RIP, RSP
+
+режимы: long mode, compatibility mode
+
+Ryzen / Intel (микроархитектура)
+
+различия в производительности, latency инструкций
+
+одинаковый ISA (Instruction Set Architecture)
+
+ISA (Instruction Set Architecture)
+
+набор инструкций, видимых программисту
+
+SSE, AVX, AVX2, FMA, AES и т.д.
+
+WSL1 vs WSL2
+
+WSL1 — системные вызовы транслируются
+
+WSL2 — реальное Linux-ядро (VM)
+
+отличие в совместимости ELF и perf/debug
+
+II. Формат исполняемых файлов
+
+ELF (Executable and Linkable Format)
+
+стандартный формат бинарников в Linux
+
+типы: ET_EXEC, ET_DYN, ET_REL
+
+ELF64
+
+64-битная версия ELF
+
+адреса, заголовки, таблицы
+
+Sections (секции ELF)
+
+.text, .rodata, .data, .bss
+
+.plt, .got, .rela.plt
+
+Segments (програмные сегменты)
+
+LOAD, DYNAMIC, INTERP
+
+отличие секций от сегментов
+
+Relocations (релокации)
+
+R_X86_64_PC32
+
+R_X86_64_GOTPCREL
+
+зачем нужны и кто их применяет
+
+III. PIC / PIE / адресация
+
+PIC (Position Independent Code)
+
+код, не зависящий от абсолютных адресов
+
+используется в shared libraries (.so)
+
+PIE (Position Independent Executable)
+
+исполняемый файл, загружаемый по случайному адресу
+
+ASLR, безопасность
+
+ASLR (Address Space Layout Randomization)
+
+рандомизация адресов в памяти
+
+защита от exploit’ов
+
+RIP-relative addressing
+
+адресация относительно RIP
+
+lea rdi, [rel msg]
+
+default rel (NASM)
+
+директива синтаксиса
+
+не равно PIE
+
+IV. Линковка и динамическая загрузка
+
+Static linking
+
+всё включено в бинарник
+
+большой размер, нет libc.so
+
+Dynamic linking
+
+libc, ld-linux, shared libraries
+
+загрузка во время запуска
+
+ld (linker)
+
+связывает объектные файлы
+
+создаёт ELF
+
+gcc как драйвер
+
+gcc ≠ компилятор
+
+вызывает as, ld, collect2
+
+Dynamic Loader (ld-linux-x86-64.so.2)
+
+загружает .so
+
+резолвит символы
+
+V. PLT / GOT / символы
+
+Symbol (символ)
+
+имя функции/переменной
+
+локальный / глобальный / undefined
+
+PLT (Procedure Linkage Table)
+
+таблица переходов для функций
+
+puts@plt
+
+GOT (Global Offset Table)
+
+таблица адресов
+
+используется вместе с PLT
+
+Lazy binding
+
+функция резолвится при первом вызове
+
+wrt ..plt / @plt (NASM)
+
+явный вызов через PLT
+
+обязателен для PIE
+
+VI. ABI и соглашения вызовов
+
+ABI (Application Binary Interface)
+
+бинарный контракт
+
+регистры, стек, выравнивание
+
+SysV x86-64 ABI
+
+стандарт Linux для x86-64
+
+Calling Convention
+
+RDI, RSI, RDX, RCX, R8, R9
+
+return → RAX
+
+Stack alignment
+
+16-байтное выравнивание перед call
+
+критично для SSE/AVX
+
+Red Zone
+
+128 байт под RSP (Linux)
+
+отсутствует в Windows ABI
+
+VII. Variadic и связанные нюансы
+
+Variadic functions
+
+функции с переменным числом аргументов
+
+printf, scanf
+
+AL / EAX for variadic
+
+количество XMM-регистров
+
+обязательное обнуление AL
+
+puts vs printf
+
+puts — не variadic
+
+printf — variadic
+
+VIII. Ассемблеры и синтаксис
+
+NASM
+
+Intel syntax
+
+default rel, wrt
+
+GAS (GNU as)
+
+AT&T syntax
+
+.intel_syntax noprefix
+
+Intel vs AT&T syntax
+
+порядок операндов
+
+префиксы %, $
+
+IX. Отладка и анализ
+
+objdump
+
+дизассемблирование
+
+просмотр PLT/GOT
+
+readelf
+
+структура ELF
+
+релокации, сегменты
+
+ldd
+
+динамические зависимости
+
+gdb
+
+пошаговая отладка
+
+ABI, стек, регистры
+
+strace
+
+системные вызовы
+
+X. Оптимизация и переносимость
+
+-march / -mtune
+
+ISA vs микроархитектура
+
+-march=native
+
+максимум под текущий CPU
+
+минус переносимость
+
+Illegal instruction
+
+инструкция не поддерживается CPU
+
+Как с этим работать дальше (рекомендация)
+
+Лучший порядок изучения:
+
+1️ELF → Sections → Segments
+2️ABI → Calling Convention → Stack
+3️PIC → PLT/GOT → PIE
+4️Variadic → AL/EAX → SSE/AVX
+5️Dynamic loader → ASLR
+6️Отладка (objdump + gdb)
+
+XI. Интернет-ресурсы, документация и теория
+1️База: архитектура, ABI, ELF (ОБЯЗАТЕЛЬНО)
+System V AMD64 ABI (официальная спецификация)
+
+Канон. Без него — никуда.
+
+https://refspecs.linuxfoundation.org/elf64-gen.pdf
+
+https://refspecs.linuxfoundation.org/elf/x86_64-abi-0.99.pdf
+
+Что даёт:
+
+ABI целиком
+
+calling convention
+
+variadic (AL/EAX)
+
+стек, red zone
+
+ELF-релокации
+
+Это источник истины, всё остальное — интерпретации.
+
+OSDev Wiki — System V x86-64 ABI
+
+https://wiki.osdev.org/System_V_ABI
+
+Что даёт:
+
+упрощённое объяснение ABI
+
+хорошие таблицы регистров
+
+практическая интерпретация спецификации
+
+Отлично после официального PDF.
+
+2️ELF, PIE, PIC, PLT, GOT (ключевая теория)
+Eli Bendersky — PIE / PLT / GOT (лучшее объяснение в сети)
+
+Очень рекомендую.
+
+https://eli.thegreenplace.net/2013/08/04/position-independent-executables-plt-got/
+
+https://eli.thegreenplace.net/2011/11/03/position-independent-code-pic-in-shared-libraries
+
+Что даёт:
+
+как реально работает PLT/GOT
+
+lazy binding
+
+разницу PIC vs PIE
+
+схемы, понятные без магии
+
+Если прочитать ТОЛЬКО ОДИН материал про PLT — это он.
+
+Linux Foundation — ELF и линковка
+
+https://www.linuxfoundation.org/resources/publications/
+
+(искать по “ELF”, “linker”, “ABI”)
+
+3️NASM и ассемблер
+Официальная документация NASM
+
+https://www.nasm.us/doc/
+
+Ключевые разделы:
+
+default rel
+
+wrt
+
+object formats (elf64)
+
+extern / global
+
+NASM имеет свою модель релокаций, отличную от GAS.
+
+NASM Tutorial (Practical)
+
+https://cs.lmu.edu/~ray/notes/nasmtutorial/
+
+Хорош для:
+
+первых шагов
+
+связи NASM ↔ C
+
+понимания, как всё реально собирается
+
+4️GAS / AT&T syntax (для сравнения)
+GNU Assembler Manual
+
+https://sourceware.org/binutils/docs/as/
+
+Intel syntax в GAS
+
+https://sourceware.org/binutils/docs/as/i386_002dDependent.html
+
+Полезно, если будешь читать чужие .s файлы.
+
+5️Variadic, ABI и низкоуровневые нюансы
+“x86-64 calling conventions” (Agner Fog)
+
+https://www.agner.org/optimize/calling_conventions.pdf
+
+Что даёт:
+
+variadic
+
+регистры XMM
+
+AL/EAX
+
+производительность вызовов
+
+Очень инженерный, точный документ.
+
+6️Линковка, gcc, ld, динамический загрузчик
+GNU ld manual
+
+https://sourceware.org/binutils/docs/ld/
+
+“How programs get run” (dynamic loader)
+
+https://lwn.net/Articles/631631/
+
+man-страницы (обязательно локально)
+man ld
+man gcc
+man elf
+man dlopen
+man ld.so
+
+7️Практика и анализ бинарников
+Linux Binary Analysis
+
+https://linux-audit.com/elf-binaries-on-linux-understanding-and-analysis/
+
+Reverse engineering basics (ELF)
+
+https://lief.quarkslab.com/doc/latest/tutorials/02_elf.html
+
+8️Отладка и интроспекция
+GDB documentation
+
+https://sourceware.org/gdb/documentation/
+
+Debugging with GDB (книга, онлайн)
+
+https://sourceware.org/gdb/onlinedocs/gdb/
+
+strace
+
+https://man7.org/linux/man-pages/man1/strace.1.html
+
+9️Безопасность, ASLR, PIE
+ASLR explained
+
+https://lwn.net/Articles/91829/
+
+PIE security overview
+
+https://www.redhat.com/en/blog/hardening-elf-binaries-using-pie
+
+Видео и курсы (если хочется «послушать»)
+“How ELF works” — LiveOverflow
+
+YouTube (канал LiveOverflow)
+
+“Linkers and Loaders” — LLVM Dev
+
+YouTube, конференционные доклады
+
+Как этим пользоваться (рекомендация)
+Минимальный маршрут (очень правильный):
+
+ELF64 + ABI PDF
+
+Eli Bendersky (PLT/GOT/PIE)
+
+NASM manual
+
+Agner Fog (variadic, ABI)
+
+objdump/readelf/gdb на своём бинарнике
