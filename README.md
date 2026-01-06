@@ -80,8 +80,8 @@ Expected output:
 
 ```elfir
 fn main_i64() {
-    auto x = 3 + 7;
-    ret x;
+    auto x = 3 + 7 * 2;
+    ret -x;
 }
 ```
 
@@ -89,7 +89,10 @@ fn main_i64() {
 
 - `auto` declares a variable (always signed i64).
 - `ret <expr>;` returns the expression value in `rax`.
-- `+` performs signed i64 addition (hardware wrap-around).
+- Operators: `+`, `-`, `*`, `/` with standard precedence and left associativity.
+- Unary minus is supported: `-x` is parsed as `0 - x`.
+- `()` can be used to group expressions.
+- Numeric literals are decimal digits only; a leading `-` is parsed as unary minus.
 
 There are no unsigned types, no implicit casts, and no multiple integer sizes in v0.
 
@@ -103,7 +106,5 @@ There are no unsigned types, no implicit casts, and no multiple integer sizes in
 
 ## Planned Extensions (Ideas)
 
-- negative numeric literals (`-7`)
 - `print <expr>;` inside function bodies
-- parentheses in expressions
 - multiple functions and function calls
