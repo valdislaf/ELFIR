@@ -1,0 +1,5 @@
+fn main_i64() {
+    auto a = 5;
+    auto b = 7;
+    ret (a < b) == 1;
+}

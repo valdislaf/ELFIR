@@ -1,0 +1,5 @@
+fn main_d64() {
+    auto a = 1.25;
+    auto b = 1.25;
+    ret (a == b) != 0.0;
+}

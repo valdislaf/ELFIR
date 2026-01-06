@@ -14,3 +14,43 @@ nasm -felf64 out.asm -o out.o
 nasm -felf64 runtime.asm -o runtime.o
 ld out.o runtime.o -o prog
 ./prog
+
+./elfirc main_d64_big.elfir out.asm
+nasm -felf64 out.asm -o out.o
+nasm -felf64 runtime.asm -o runtime.o
+ld out.o runtime.o -o prog
+./prog
+
+./elfirc main_d64_small.elfir out.asm
+nasm -felf64 out.asm -o out.o
+nasm -felf64 runtime.asm -o runtime.o
+ld out.o runtime.o -o prog
+./prog
+
+./elfirc main_d64_nan.elfir out.asm
+nasm -felf64 out.asm -o out.o
+nasm -felf64 runtime.asm -o runtime.o
+ld out.o runtime.o -o prog
+./prog
+
+./elfirc main_d64_inf.elfir out.asm
+nasm -felf64 out.asm -o out.o
+nasm -felf64 runtime.asm -o runtime.o
+ld out.o runtime.o -o prog
+./prog
+
+
+g++ -std=c++20 -O2 -Wall -Wextra -pedantic elfirc.cpp -o elfirc
+
+./elfirc main_i64_cmp.elfir out.asm
+nasm -felf64 out.asm -o out.o
+nasm -felf64 runtime.asm -o runtime.o
+ld out.o runtime.o -o prog
+./prog
+
+./elfirc main_d64_cmp.elfir out.asm
+nasm -felf64 out.asm -o out.o
+nasm -felf64 runtime.asm -o runtime.o
+ld out.o runtime.o -o prog
+./prog
+

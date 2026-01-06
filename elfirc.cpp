@@ -32,6 +32,12 @@ enum class TokKind {
     Slash,
     Plus,
     Minus,
+    EqEq,
+    NotEq,
+    Lt,
+    Le,
+    Gt,
+    Ge,
 };
 
 struct Tok {
@@ -96,7 +102,7 @@ public:
             return t;
         }
 
-        // single-char tokens
+        // operators and punctuators
         i_++;
         switch (c) {
             case '(': t.kind = TokKind::LParen; return t;
@@ -104,11 +110,22 @@ public:
             case '{': t.kind = TokKind::LBrace; return t;
             case '}': t.kind = TokKind::RBrace; return t;
             case ';': t.kind = TokKind::Semicolon; return t;
-            case '=': t.kind = TokKind::Equal; return t;
+            case '=':
+                if (i_ < s_.size() && s_[i_] == '=') { i_++; t.kind = TokKind::EqEq; return t; }
+                t.kind = TokKind::Equal; return t;
             case '*': t.kind = TokKind::Star;  return t;
             case '/': t.kind = TokKind::Slash; return t;
             case '+': t.kind = TokKind::Plus; return t;
             case '-': t.kind = TokKind::Minus; return t;
+            case '!':
+                if (i_ < s_.size() && s_[i_] == '=') { i_++; t.kind = TokKind::NotEq; return t; }
+                throw Error(std::string("Unexpected character '") + c + "' at position " + std::to_string(t.pos));
+            case '<':
+                if (i_ < s_.size() && s_[i_] == '=') { i_++; t.kind = TokKind::Le; return t; }
+                t.kind = TokKind::Lt; return t;
+            case '>':
+                if (i_ < s_.size() && s_[i_] == '=') { i_++; t.kind = TokKind::Ge; return t; }
+                t.kind = TokKind::Gt; return t;
             default:
                 throw Error(std::string("Unexpected character '") + c + "' at position " + std::to_string(t.pos));
         }
@@ -130,7 +147,8 @@ private:
 
 // AST (минимально)
 struct Expr {
-    enum class Kind { Num, Var, Add, Sub, Mul, Div } kind;
+    enum class Kind { Num, Var, Add, Sub, Mul, Div, Cmp, And } kind;
+    enum class CmpOp { Eq, Ne, Lt, Le, Gt, Ge } cmpOp;
     std::string numText;
     std::string var;
     std::unique_ptr<Expr> lhs, rhs;
@@ -158,6 +176,14 @@ struct Expr {
     static std::unique_ptr<Expr> makeSub(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
         auto e = std::make_unique<Expr>();
         e->kind = Kind::Sub; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeCmp(CmpOp op, std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Cmp; e->cmpOp = op; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeAnd(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::And; e->lhs = std::move(a); e->rhs = std::move(b); return e;
     }
 };
 
@@ -210,7 +236,7 @@ private:
             advance();
             std::string var = expectIdent("Expected identifier after 'auto'");
             expect(TokKind::Equal, "Expected '=' after variable name");
-            auto e = parseExpr();
+            auto e = parseComparison();
             expect(TokKind::Semicolon, "Expected ';' after assignment");
             Stmt st;
             st.kind = Stmt::Kind::AutoAssign;
@@ -221,7 +247,7 @@ private:
 
         if (cur_.kind == TokKind::KwRet) {
             advance();
-            auto e = parseExpr();
+            auto e = parseComparison();
             expect(TokKind::Semicolon, "Expected ';' after ret expression");
             Stmt st;
             st.kind = Stmt::Kind::Ret;
@@ -246,7 +272,7 @@ private:
         }
         if (cur_.kind == TokKind::LParen) {
             advance();
-            auto e = parseExpr();
+            auto e = parseComparison();
             expect(TokKind::RParen, "Expected ')'");
             return e;
         }
@@ -287,6 +313,59 @@ private:
             else                    left = Expr::makeSub(std::move(left), std::move(right));
         }
         return left;
+    }
+
+    static std::unique_ptr<Expr> cloneExpr(const std::unique_ptr<Expr>& e) {
+        if (!e) return nullptr;
+        auto out = std::make_unique<Expr>();
+        out->kind = e->kind;
+        out->cmpOp = e->cmpOp;
+        out->numText = e->numText;
+        out->var = e->var;
+        out->lhs = cloneExpr(e->lhs);
+        out->rhs = cloneExpr(e->rhs);
+        return out;
+    }
+
+    static bool isCmpTok(TokKind k) {
+        return k == TokKind::EqEq || k == TokKind::NotEq || k == TokKind::Lt ||
+               k == TokKind::Le || k == TokKind::Gt || k == TokKind::Ge;
+    }
+
+    static Expr::CmpOp tokToCmpOp(TokKind k) {
+        switch (k) {
+            case TokKind::EqEq: return Expr::CmpOp::Eq;
+            case TokKind::NotEq: return Expr::CmpOp::Ne;
+            case TokKind::Lt: return Expr::CmpOp::Lt;
+            case TokKind::Le: return Expr::CmpOp::Le;
+            case TokKind::Gt: return Expr::CmpOp::Gt;
+            case TokKind::Ge: return Expr::CmpOp::Ge;
+            default: break;
+        }
+        throw Error("Internal: invalid comparison operator");
+    }
+
+    // comparison := expr ( (==|!=|<|<=|>|>=) expr )*
+    std::unique_ptr<Expr> parseComparison() {
+        auto left = parseExpr();
+        if (!isCmpTok(cur_.kind)) return left;
+
+        auto op = tokToCmpOp(cur_.kind);
+        advance();
+        auto right = parseExpr();
+        auto result = Expr::makeCmp(op, std::move(left), cloneExpr(right));
+        auto prev = std::move(right);
+
+        while (isCmpTok(cur_.kind)) {
+            op = tokToCmpOp(cur_.kind);
+            advance();
+            auto next = parseExpr();
+            auto cmp = Expr::makeCmp(op, cloneExpr(prev), cloneExpr(next));
+            result = Expr::makeAnd(std::move(result), std::move(cmp));
+            prev = std::move(next);
+        }
+
+        return result;
     }
 
     void advance() { cur_ = lex_.next(); }
@@ -419,6 +498,30 @@ static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e) 
             out << "    sub  rcx, rax\n";   // rcx = lhs - rhs
             out << "    mov  rax, rcx\n";   // rax = result
             return;
+        case K::Cmp: {
+            emitExprI64(out, cg, *e.lhs);
+            out << "    push rax\n";
+            emitExprI64(out, cg, *e.rhs);
+            out << "    pop  rcx\n";
+            out << "    cmp  rcx, rax\n";
+            switch (e.cmpOp) {
+                case Expr::CmpOp::Eq: out << "    sete al\n"; break;
+                case Expr::CmpOp::Ne: out << "    setne al\n"; break;
+                case Expr::CmpOp::Lt: out << "    setl al\n"; break;
+                case Expr::CmpOp::Le: out << "    setle al\n"; break;
+                case Expr::CmpOp::Gt: out << "    setg al\n"; break;
+                case Expr::CmpOp::Ge: out << "    setge al\n"; break;
+            }
+            out << "    movzx eax, al\n";
+            return;
+        }
+        case K::And:
+            emitExprI64(out, cg, *e.lhs);
+            out << "    push rax\n";
+            emitExprI64(out, cg, *e.rhs);
+            out << "    pop  rcx\n";
+            out << "    and  rax, rcx\n";
+            return;
 
     }
     throw Error("Internal: unknown expr kind");
@@ -475,6 +578,59 @@ static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e) 
             out << "    add  rsp, 8\n";
             out << "    subsd xmm1, xmm0\n";
             out << "    movapd xmm0, xmm1\n";
+            return;
+        case K::Cmp: {
+            emitExprD64(out, cg, *e.lhs);
+            out << "    sub  rsp, 8\n";
+            out << "    movsd [rsp], xmm0\n";
+            emitExprD64(out, cg, *e.rhs);
+            out << "    movsd xmm1, [rsp]\n";
+            out << "    add  rsp, 8\n";
+            out << "    ucomisd xmm1, xmm0\n";
+            switch (e.cmpOp) {
+                case Expr::CmpOp::Eq:
+                    out << "    sete al\n";
+                    out << "    setnp dl\n";
+                    out << "    and  al, dl\n";
+                    break;
+                case Expr::CmpOp::Ne:
+                    out << "    setne al\n";
+                    out << "    setp dl\n";
+                    out << "    or   al, dl\n";
+                    break;
+                case Expr::CmpOp::Lt:
+                    out << "    setb al\n";
+                    out << "    setnp dl\n";
+                    out << "    and  al, dl\n";
+                    break;
+                case Expr::CmpOp::Le:
+                    out << "    setbe al\n";
+                    out << "    setnp dl\n";
+                    out << "    and  al, dl\n";
+                    break;
+                case Expr::CmpOp::Gt:
+                    out << "    seta al\n";
+                    out << "    setnp dl\n";
+                    out << "    and  al, dl\n";
+                    break;
+                case Expr::CmpOp::Ge:
+                    out << "    setae al\n";
+                    out << "    setnp dl\n";
+                    out << "    and  al, dl\n";
+                    break;
+            }
+            out << "    movzx eax, al\n";
+            out << "    cvtsi2sd xmm0, eax\n";
+            return;
+        }
+        case K::And:
+            emitExprD64(out, cg, *e.lhs);
+            out << "    sub  rsp, 8\n";
+            out << "    movsd [rsp], xmm0\n";
+            emitExprD64(out, cg, *e.rhs);
+            out << "    movsd xmm1, [rsp]\n";
+            out << "    add  rsp, 8\n";
+            out << "    mulsd xmm0, xmm1\n";
             return;
     }
     throw Error("Internal: unknown expr kind");

@@ -30,6 +30,8 @@ Defining more than one is a compile-time error.
 - `main_d64_small.elfir` — d64 example (`-1e-100`)
 - `main_d64_nan.elfir` — d64 example (`0.0/0.0`)
 - `main_d64_inf.elfir` — d64 example (`1.0/0.0`)
+- `main_i64_cmp.elfir` — i64 comparison example
+- `main_d64_cmp.elfir` — d64 comparison example
 - `hello.asm` — NASM + libc `puts` (PIE-friendly) example
 - `add.asm` — syscall-only demo with `_start` (no CRT)
 - `no_includes.cpp` / `no_includes.s` — reference output from a Windows toolchain (MSYS2)
@@ -107,11 +109,13 @@ fn main_d64() {
 - `auto` declares a variable (i64 in `main`/`main_i64`, d64 in `main_d64`).
 - `ret <expr>;` returns the expression value in `rax` (i64) or `xmm0` (d64).
 - Operators: `+`, `-`, `*`, `/` with standard precedence and left associativity.
+- Comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=` (lower precedence than arithmetic).
 - Unary minus is supported: `-x` is parsed as `0 - x`.
 - `()` can be used to group expressions.
 - Integer literals: decimal digits only; a leading `-` is parsed as unary minus.
 - Floating literals (d64 mode): digits with optional `.` and optional exponent `e|E[+|-]digits`.
 - d64 output format: scientific notation with trailing zeros trimmed (at least one digit after the dot).
+- Comparison result: `0/1` in i64 mode, `0.0/1.0` in d64 mode.
 
 There are no unsigned types, no implicit casts, and no multiple integer sizes in v0.
 
