@@ -1,4 +1,4 @@
-fn main_d64() {  
- auto a =  min(5.010000000000, 5.011) ;
+fn main_i64() {  
+ auto a =  5 % 2 ;
     ret a;
 }

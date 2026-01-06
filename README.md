@@ -119,7 +119,8 @@ fn main_d64() {
 
 - `auto` declares a variable (i64 in `main`/`main_i64`, d64 in `main_d64`).
 - `ret <expr>;` returns the expression value in `rax` (i64) or `xmm0` (d64).
-- Operators: `+`, `-`, `*`, `/` with standard precedence and left associativity.
+- Operators: `+`, `-`, `*`, `/`, `%` with standard precedence and left associativity.
+- `%` is remainder (i64) / fmod-style remainder (d64).
 - Comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=` (lower precedence than arithmetic).
 - Builtins: `sqrt(x)`, `pow(x, y)`, `min(x, y)`, `max(x, y)`.
 - Unary minus is supported: `-x` is parsed as `0 - x`.

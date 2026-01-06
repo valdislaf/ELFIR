@@ -31,6 +31,7 @@ enum class TokKind {
     Equal,
     Star,
     Slash,
+    Percent,
     Plus,
     Minus,
     EqEq,
@@ -117,6 +118,7 @@ public:
                 t.kind = TokKind::Equal; return t;
             case '*': t.kind = TokKind::Star;  return t;
             case '/': t.kind = TokKind::Slash; return t;
+            case '%': t.kind = TokKind::Percent; return t;
             case '+': t.kind = TokKind::Plus; return t;
             case '-': t.kind = TokKind::Minus; return t;
             case '!':
@@ -149,7 +151,7 @@ private:
 
 // AST (минимально)
 struct Expr {
-    enum class Kind { Num, Var, Add, Sub, Mul, Div, Cmp, And, Sqrt, Pow, Min, Max } kind;
+    enum class Kind { Num, Var, Add, Sub, Mul, Div, Mod, Cmp, And, Sqrt, Pow, Min, Max } kind;
     enum class CmpOp { Eq, Ne, Lt, Le, Gt, Ge } cmpOp;
     std::string numText;
     std::string var;
@@ -170,6 +172,10 @@ struct Expr {
     static std::unique_ptr<Expr> makeDiv(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
         auto e = std::make_unique<Expr>();
         e->kind = Kind::Div; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeMod(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Mod; e->lhs = std::move(a); e->rhs = std::move(b); return e;
     }
     static std::unique_ptr<Expr> makeAdd(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
         auto e = std::make_unique<Expr>();
@@ -337,15 +343,16 @@ private:
         return parsePrimary();
     }
 
-    // term := unary { (*|/) unary }
+    // term := unary { (*|/|%) unary }
     std::unique_ptr<Expr> parseTerm() {
         auto left = parseUnary();
-        while (cur_.kind == TokKind::Star || cur_.kind == TokKind::Slash) {
+        while (cur_.kind == TokKind::Star || cur_.kind == TokKind::Slash || cur_.kind == TokKind::Percent) {
             TokKind op = cur_.kind;
             advance();
             auto right = parseUnary();
             if (op == TokKind::Star) left = Expr::makeMul(std::move(left), std::move(right));
-            else                    left = Expr::makeDiv(std::move(left), std::move(right));
+            else if (op == TokKind::Slash) left = Expr::makeDiv(std::move(left), std::move(right));
+            else                          left = Expr::makeMod(std::move(left), std::move(right));
         }
         return left;
     }
@@ -529,6 +536,17 @@ static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             out << "    cqo\n";             // sign-extend rax -> rdx:rax
             out << "    idiv rcx\n";        // rax = lhs / rhs, rdx = lhs % rhs
             return;
+        case K::Mod:
+            emitExprI64(out, cg, *e.lhs, labelId);
+            out << "    push rax\n";
+            emitExprI64(out, cg, *e.rhs, labelId);
+            out << "    pop  rcx\n";        // rcx = lhs, rax = rhs
+            out << "    mov  r8, rax\n";
+            out << "    mov  rax, rcx\n";
+            out << "    cqo\n";
+            out << "    idiv r8\n";
+            out << "    mov  rax, rdx\n";
+            return;
         case K::Add:
             // Evaluate lhs into rax, push, evaluate rhs into rax, pop rcx, add rax, rcx
             emitExprI64(out, cg, *e.lhs, labelId);
@@ -662,6 +680,27 @@ static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             out << "    divsd xmm1, xmm0\n";
             out << "    movapd xmm0, xmm1\n";
             return;
+        case K::Mod:
+            {
+            int id = labelId++;
+            emitExprD64(out, cg, *e.lhs, labelId);
+            out << "    sub  rsp, 16\n";
+            out << "    movsd [rsp], xmm0\n";
+            emitExprD64(out, cg, *e.rhs, labelId);
+            out << "    movsd [rsp+8], xmm0\n";
+            out << "    fld  qword [rsp+8]\n";
+            out << "    fld  qword [rsp]\n";
+            out << ".fprem_loop_" << id << ":\n";
+            out << "    fprem\n";
+            out << "    fnstsw ax\n";
+            out << "    test ax, 0x0400\n";
+            out << "    jnz  .fprem_loop_" << id << "\n";
+            out << "    fstp qword [rsp]\n";
+            out << "    fstp st0\n";
+            out << "    movsd xmm0, [rsp]\n";
+            out << "    add  rsp, 16\n";
+            return;
+            }
         case K::Add:
             emitExprD64(out, cg, *e.lhs, labelId);
             out << "    sub  rsp, 8\n";
