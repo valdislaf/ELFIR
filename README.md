@@ -56,7 +56,18 @@ sudo apt install -y build-essential nasm binutils
 1) Build the compiler
 
 ```bash
+make clean && make
+```
+
+Or build manually:
+
+```bash
 g++ -std=c++20 -O2 -Wall -Wextra -pedantic elfirc.cpp -o elfirc
+./elfirc test.elfir out.asm
+nasm -felf64 out.asm -o out.o
+nasm -felf64 runtime.asm -o runtime.o
+ld out.o runtime.o -o prog
+./prog
 ```
 
 2) Compile ELFIR → ASM
