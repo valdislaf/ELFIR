@@ -68,8 +68,11 @@ utoa10_u64:
 ; rt_print_i64: prints signed i64 in decimal + '\n'
 ; input : rdi = value (int64)
 rt_print_i64:
+    push    rbx             ; SysV ABI: RBX is callee-saved
+                            ; Also fixes alignment: after push, rsp%16 == 0
+
     ; stack buffer
-    sub     rsp, 96
+    sub     rsp, 96         ; keep rsp 16-byte aligned for calls
     lea     rsi, [rsp]      ; buf base
     xor     ebx, ebx        ; len = 0
 
@@ -108,4 +111,5 @@ rt_print_i64:
     call    rt_write
 
     add     rsp, 96
+    pop     rbx
     ret
