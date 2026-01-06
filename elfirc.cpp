@@ -27,6 +27,7 @@ enum class TokKind {
     LParen, RParen,
     LBrace, RBrace,
     Semicolon,
+    Comma,
     Equal,
     Star,
     Slash,
@@ -110,6 +111,7 @@ public:
             case '{': t.kind = TokKind::LBrace; return t;
             case '}': t.kind = TokKind::RBrace; return t;
             case ';': t.kind = TokKind::Semicolon; return t;
+            case ',': t.kind = TokKind::Comma; return t;
             case '=':
                 if (i_ < s_.size() && s_[i_] == '=') { i_++; t.kind = TokKind::EqEq; return t; }
                 t.kind = TokKind::Equal; return t;
@@ -147,7 +149,7 @@ private:
 
 // AST (минимально)
 struct Expr {
-    enum class Kind { Num, Var, Add, Sub, Mul, Div, Cmp, And } kind;
+    enum class Kind { Num, Var, Add, Sub, Mul, Div, Cmp, And, Sqrt, Pow } kind;
     enum class CmpOp { Eq, Ne, Lt, Le, Gt, Ge } cmpOp;
     std::string numText;
     std::string var;
@@ -184,6 +186,14 @@ struct Expr {
     static std::unique_ptr<Expr> makeAnd(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
         auto e = std::make_unique<Expr>();
         e->kind = Kind::And; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeSqrt(std::unique_ptr<Expr> a) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Sqrt; e->lhs = std::move(a); return e;
+    }
+    static std::unique_ptr<Expr> makePow(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Pow; e->lhs = std::move(a); e->rhs = std::move(b); return e;
     }
 };
 
@@ -268,6 +278,22 @@ private:
         if (cur_.kind == TokKind::Ident) {
             std::string n = cur_.text;
             advance();
+            if (cur_.kind == TokKind::LParen) {
+                advance();
+                if (n == "sqrt") {
+                    auto a = parseComparison();
+                    expect(TokKind::RParen, "Expected ')' after sqrt argument");
+                    return Expr::makeSqrt(std::move(a));
+                }
+                if (n == "pow") {
+                    auto a = parseComparison();
+                    expect(TokKind::Comma, "Expected ',' after pow base");
+                    auto b = parseComparison();
+                    expect(TokKind::RParen, "Expected ')' after pow exponent");
+                    return Expr::makePow(std::move(a), std::move(b));
+                }
+                throw Error("Unknown function '" + n + "'");
+            }
             return Expr::makeVar(n);
         }
         if (cur_.kind == TokKind::LParen) {
@@ -454,7 +480,7 @@ static void writeFile(const std::string& path, const std::string& content) {
     out << content;
 }
 
-static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e) {
+static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId) {
     using K = Expr::Kind;
     switch (e.kind) {
         case K::Num:
@@ -466,16 +492,16 @@ static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e) 
             return;
         }
         case K::Mul:
-            emitExprI64(out, cg, *e.lhs);
+            emitExprI64(out, cg, *e.lhs, labelId);
             out << "    push rax\n";
-            emitExprI64(out, cg, *e.rhs);
+            emitExprI64(out, cg, *e.rhs, labelId);
             out << "    pop  rcx\n";
             out << "    imul rax, rcx\n"; // rax = rhs * lhs
             return;
         case K::Div:
-            emitExprI64(out, cg, *e.lhs);
+            emitExprI64(out, cg, *e.lhs, labelId);
             out << "    push rax\n";
-            emitExprI64(out, cg, *e.rhs);
+            emitExprI64(out, cg, *e.rhs, labelId);
             out << "    pop  rcx\n";        // rcx = lhs, rax = rhs
             out << "    xchg rax, rcx\n";   // rax = lhs, rcx = rhs (divisor)
             out << "    cqo\n";             // sign-extend rax -> rdx:rax
@@ -483,25 +509,25 @@ static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e) 
             return;
         case K::Add:
             // Evaluate lhs into rax, push, evaluate rhs into rax, pop rcx, add rax, rcx
-            emitExprI64(out, cg, *e.lhs);
+            emitExprI64(out, cg, *e.lhs, labelId);
             out << "    push rax\n";
-            emitExprI64(out, cg, *e.rhs);
+            emitExprI64(out, cg, *e.rhs, labelId);
             out << "    pop  rcx\n";
             out << "    add  rax, rcx\n";
             return;
         case K::Sub:
             // Evaluate lhs into rax, push, evaluate rhs into rax, pop rcx, compute (lhs - rhs) into rax
-            emitExprI64(out, cg, *e.lhs);
+            emitExprI64(out, cg, *e.lhs, labelId);
             out << "    push rax\n";
-            emitExprI64(out, cg, *e.rhs);
+            emitExprI64(out, cg, *e.rhs, labelId);
             out << "    pop  rcx\n";        // rcx = lhs, rax = rhs
             out << "    sub  rcx, rax\n";   // rcx = lhs - rhs
             out << "    mov  rax, rcx\n";   // rax = result
             return;
         case K::Cmp: {
-            emitExprI64(out, cg, *e.lhs);
+            emitExprI64(out, cg, *e.lhs, labelId);
             out << "    push rax\n";
-            emitExprI64(out, cg, *e.rhs);
+            emitExprI64(out, cg, *e.rhs, labelId);
             out << "    pop  rcx\n";
             out << "    cmp  rcx, rax\n";
             switch (e.cmpOp) {
@@ -516,18 +542,56 @@ static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e) 
             return;
         }
         case K::And:
-            emitExprI64(out, cg, *e.lhs);
+            emitExprI64(out, cg, *e.lhs, labelId);
             out << "    push rax\n";
-            emitExprI64(out, cg, *e.rhs);
+            emitExprI64(out, cg, *e.rhs, labelId);
             out << "    pop  rcx\n";
             out << "    and  rax, rcx\n";
             return;
+        case K::Sqrt: {
+            int id = labelId++;
+            emitExprI64(out, cg, *e.lhs, labelId);
+            out << "    cmp  rax, 0\n";
+            out << "    jl   .isqrt_neg_" << id << "\n";
+            out << "    cvtsi2sd xmm0, rax\n";
+            out << "    sqrtsd xmm0, xmm0\n";
+            out << "    cvttsd2si rax, xmm0\n";
+            out << "    jmp  .isqrt_done_" << id << "\n";
+            out << ".isqrt_neg_" << id << ":\n";
+            out << "    xor  eax, eax\n";
+            out << ".isqrt_done_" << id << ":\n";
+            return;
+        }
+        case K::Pow: {
+            int id = labelId++;
+            emitExprI64(out, cg, *e.lhs, labelId);
+            out << "    mov  r8, rax\n";
+            emitExprI64(out, cg, *e.rhs, labelId);
+            out << "    mov  r9, rax\n";
+            out << "    mov  rax, 1\n";
+            out << "    cmp  r9, 0\n";
+            out << "    jl   .ipow_neg_" << id << "\n";
+            out << "    je   .ipow_done_" << id << "\n";
+            out << ".ipow_loop_" << id << ":\n";
+            out << "    test r9, 1\n";
+            out << "    jz   .ipow_skip_" << id << "\n";
+            out << "    imul rax, r8\n";
+            out << ".ipow_skip_" << id << ":\n";
+            out << "    imul r8, r8\n";
+            out << "    shr  r9, 1\n";
+            out << "    jne  .ipow_loop_" << id << "\n";
+            out << "    jmp  .ipow_done_" << id << "\n";
+            out << ".ipow_neg_" << id << ":\n";
+            out << "    xor  eax, eax\n";
+            out << ".ipow_done_" << id << ":\n";
+            return;
+        }
 
     }
     throw Error("Internal: unknown expr kind");
 }
 
-static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e) {
+static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId) {
     using K = Expr::Kind;
     switch (e.kind) {
         case K::Num: {
@@ -542,48 +606,48 @@ static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e) 
             return;
         }
         case K::Mul:
-            emitExprD64(out, cg, *e.lhs);
+            emitExprD64(out, cg, *e.lhs, labelId);
             out << "    sub  rsp, 8\n";
             out << "    movsd [rsp], xmm0\n";
-            emitExprD64(out, cg, *e.rhs);
+            emitExprD64(out, cg, *e.rhs, labelId);
             out << "    movsd xmm1, [rsp]\n";
             out << "    add  rsp, 8\n";
             out << "    mulsd xmm0, xmm1\n";
             return;
         case K::Div:
-            emitExprD64(out, cg, *e.lhs);
+            emitExprD64(out, cg, *e.lhs, labelId);
             out << "    sub  rsp, 8\n";
             out << "    movsd [rsp], xmm0\n";
-            emitExprD64(out, cg, *e.rhs);
+            emitExprD64(out, cg, *e.rhs, labelId);
             out << "    movsd xmm1, [rsp]\n";
             out << "    add  rsp, 8\n";
             out << "    divsd xmm1, xmm0\n";
             out << "    movapd xmm0, xmm1\n";
             return;
         case K::Add:
-            emitExprD64(out, cg, *e.lhs);
+            emitExprD64(out, cg, *e.lhs, labelId);
             out << "    sub  rsp, 8\n";
             out << "    movsd [rsp], xmm0\n";
-            emitExprD64(out, cg, *e.rhs);
+            emitExprD64(out, cg, *e.rhs, labelId);
             out << "    movsd xmm1, [rsp]\n";
             out << "    add  rsp, 8\n";
             out << "    addsd xmm0, xmm1\n";
             return;
         case K::Sub:
-            emitExprD64(out, cg, *e.lhs);
+            emitExprD64(out, cg, *e.lhs, labelId);
             out << "    sub  rsp, 8\n";
             out << "    movsd [rsp], xmm0\n";
-            emitExprD64(out, cg, *e.rhs);
+            emitExprD64(out, cg, *e.rhs, labelId);
             out << "    movsd xmm1, [rsp]\n";
             out << "    add  rsp, 8\n";
             out << "    subsd xmm1, xmm0\n";
             out << "    movapd xmm0, xmm1\n";
             return;
         case K::Cmp: {
-            emitExprD64(out, cg, *e.lhs);
+            emitExprD64(out, cg, *e.lhs, labelId);
             out << "    sub  rsp, 8\n";
             out << "    movsd [rsp], xmm0\n";
-            emitExprD64(out, cg, *e.rhs);
+            emitExprD64(out, cg, *e.rhs, labelId);
             out << "    movsd xmm1, [rsp]\n";
             out << "    add  rsp, 8\n";
             out << "    ucomisd xmm1, xmm0\n";
@@ -624,13 +688,39 @@ static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e) 
             return;
         }
         case K::And:
-            emitExprD64(out, cg, *e.lhs);
+            emitExprD64(out, cg, *e.lhs, labelId);
             out << "    sub  rsp, 8\n";
             out << "    movsd [rsp], xmm0\n";
-            emitExprD64(out, cg, *e.rhs);
+            emitExprD64(out, cg, *e.rhs, labelId);
             out << "    movsd xmm1, [rsp]\n";
             out << "    add  rsp, 8\n";
             out << "    mulsd xmm0, xmm1\n";
+            return;
+        case K::Sqrt:
+            emitExprD64(out, cg, *e.lhs, labelId);
+            out << "    sqrtsd xmm0, xmm0\n";
+            return;
+        case K::Pow:
+            emitExprD64(out, cg, *e.lhs, labelId);
+            out << "    sub  rsp, 16\n";
+            out << "    movsd [rsp], xmm0\n";
+            emitExprD64(out, cg, *e.rhs, labelId);
+            out << "    movsd [rsp+8], xmm0\n";
+            out << "    fld  qword [rsp+8]\n";
+            out << "    fld  qword [rsp]\n";
+            out << "    fyl2x\n";
+            out << "    fld  st0\n";
+            out << "    frndint\n";
+            out << "    fsub st1, st0\n";
+            out << "    fxch st1\n";
+            out << "    f2xm1\n";
+            out << "    fld1\n";
+            out << "    faddp st1, st0\n";
+            out << "    fscale\n";
+            out << "    fstp st1\n";
+            out << "    fstp qword [rsp]\n";
+            out << "    movsd xmm0, [rsp]\n";
+            out << "    add  rsp, 16\n";
             return;
     }
     throw Error("Internal: unknown expr kind");
@@ -647,21 +737,22 @@ static std::string genFunctionAsm(const Func& f, Mode mode) {
 
     std::ostringstream body;
 
+    int labelId = 0;
     for (const auto& st : f.body) {
         if (st.kind == Stmt::Kind::AutoAssign) {
             int slot = cg.allocSlot(st.name);
             if (mode == Mode::D64) {
-                emitExprD64(body, cg, *st.expr);
+                emitExprD64(body, cg, *st.expr, labelId);
                 body << "    movsd [rbp-" << CodegenCtx::slotDisp(slot) << "], xmm0\n";
             } else {
-                emitExprI64(body, cg, *st.expr);
+                emitExprI64(body, cg, *st.expr, labelId);
                 body << "    mov  [rbp-" << CodegenCtx::slotDisp(slot) << "], rax\n";
             }
         } else { // Ret
             if (mode == Mode::D64) {
-                emitExprD64(body, cg, *st.expr);
+                emitExprD64(body, cg, *st.expr, labelId);
             } else {
-                emitExprI64(body, cg, *st.expr);
+                emitExprI64(body, cg, *st.expr, labelId);
             }
             hasRet = true;
             body << "    leave\n";
