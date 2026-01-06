@@ -1,0 +1,4 @@
+fn main_d64() {
+    auto x = 1.0 / 0.0;
+    ret x;
+}

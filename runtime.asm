@@ -4,6 +4,16 @@
 global rt_exit
 global rt_write
 global rt_print_i64
+global rt_print_f64
+
+section .rodata
+align 8
+const_f64_0:  dq 0x0000000000000000
+const_f64_1:  dq 0x3ff0000000000000
+const_f64_10: dq 0x4024000000000000
+mask_f64_exp: dq 0x7ff0000000000000
+mask_f64_man: dq 0x000fffffffffffff
+mask_f64_sign: dq 0x7fffffffffffffff
 
 section .text
 
@@ -111,5 +121,168 @@ rt_print_i64:
     call    rt_write
 
     add     rsp, 96
+    pop     rbx
+    ret
+
+; rt_print_f64: prints double in scientific notation + '\n'
+; input : xmm0 = value (double)
+rt_print_f64:
+    push    rbx             ; SysV ABI: RBX is callee-saved
+    sub     rsp, 64         ; keep rsp 16-byte aligned for calls
+    lea     rsi, [rsp]      ; buf base
+    xor     ebx, ebx        ; len = 0
+
+    movq    rax, xmm0
+    mov     rcx, rax
+    mov     rdx, [rel mask_f64_exp]
+    and     rcx, rdx
+    cmp     rcx, rdx
+    jne     .finite
+
+    mov     rcx, rax
+    mov     rdx, [rel mask_f64_man]
+    and     rcx, rdx
+    jne     .nan
+
+    test    rax, rax
+    jns     .inf_pos
+    mov     byte [rsi + rbx], '-'
+    inc     ebx
+.inf_pos:
+    mov     byte [rsi + rbx], 'i'
+    mov     byte [rsi + rbx + 1], 'n'
+    mov     byte [rsi + rbx + 2], 'f'
+    add     ebx, 3
+    jmp     .emit_nl
+
+.nan:
+    mov     byte [rsi + rbx], 'n'
+    mov     byte [rsi + rbx + 1], 'a'
+    mov     byte [rsi + rbx + 2], 'n'
+    add     ebx, 3
+    jmp     .emit_nl
+
+.finite:
+    test    rax, rax
+    jns     .abs_done
+    mov     byte [rsi + rbx], '-'
+    inc     ebx
+    mov     rdx, [rel mask_f64_sign]
+    and     rax, rdx
+    movq    xmm0, rax
+.abs_done:
+    ucomisd xmm0, [rel const_f64_0]
+    jne     .not_zero
+    mov     byte [rsi + rbx], '0'
+    mov     byte [rsi + rbx + 1], '.'
+    mov     byte [rsi + rbx + 2], '0'
+    mov     byte [rsi + rbx + 3], 'e'
+    mov     byte [rsi + rbx + 4], '+'
+    mov     byte [rsi + rbx + 5], '0'
+    mov     byte [rsi + rbx + 6], '0'
+    add     ebx, 7
+    jmp     .emit_nl
+
+.not_zero:
+    xor     ecx, ecx
+    movsd   xmm2, [rel const_f64_10]
+    movsd   xmm3, [rel const_f64_1]
+.norm_hi:
+    ucomisd xmm0, xmm2
+    jb      .norm_lo
+    divsd   xmm0, xmm2
+    inc     ecx
+    jmp     .norm_hi
+.norm_lo:
+    ucomisd xmm0, xmm3
+    jae     .format
+    mulsd   xmm0, xmm2
+    dec     ecx
+    jmp     .norm_lo
+
+.format:
+    cvttsd2si eax, xmm0
+    mov     edx, eax
+    add     dl, '0'
+    mov     [rsi + rbx], dl
+    inc     ebx
+    mov     byte [rsi + rbx], '.'
+    inc     ebx
+    mov     r9d, ebx         ; first fractional digit index
+    cvtsi2sd xmm4, eax
+    subsd   xmm0, xmm4
+    mulsd   xmm0, xmm2
+
+    mov     edi, 16
+.digit_loop:
+    cvttsd2si eax, xmm0
+    mov     edx, eax
+    add     dl, '0'
+    mov     [rsi + rbx], dl
+    inc     ebx
+    cvtsi2sd xmm4, eax
+    subsd   xmm0, xmm4
+    mulsd   xmm0, xmm2
+    dec     edi
+    jne     .digit_loop
+
+    mov     r10d, ebx
+.trim_loop:
+    cmp     r10d, r9d
+    jle     .trim_done
+    mov     al, [rsi + r10 - 1]
+    cmp     al, '0'
+    jne     .trim_done
+    dec     r10d
+    jmp     .trim_loop
+.trim_done:
+    cmp     r10d, r9d
+    jne     .trim_set
+    mov     byte [rsi + r9], '0'
+    mov     r10d, r9d
+    inc     r10d
+.trim_set:
+    mov     ebx, r10d
+
+    mov     byte [rsi + rbx], 'e'
+    inc     ebx
+    mov     eax, ecx
+    test    eax, eax
+    jns     .exp_pos
+    mov     byte [rsi + rbx], '-'
+    inc     ebx
+    neg     eax
+    jmp     .exp_abs
+.exp_pos:
+    mov     byte [rsi + rbx], '+'
+    inc     ebx
+.exp_abs:
+    cmp     eax, 100
+    jb      .exp_two
+    xor     edx, edx
+    mov     r8d, 100
+    div     r8d
+    add     al, '0'
+    mov     [rsi + rbx], al
+    inc     ebx
+    mov     eax, edx
+.exp_two:
+    xor     edx, edx
+    mov     r8d, 10
+    div     r8d
+    add     al, '0'
+    mov     [rsi + rbx], al
+    inc     ebx
+    add     dl, '0'
+    mov     [rsi + rbx], dl
+    inc     ebx
+
+.emit_nl:
+    mov     byte [rsi + rbx], 10
+    inc     ebx
+    mov     rdx, rbx
+    call    rt_write
+
+    add     rsp, 64
     pop     rbx
     ret

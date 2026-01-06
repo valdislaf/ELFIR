@@ -1,0 +1,5 @@
+fn main_d64() {
+    auto x = 1.5;
+    auto y = 2.25;
+    ret x + y;
+}

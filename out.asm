@@ -1,74 +1,33 @@
 global _start
-global main_i64
+global main_d64
 
 extern rt_exit
-extern rt_print_i64
+extern rt_print_f64
 
 section .text
 
-main_i64:
+main_d64:
     push rbp
     mov  rbp, rsp
-    sub  rsp, 32
-    mov  rax, 0
-    push rax
-    mov  rax, 100
-    pop  rcx
-    sub  rcx, rax
-    mov  rax, rcx
-    mov  [rbp-8], rax
-    mov  rax, 500
-    push rax
-    mov  rax, [rbp-8]
-    pop  rcx
-    add  rax, rcx
-    mov  [rbp-16], rax
-    mov  rax, 1000
-    push rax
-    mov  rax, 2
-    pop  rcx
-    imul rax, rcx
-    push rax
-    mov  rax, [rbp-16]
-    pop  rcx
-    xchg rax, rcx
-    cqo
-    idiv rcx
-    push rax
-    mov  rax, 100
-    pop  rcx
-    sub  rcx, rax
-    mov  rax, rcx
-    push rax
-    mov  rax, 10
-    pop  rcx
-    add  rax, rcx
-    push rax
-    mov  rax, 10
-    pop  rcx
-    imul rax, rcx
-    mov  [rbp-24], rax
-    mov  rax, [rbp-24]
-    push rax
-    mov  rax, 10
-    pop  rcx
-    xchg rax, rcx
-    cqo
-    idiv rcx
-    mov  [rbp-32], rax
-    mov  rax, 0
-    push rax
-    mov  rax, [rbp-32]
-    pop  rcx
-    sub  rcx, rax
-    mov  rax, rcx
+    sub  rsp, 16
+    mov  rax, 0x3ff0000000000000
+    movq xmm0, rax
+    sub  rsp, 8
+    movsd [rsp], xmm0
+    mov  rax, 0x0
+    movq xmm0, rax
+    movsd xmm1, [rsp]
+    add  rsp, 8
+    divsd xmm1, xmm0
+    movapd xmm0, xmm1
+    movsd [rbp-8], xmm0
+    movsd xmm0, [rbp-8]
     leave
     ret
 
 _start:
     and  rsp, -16
-    call main_i64
-    mov  rdi, rax
-    call rt_print_i64
+    call main_d64
+    call rt_print_f64
     xor  edi, edi
     jmp  rt_exit

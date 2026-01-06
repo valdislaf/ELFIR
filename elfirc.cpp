@@ -1,6 +1,8 @@
 #include <memory>
 #include <cctype>
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -35,7 +37,6 @@ enum class TokKind {
 struct Tok {
     TokKind kind{};
     std::string text;
-    int64_t number = 0;
     size_t pos = 0;
 };
 
@@ -72,18 +73,25 @@ public:
             return t;
         }
 
-        // numbers (only decimal, optional leading minus NOT supported in v0)
-        if (std::isdigit((unsigned char)c)) {
+        // numbers (integer or float literal)
+        if (std::isdigit((unsigned char)c) || (c == '.' && i_ + 1 < s_.size() && std::isdigit((unsigned char)s_[i_ + 1]))) {
             size_t start = i_;
             while (i_ < s_.size() && std::isdigit((unsigned char)s_[i_])) i_++;
-            t.text = s_.substr(start, i_ - start);
-            // parse to int64
-            try {
-                long long v = std::stoll(t.text);
-                t.number = (int64_t)v;
-            } catch (...) {
-                throw Error("Number literal out of range at position " + std::to_string(start));
+            if (i_ < s_.size() && s_[i_] == '.') {
+                i_++;
+                while (i_ < s_.size() && std::isdigit((unsigned char)s_[i_])) i_++;
             }
+            if (i_ < s_.size() && (s_[i_] == 'e' || s_[i_] == 'E')) {
+                size_t expPos = i_;
+                i_++;
+                if (i_ < s_.size() && (s_[i_] == '+' || s_[i_] == '-')) i_++;
+                size_t expDigits = i_;
+                while (i_ < s_.size() && std::isdigit((unsigned char)s_[i_])) i_++;
+                if (expDigits == i_) {
+                    throw Error("Invalid exponent at position " + std::to_string(expPos));
+                }
+            }
+            t.text = s_.substr(start, i_ - start);
             t.kind = TokKind::Number;
             return t;
         }
@@ -123,13 +131,13 @@ private:
 // AST (минимально)
 struct Expr {
     enum class Kind { Num, Var, Add, Sub, Mul, Div } kind;
-    int64_t num = 0;
+    std::string numText;
     std::string var;
     std::unique_ptr<Expr> lhs, rhs;
 
-    static std::unique_ptr<Expr> makeNum(int64_t v) {
+    static std::unique_ptr<Expr> makeNum(std::string v) {
         auto e = std::make_unique<Expr>();
-        e->kind = Kind::Num; e->num = v; return e;
+        e->kind = Kind::Num; e->numText = std::move(v); return e;
     }
     static std::unique_ptr<Expr> makeVar(std::string n) {
         auto e = std::make_unique<Expr>();
@@ -227,9 +235,9 @@ private:
     // primary := number | ident | '(' expr ')'
     std::unique_ptr<Expr> parsePrimary() {
         if (cur_.kind == TokKind::Number) {
-            int64_t v = cur_.number;
+            std::string v = cur_.text;
             advance();
-            return Expr::makeNum(v);
+            return Expr::makeNum(std::move(v));
         }
         if (cur_.kind == TokKind::Ident) {
             std::string n = cur_.text;
@@ -250,7 +258,7 @@ private:
         if (cur_.kind == TokKind::Minus) {
             advance();
             auto rhs = parseUnary();
-            return Expr::makeSub(Expr::makeNum(0), std::move(rhs));
+            return Expr::makeSub(Expr::makeNum("0"), std::move(rhs));
         }
         return parsePrimary();
     }
@@ -323,6 +331,36 @@ struct CodegenCtx {
     static int slotDisp(int slot) { return slot * 8; } // [rbp-8*slot]
 };
 
+enum class Mode { I64, D64 };
+
+static int64_t parseI64Literal(const std::string& text) {
+    if (text.find_first_of(".eE") != std::string::npos) {
+        throw Error("Expected integer literal, got '" + text + "'");
+    }
+    try {
+        long long v = std::stoll(text);
+        return (int64_t)v;
+    } catch (...) {
+        throw Error("Number literal out of range: '" + text + "'");
+    }
+}
+
+static double parseF64Literal(const std::string& text) {
+    const char* start = text.c_str();
+    char* end = nullptr;
+    double v = std::strtod(start, &end);
+    if (end != start + text.size()) {
+        throw Error("Invalid floating literal: '" + text + "'");
+    }
+    return v;
+}
+
+static uint64_t f64ToBits(double v) {
+    uint64_t bits = 0;
+    std::memcpy(&bits, &v, sizeof(bits));
+    return bits;
+}
+
 static std::string readFile(const std::string& path) {
     std::ifstream in(path, std::ios::binary);
     if (!in) throw Error("Cannot open input file: " + path);
@@ -337,11 +375,11 @@ static void writeFile(const std::string& path, const std::string& content) {
     out << content;
 }
 
-static void emitExpr(std::ostringstream& out, CodegenCtx& cg, const Expr& e) {
+static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e) {
     using K = Expr::Kind;
     switch (e.kind) {
         case K::Num:
-            out << "    mov  rax, " << e.num << "\n";
+            out << "    mov  rax, " << parseI64Literal(e.numText) << "\n";
             return;
         case K::Var: {
             int slot = cg.getSlot(e.var);
@@ -349,16 +387,16 @@ static void emitExpr(std::ostringstream& out, CodegenCtx& cg, const Expr& e) {
             return;
         }
         case K::Mul:
-            emitExpr(out, cg, *e.lhs);
+            emitExprI64(out, cg, *e.lhs);
             out << "    push rax\n";
-            emitExpr(out, cg, *e.rhs);
+            emitExprI64(out, cg, *e.rhs);
             out << "    pop  rcx\n";
             out << "    imul rax, rcx\n"; // rax = rhs * lhs
             return;
         case K::Div:
-            emitExpr(out, cg, *e.lhs);
+            emitExprI64(out, cg, *e.lhs);
             out << "    push rax\n";
-            emitExpr(out, cg, *e.rhs);
+            emitExprI64(out, cg, *e.rhs);
             out << "    pop  rcx\n";        // rcx = lhs, rax = rhs
             out << "    xchg rax, rcx\n";   // rax = lhs, rcx = rhs (divisor)
             out << "    cqo\n";             // sign-extend rax -> rdx:rax
@@ -366,17 +404,17 @@ static void emitExpr(std::ostringstream& out, CodegenCtx& cg, const Expr& e) {
             return;
         case K::Add:
             // Evaluate lhs into rax, push, evaluate rhs into rax, pop rcx, add rax, rcx
-            emitExpr(out, cg, *e.lhs);
+            emitExprI64(out, cg, *e.lhs);
             out << "    push rax\n";
-            emitExpr(out, cg, *e.rhs);
+            emitExprI64(out, cg, *e.rhs);
             out << "    pop  rcx\n";
             out << "    add  rax, rcx\n";
             return;
         case K::Sub:
             // Evaluate lhs into rax, push, evaluate rhs into rax, pop rcx, compute (lhs - rhs) into rax
-            emitExpr(out, cg, *e.lhs);
+            emitExprI64(out, cg, *e.lhs);
             out << "    push rax\n";
-            emitExpr(out, cg, *e.rhs);
+            emitExprI64(out, cg, *e.rhs);
             out << "    pop  rcx\n";        // rcx = lhs, rax = rhs
             out << "    sub  rcx, rax\n";   // rcx = lhs - rhs
             out << "    mov  rax, rcx\n";   // rax = result
@@ -386,7 +424,63 @@ static void emitExpr(std::ostringstream& out, CodegenCtx& cg, const Expr& e) {
     throw Error("Internal: unknown expr kind");
 }
 
-static std::string genFunctionAsm(const Func& f) {
+static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e) {
+    using K = Expr::Kind;
+    switch (e.kind) {
+        case K::Num: {
+            uint64_t bits = f64ToBits(parseF64Literal(e.numText));
+            out << "    mov  rax, 0x" << std::hex << bits << std::dec << "\n";
+            out << "    movq xmm0, rax\n";
+            return;
+        }
+        case K::Var: {
+            int slot = cg.getSlot(e.var);
+            out << "    movsd xmm0, [rbp-" << CodegenCtx::slotDisp(slot) << "]\n";
+            return;
+        }
+        case K::Mul:
+            emitExprD64(out, cg, *e.lhs);
+            out << "    sub  rsp, 8\n";
+            out << "    movsd [rsp], xmm0\n";
+            emitExprD64(out, cg, *e.rhs);
+            out << "    movsd xmm1, [rsp]\n";
+            out << "    add  rsp, 8\n";
+            out << "    mulsd xmm0, xmm1\n";
+            return;
+        case K::Div:
+            emitExprD64(out, cg, *e.lhs);
+            out << "    sub  rsp, 8\n";
+            out << "    movsd [rsp], xmm0\n";
+            emitExprD64(out, cg, *e.rhs);
+            out << "    movsd xmm1, [rsp]\n";
+            out << "    add  rsp, 8\n";
+            out << "    divsd xmm1, xmm0\n";
+            out << "    movapd xmm0, xmm1\n";
+            return;
+        case K::Add:
+            emitExprD64(out, cg, *e.lhs);
+            out << "    sub  rsp, 8\n";
+            out << "    movsd [rsp], xmm0\n";
+            emitExprD64(out, cg, *e.rhs);
+            out << "    movsd xmm1, [rsp]\n";
+            out << "    add  rsp, 8\n";
+            out << "    addsd xmm0, xmm1\n";
+            return;
+        case K::Sub:
+            emitExprD64(out, cg, *e.lhs);
+            out << "    sub  rsp, 8\n";
+            out << "    movsd [rsp], xmm0\n";
+            emitExprD64(out, cg, *e.rhs);
+            out << "    movsd xmm1, [rsp]\n";
+            out << "    add  rsp, 8\n";
+            out << "    subsd xmm1, xmm0\n";
+            out << "    movapd xmm0, xmm1\n";
+            return;
+    }
+    throw Error("Internal: unknown expr kind");
+}
+
+static std::string genFunctionAsm(const Func& f, Mode mode) {
     // v0: generate body for entrypoint only
     CodegenCtx cg;
     bool hasRet = false;
@@ -400,10 +494,19 @@ static std::string genFunctionAsm(const Func& f) {
     for (const auto& st : f.body) {
         if (st.kind == Stmt::Kind::AutoAssign) {
             int slot = cg.allocSlot(st.name);
-            emitExpr(body, cg, *st.expr);
-            body << "    mov  [rbp-" << CodegenCtx::slotDisp(slot) << "], rax\n";
+            if (mode == Mode::D64) {
+                emitExprD64(body, cg, *st.expr);
+                body << "    movsd [rbp-" << CodegenCtx::slotDisp(slot) << "], xmm0\n";
+            } else {
+                emitExprI64(body, cg, *st.expr);
+                body << "    mov  [rbp-" << CodegenCtx::slotDisp(slot) << "], rax\n";
+            }
         } else { // Ret
-            emitExpr(body, cg, *st.expr);
+            if (mode == Mode::D64) {
+                emitExprD64(body, cg, *st.expr);
+            } else {
+                emitExprI64(body, cg, *st.expr);
+            }
             hasRet = true;
             body << "    leave\n";
             body << "    ret\n";
@@ -427,23 +530,33 @@ static std::string genFunctionAsm(const Func& f) {
     return out.str();
 }
 
-static std::string genOutAsm(const Func& entry, bool isMainI64) {
+enum class EntryKind { Main, MainI64, MainD64 };
+
+static std::string genOutAsm(const Func& entry, EntryKind kind) {
     std::ostringstream out;
+    const bool isMainI64 = (kind == EntryKind::MainI64);
+    const bool isMainD64 = (kind == EntryKind::MainD64);
+    const Mode mode = isMainD64 ? Mode::D64 : Mode::I64;
 
     out << "global _start\n";
     out << "global " << entry.name << "\n\n";
 
     out << "extern rt_exit\n";
     if (isMainI64) out << "extern rt_print_i64\n";
+    if (isMainD64) out << "extern rt_print_f64\n";
     out << "\nsection .text\n\n";
 
-    out << genFunctionAsm(entry) << "\n";
+    out << genFunctionAsm(entry, mode) << "\n";
 
     out << "_start:\n";
     out << "    and  rsp, -16\n";
     out << "    call " << entry.name << "\n";
 
-    if (isMainI64) {
+    if (isMainD64) {
+        out << "    call rt_print_f64\n";
+        out << "    xor  edi, edi\n";
+        out << "    jmp  rt_exit\n";
+    } else if (isMainI64) {
         out << "    mov  rdi, rax\n";
         out << "    call rt_print_i64\n";
         out << "    xor  edi, edi\n";
@@ -472,24 +585,35 @@ int main(int argc, char** argv) {
 
         int mainIdx = -1;
 		int mainI64Idx = -1;
+        int mainD64Idx = -1;
 
 		for (int i = 0; i < (int)funcs.size(); ++i) {
 			if (funcs[i].name == "main") mainIdx = i;
 			else if (funcs[i].name == "main_i64") mainI64Idx = i;
+            else if (funcs[i].name == "main_d64") mainD64Idx = i;
 		}
 
-		if (mainIdx != -1 && mainI64Idx != -1) {
-			throw Error("Multiple entrypoints: both 'main' and 'main_i64' are defined (v0 requires exactly one).");
+        const int count = (mainIdx != -1) + (mainI64Idx != -1) + (mainD64Idx != -1);
+		if (count > 1) {
+			throw Error("Multiple entrypoints: only one of 'main', 'main_i64', 'main_d64' is allowed.");
 		}
-		if (mainIdx == -1 && mainI64Idx == -1) {
-			throw Error("Missing entrypoint: define either 'fn main() { ... }' or 'fn main_i64() { ... }'.");
+		if (count == 0) {
+			throw Error("Missing entrypoint: define one of 'fn main() { ... }', 'fn main_i64() { ... }', or 'fn main_d64() { ... }'.");
 		}
 
-		const bool isMainI64 = (mainI64Idx != -1);
-		const Func& entry = funcs[ isMainI64 ? mainI64Idx : mainIdx ];
+        EntryKind kind = EntryKind::Main;
+        int entryIdx = mainIdx;
+        if (mainI64Idx != -1) {
+            kind = EntryKind::MainI64;
+            entryIdx = mainI64Idx;
+        } else if (mainD64Idx != -1) {
+            kind = EntryKind::MainD64;
+            entryIdx = mainD64Idx;
+        }
 
+		const Func& entry = funcs[entryIdx];
 
-        std::string asmText = genOutAsm(entry, isMainI64);
+        std::string asmText = genOutAsm(entry, kind);
         writeFile(outPath, asmText);
 
         std::cerr << "OK: generated " << outPath
