@@ -1,41 +1,46 @@
 global _start
-global main_i64
+global main_d64
 
 extern rt_exit
-extern rt_print_i64
+extern rt_print_f64
 
 section .text
 
-main_i64:
+main_d64:
     push rbp
     mov  rbp, rsp
-    mov  rax, 6
-    mov  r8, rax
-    mov  rax, 5
-    mov  r9, rax
-    mov  rax, 1
-    cmp  r9, 0
-    jl   .ipow_neg_0
-    je   .ipow_done_0
-.ipow_loop_0:
-    test r9, 1
-    jz   .ipow_skip_0
-    imul rax, r8
-.ipow_skip_0:
-    imul r8, r8
-    shr  r9, 1
-    jne  .ipow_loop_0
-    jmp  .ipow_done_0
-.ipow_neg_0:
-    xor  eax, eax
-.ipow_done_0:
+    sub  rsp, 16
+    mov  rax, 0x40140a3d70a3d70a
+    movq xmm0, rax
+    sub  rsp, 8
+    movsd [rsp], xmm0
+    mov  rax, 0x40140b4395810625
+    movq xmm0, rax
+    movsd xmm1, [rsp]
+    add  rsp, 8
+    ucomisd xmm1, xmm1
+    jp   .min_nan_l_0
+    ucomisd xmm0, xmm0
+    jp   .min_nan_r_0
+    ucomisd xmm1, xmm0
+    jbe  .min_take_l_0
+    jmp  .min_done_0
+.min_nan_l_0:
+    movapd xmm0, xmm1
+    jmp  .min_done_0
+.min_nan_r_0:
+    jmp  .min_done_0
+.min_take_l_0:
+    movapd xmm0, xmm1
+.min_done_0:
+    movsd [rbp-8], xmm0
+    movsd xmm0, [rbp-8]
     leave
     ret
 
 _start:
     and  rsp, -16
-    call main_i64
-    mov  rdi, rax
-    call rt_print_i64
+    call main_d64
+    call rt_print_f64
     xor  edi, edi
     jmp  rt_exit

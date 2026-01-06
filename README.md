@@ -110,7 +110,7 @@ fn main_d64() {
 - `ret <expr>;` returns the expression value in `rax` (i64) or `xmm0` (d64).
 - Operators: `+`, `-`, `*`, `/` with standard precedence and left associativity.
 - Comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=` (lower precedence than arithmetic).
-- Builtins: `sqrt(x)` and `pow(x, y)`.
+- Builtins: `sqrt(x)`, `pow(x, y)`, `min(x, y)`, `max(x, y)`.
 - Unary minus is supported: `-x` is parsed as `0 - x`.
 - `()` can be used to group expressions.
 - Integer literals: decimal digits only; a leading `-` is parsed as unary minus.
@@ -119,6 +119,7 @@ fn main_d64() {
 - Comparison result: `0/1` in i64 mode, `0.0/1.0` in d64 mode.
 - i64 `sqrt`: integer result (truncates toward zero). Negative input yields `0`.
 - i64 `pow`: integer exponent. Negative exponent yields `0`.
+- d64 `min/max`: if either operand is NaN, result is NaN. `inf` compares greater than all finite values.
 
 There are no unsigned types, no implicit casts, and no multiple integer sizes in v0.
 

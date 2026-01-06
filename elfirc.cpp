@@ -149,7 +149,7 @@ private:
 
 // AST (минимально)
 struct Expr {
-    enum class Kind { Num, Var, Add, Sub, Mul, Div, Cmp, And, Sqrt, Pow } kind;
+    enum class Kind { Num, Var, Add, Sub, Mul, Div, Cmp, And, Sqrt, Pow, Min, Max } kind;
     enum class CmpOp { Eq, Ne, Lt, Le, Gt, Ge } cmpOp;
     std::string numText;
     std::string var;
@@ -194,6 +194,14 @@ struct Expr {
     static std::unique_ptr<Expr> makePow(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
         auto e = std::make_unique<Expr>();
         e->kind = Kind::Pow; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeMin(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Min; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeMax(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Max; e->lhs = std::move(a); e->rhs = std::move(b); return e;
     }
 };
 
@@ -291,6 +299,20 @@ private:
                     auto b = parseComparison();
                     expect(TokKind::RParen, "Expected ')' after pow exponent");
                     return Expr::makePow(std::move(a), std::move(b));
+                }
+                if (n == "min") {
+                    auto a = parseComparison();
+                    expect(TokKind::Comma, "Expected ',' after min left operand");
+                    auto b = parseComparison();
+                    expect(TokKind::RParen, "Expected ')' after min right operand");
+                    return Expr::makeMin(std::move(a), std::move(b));
+                }
+                if (n == "max") {
+                    auto a = parseComparison();
+                    expect(TokKind::Comma, "Expected ',' after max left operand");
+                    auto b = parseComparison();
+                    expect(TokKind::RParen, "Expected ')' after max right operand");
+                    return Expr::makeMax(std::move(a), std::move(b));
                 }
                 throw Error("Unknown function '" + n + "'");
             }
@@ -586,6 +608,22 @@ static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             out << ".ipow_done_" << id << ":\n";
             return;
         }
+        case K::Min:
+            emitExprI64(out, cg, *e.lhs, labelId);
+            out << "    push rax\n";
+            emitExprI64(out, cg, *e.rhs, labelId);
+            out << "    pop  rcx\n";
+            out << "    cmp  rcx, rax\n";
+            out << "    cmovle rax, rcx\n";
+            return;
+        case K::Max:
+            emitExprI64(out, cg, *e.lhs, labelId);
+            out << "    push rax\n";
+            emitExprI64(out, cg, *e.rhs, labelId);
+            out << "    pop  rcx\n";
+            out << "    cmp  rcx, rax\n";
+            out << "    cmovge rax, rcx\n";
+            return;
 
     }
     throw Error("Internal: unknown expr kind");
@@ -722,6 +760,56 @@ static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             out << "    movsd xmm0, [rsp]\n";
             out << "    add  rsp, 16\n";
             return;
+        case K::Min: {
+            int id = labelId++;
+            emitExprD64(out, cg, *e.lhs, labelId);
+            out << "    sub  rsp, 8\n";
+            out << "    movsd [rsp], xmm0\n";
+            emitExprD64(out, cg, *e.rhs, labelId);
+            out << "    movsd xmm1, [rsp]\n";
+            out << "    add  rsp, 8\n";
+            out << "    ucomisd xmm1, xmm1\n";
+            out << "    jp   .min_nan_l_" << id << "\n";
+            out << "    ucomisd xmm0, xmm0\n";
+            out << "    jp   .min_nan_r_" << id << "\n";
+            out << "    ucomisd xmm1, xmm0\n";
+            out << "    jbe  .min_take_l_" << id << "\n";
+            out << "    jmp  .min_done_" << id << "\n";
+            out << ".min_nan_l_" << id << ":\n";
+            out << "    movapd xmm0, xmm1\n";
+            out << "    jmp  .min_done_" << id << "\n";
+            out << ".min_nan_r_" << id << ":\n";
+            out << "    jmp  .min_done_" << id << "\n";
+            out << ".min_take_l_" << id << ":\n";
+            out << "    movapd xmm0, xmm1\n";
+            out << ".min_done_" << id << ":\n";
+            return;
+        }
+        case K::Max: {
+            int id = labelId++;
+            emitExprD64(out, cg, *e.lhs, labelId);
+            out << "    sub  rsp, 8\n";
+            out << "    movsd [rsp], xmm0\n";
+            emitExprD64(out, cg, *e.rhs, labelId);
+            out << "    movsd xmm1, [rsp]\n";
+            out << "    add  rsp, 8\n";
+            out << "    ucomisd xmm1, xmm1\n";
+            out << "    jp   .max_nan_l_" << id << "\n";
+            out << "    ucomisd xmm0, xmm0\n";
+            out << "    jp   .max_nan_r_" << id << "\n";
+            out << "    ucomisd xmm1, xmm0\n";
+            out << "    jae  .max_take_l_" << id << "\n";
+            out << "    jmp  .max_done_" << id << "\n";
+            out << ".max_nan_l_" << id << ":\n";
+            out << "    movapd xmm0, xmm1\n";
+            out << "    jmp  .max_done_" << id << "\n";
+            out << ".max_nan_r_" << id << ":\n";
+            out << "    jmp  .max_done_" << id << "\n";
+            out << ".max_take_l_" << id << ":\n";
+            out << "    movapd xmm0, xmm1\n";
+            out << ".max_done_" << id << ":\n";
+            return;
+        }
     }
     throw Error("Internal: unknown expr kind");
 }

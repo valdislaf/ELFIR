@@ -1,3 +1,4 @@
-fn main_i64() {   
-    ret pow(6,5);
+fn main_d64() {  
+ auto a =  min(5.010000000000, 5.011) ;
+    ret a;
 }
