@@ -1,4 +1,3 @@
-fn main_i64() {  
- auto a =  5 % 2 ;
-    ret a;
+fn main_d64() {  
+    ret abs(-5.01*100) == 5.01e+02;
 }

@@ -122,7 +122,7 @@ fn main_d64() {
 - Operators: `+`, `-`, `*`, `/`, `%` with standard precedence and left associativity.
 - `%` is remainder (i64) / fmod-style remainder (d64).
 - Comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=` (lower precedence than arithmetic).
-- Builtins: `sqrt(x)`, `pow(x, y)`, `min(x, y)`, `max(x, y)`.
+- Builtins: `sqrt(x)`, `pow(x, y)`, `min(x, y)`, `max(x, y)`, `abs(x)`.
 - Unary minus is supported: `-x` is parsed as `0 - x`.
 - `()` can be used to group expressions.
 - Integer literals: decimal digits only; a leading `-` is parsed as unary minus.
@@ -132,6 +132,7 @@ fn main_d64() {
 - i64 `sqrt`: integer result (truncates toward zero). Negative input yields `0`.
 - i64 `pow`: integer exponent. Negative exponent yields `0`.
 - d64 `min/max`: if either operand is NaN, result is NaN. `inf` compares greater than all finite values.
+- `abs(x)` returns the absolute value of `x`.
 
 There are no unsigned types, no implicit casts, and no multiple integer sizes in v0.
 

@@ -151,7 +151,7 @@ private:
 
 // AST (минимально)
 struct Expr {
-    enum class Kind { Num, Var, Add, Sub, Mul, Div, Mod, Cmp, And, Sqrt, Pow, Min, Max } kind;
+    enum class Kind { Num, Var, Add, Sub, Mul, Div, Mod, Cmp, And, Sqrt, Pow, Min, Max, Abs } kind;
     enum class CmpOp { Eq, Ne, Lt, Le, Gt, Ge } cmpOp;
     std::string numText;
     std::string var;
@@ -208,6 +208,10 @@ struct Expr {
     static std::unique_ptr<Expr> makeMax(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
         auto e = std::make_unique<Expr>();
         e->kind = Kind::Max; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeAbs(std::unique_ptr<Expr> a) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Abs; e->lhs = std::move(a); return e;
     }
 };
 
@@ -319,6 +323,11 @@ private:
                     auto b = parseComparison();
                     expect(TokKind::RParen, "Expected ')' after max right operand");
                     return Expr::makeMax(std::move(a), std::move(b));
+                }
+                if (n == "abs") {
+                    auto a = parseComparison();
+                    expect(TokKind::RParen, "Expected ')' after abs argument");
+                    return Expr::makeAbs(std::move(a));
                 }
                 throw Error("Unknown function '" + n + "'");
             }
@@ -642,6 +651,15 @@ static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             out << "    cmp  rcx, rax\n";
             out << "    cmovge rax, rcx\n";
             return;
+        case K::Abs: {
+            int id = labelId++;
+            emitExprI64(out, cg, *e.lhs, labelId);
+            out << "    cmp  rax, 0\n";
+            out << "    jge  .iabs_done_" << id << "\n";
+            out << "    neg  rax\n";
+            out << ".iabs_done_" << id << ":\n";
+            return;
+        }
 
     }
     throw Error("Internal: unknown expr kind");
@@ -849,6 +867,12 @@ static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             out << ".max_done_" << id << ":\n";
             return;
         }
+        case K::Abs:
+            emitExprD64(out, cg, *e.lhs, labelId);
+            out << "    mov  rax, 0x7fffffffffffffff\n";
+            out << "    movq xmm1, rax\n";
+            out << "    andpd xmm0, xmm1\n";
+            return;
     }
     throw Error("Internal: unknown expr kind");
 }
