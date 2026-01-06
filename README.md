@@ -111,13 +111,17 @@ fn main_i64() {
 fn main_d64() {
     auto x = 1.5;
     auto y = 2.25;
+    print_d64(x);
     ret x + y;
 }
 ```
 
 ## ELFIR v0.1 Semantics
 
-- `auto` declares a variable (i64 in `main`/`main_i64`, d64 in `main_d64`).
+- `auto` declares a variable (i64 in `main_i64`, d64 in `main_d64`). `auto` is not allowed in `main`.
+- `i64 x = <expr>;` and `d64 x = <expr>;` declare typed variables (required in `main`).
+- `print_i64(<expr>);` prints i64, `print_d64(<expr>);` prints d64.
+- `print_i64` is only allowed in `main`/`main_i64`; `print_d64` only in `main`/`main_d64`.
 - `ret <expr>;` returns the expression value in `rax` (i64) or `xmm0` (d64).
 - Operators: `+`, `-`, `*`, `/`, `%` with standard precedence and left associativity.
 - `%` is remainder (i64) / fmod-style remainder (d64).
@@ -133,8 +137,7 @@ fn main_d64() {
 - i64 `pow`: integer exponent. Negative exponent yields `0`.
 - d64 `min/max`: if either operand is NaN, result is NaN. `inf` compares greater than all finite values.
 - `abs(x)` returns the absolute value of `x`.
-- d64 only: `sin`, `cos`, `tan` (calling them in i64 mode is a compile-time error).
-- d64 only: `pi` constant (calling it in i64 mode is a compile-time error).
+- d64 only: `sin`, `cos`, `tan`, `pi` (calling them in i64 mode is a compile-time error).
 
 There are no unsigned types, no implicit casts, and no multiple integer sizes in v0.
 

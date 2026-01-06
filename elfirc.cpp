@@ -23,6 +23,8 @@ enum class TokKind {
     KwFn,
     KwAuto,
     KwRet,
+    KwI64,
+    KwD64,
 
     LParen, RParen,
     LBrace, RBrace,
@@ -77,6 +79,8 @@ public:
             if (t.text == "fn") t.kind = TokKind::KwFn;
             else if (t.text == "auto") t.kind = TokKind::KwAuto;
             else if (t.text == "ret") t.kind = TokKind::KwRet;
+            else if (t.text == "i64") t.kind = TokKind::KwI64;
+            else if (t.text == "d64") t.kind = TokKind::KwD64;
             else t.kind = TokKind::Ident;
             return t;
         }
@@ -227,8 +231,11 @@ struct Expr {
     }
 };
 
+enum class Type { I64, D64 };
+
 struct Stmt {
-    enum class Kind { AutoAssign, Ret } kind;
+    enum class Kind { AutoAssign, TypedAssign, Ret, PrintI64, PrintD64 } kind;
+    Type declType = Type::I64;    // for TypedAssign
     std::string name;             // for AutoAssign
     std::unique_ptr<Expr> expr;   // for both
 };
@@ -281,6 +288,34 @@ private:
             Stmt st;
             st.kind = Stmt::Kind::AutoAssign;
             st.name = var;
+            st.expr = std::move(e);
+            return st;
+        }
+
+        if (cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwD64) {
+            Type t = (cur_.kind == TokKind::KwI64) ? Type::I64 : Type::D64;
+            advance();
+            std::string var = expectIdent("Expected identifier after type");
+            expect(TokKind::Equal, "Expected '=' after variable name");
+            auto e = parseComparison();
+            expect(TokKind::Semicolon, "Expected ';' after assignment");
+            Stmt st;
+            st.kind = Stmt::Kind::TypedAssign;
+            st.declType = t;
+            st.name = var;
+            st.expr = std::move(e);
+            return st;
+        }
+
+        if (cur_.kind == TokKind::Ident && (cur_.text == "print_i64" || cur_.text == "print_d64")) {
+            bool isI64 = (cur_.text == "print_i64");
+            advance();
+            expect(TokKind::LParen, "Expected '(' after print");
+            auto e = parseComparison();
+            expect(TokKind::RParen, "Expected ')' after print argument");
+            expect(TokKind::Semicolon, "Expected ';' after print");
+            Stmt st;
+            st.kind = isI64 ? Stmt::Kind::PrintI64 : Stmt::Kind::PrintD64;
             st.expr = std::move(e);
             return st;
         }
@@ -481,21 +516,25 @@ private:
 };
 
 struct CodegenCtx {
-    std::unordered_map<std::string, int> varToSlot; // slot index: 1 => [rbp-8], 2 => [rbp-16], ...
+    struct VarInfo {
+        Type type;
+        int slot;
+    };
+    std::unordered_map<std::string, VarInfo> varToSlot; // slot index: 1 => [rbp-8], 2 => [rbp-16], ...
     int nextSlot = 1;
     int maxSlotUsed = 0;
 
-    int allocSlot(const std::string& name) {
+    int allocSlot(const std::string& name, Type type) {
         if (varToSlot.contains(name)) {
             throw Error("Variable '" + name + "' already declared");
         }
         int slot = nextSlot++;
-        varToSlot[name] = slot;
+        varToSlot[name] = VarInfo{type, slot};
         if (slot > maxSlotUsed) maxSlotUsed = slot;
         return slot;
     }
 
-    int getSlot(const std::string& name) const {
+    VarInfo getVar(const std::string& name) const {
         auto it = varToSlot.find(name);
         if (it == varToSlot.end()) throw Error("Unknown variable '" + name + "'");
         return it->second;
@@ -503,8 +542,6 @@ struct CodegenCtx {
 
     static int slotDisp(int slot) { return slot * 8; } // [rbp-8*slot]
 };
-
-enum class Mode { I64, D64 };
 
 static int64_t parseI64Literal(const std::string& text) {
     if (text.find_first_of(".eE") != std::string::npos) {
@@ -555,8 +592,9 @@ static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             out << "    mov  rax, " << parseI64Literal(e.numText) << "\n";
             return;
         case K::Var: {
-            int slot = cg.getSlot(e.var);
-            out << "    mov  rax, [rbp-" << CodegenCtx::slotDisp(slot) << "]\n";
+            auto v = cg.getVar(e.var);
+            if (v.type != Type::I64) throw Error("Type error: expected i64 variable '" + e.var + "'");
+            out << "    mov  rax, [rbp-" << CodegenCtx::slotDisp(v.slot) << "]\n";
             return;
         }
         case K::Mul:
@@ -696,6 +734,8 @@ static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             throw Error("cos() is only available in d64 mode");
         case K::Tan:
             throw Error("tan() is only available in d64 mode");
+        default:
+            break;
 
     }
     throw Error("Internal: unknown expr kind");
@@ -711,8 +751,9 @@ static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             return;
         }
         case K::Var: {
-            int slot = cg.getSlot(e.var);
-            out << "    movsd xmm0, [rbp-" << CodegenCtx::slotDisp(slot) << "]\n";
+            auto v = cg.getVar(e.var);
+            if (v.type != Type::D64) throw Error("Type error: expected d64 variable '" + e.var + "'");
+            out << "    movsd xmm0, [rbp-" << CodegenCtx::slotDisp(v.slot) << "]\n";
             return;
         }
         case K::Mul:
@@ -940,11 +981,30 @@ static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             out << "    movsd xmm0, [rsp]\n";
             out << "    add  rsp, 8\n";
             return;
+        default:
+            break;
     }
     throw Error("Internal: unknown expr kind");
 }
 
-static std::string genFunctionAsm(const Func& f, Mode mode) {
+enum class Mode { I64Only, D64Only, Mixed };
+
+static void emitPrintI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId) {
+    emitExprI64(out, cg, e, labelId);
+    out << "    mov  rdi, rax\n";
+    out << "    sub  rsp, 8\n";
+    out << "    call rt_print_i64\n";
+    out << "    add  rsp, 8\n";
+}
+
+static void emitPrintD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId) {
+    emitExprD64(out, cg, e, labelId);
+    out << "    sub  rsp, 8\n";
+    out << "    call rt_print_f64\n";
+    out << "    add  rsp, 8\n";
+}
+
+static std::string genFunctionAsm(const Func& f, Mode mode, Type retType) {
     // v0: generate body for entrypoint only
     CodegenCtx cg;
     bool hasRet = false;
@@ -958,16 +1018,45 @@ static std::string genFunctionAsm(const Func& f, Mode mode) {
     int labelId = 0;
     for (const auto& st : f.body) {
         if (st.kind == Stmt::Kind::AutoAssign) {
-            int slot = cg.allocSlot(st.name);
-            if (mode == Mode::D64) {
+            if (mode == Mode::Mixed) {
+                throw Error("auto is not allowed in 'main' (use i64 or d64)");
+            }
+            Type t = (mode == Mode::D64Only) ? Type::D64 : Type::I64;
+            int slot = cg.allocSlot(st.name, t);
+            if (t == Type::D64) {
                 emitExprD64(body, cg, *st.expr, labelId);
                 body << "    movsd [rbp-" << CodegenCtx::slotDisp(slot) << "], xmm0\n";
             } else {
                 emitExprI64(body, cg, *st.expr, labelId);
                 body << "    mov  [rbp-" << CodegenCtx::slotDisp(slot) << "], rax\n";
             }
+        } else if (st.kind == Stmt::Kind::TypedAssign) {
+            if (mode == Mode::I64Only && st.declType != Type::I64) {
+                throw Error("d64 variables are not allowed in main_i64");
+            }
+            if (mode == Mode::D64Only && st.declType != Type::D64) {
+                throw Error("i64 variables are not allowed in main_d64");
+            }
+            int slot = cg.allocSlot(st.name, st.declType);
+            if (st.declType == Type::D64) {
+                emitExprD64(body, cg, *st.expr, labelId);
+                body << "    movsd [rbp-" << CodegenCtx::slotDisp(slot) << "], xmm0\n";
+            } else {
+                emitExprI64(body, cg, *st.expr, labelId);
+                body << "    mov  [rbp-" << CodegenCtx::slotDisp(slot) << "], rax\n";
+            }
+        } else if (st.kind == Stmt::Kind::PrintI64) {
+            if (mode == Mode::D64Only) {
+                throw Error("print_i64 is not allowed in main_d64");
+            }
+            emitPrintI64(body, cg, *st.expr, labelId);
+        } else if (st.kind == Stmt::Kind::PrintD64) {
+            if (mode == Mode::I64Only) {
+                throw Error("print_d64 is not allowed in main_i64");
+            }
+            emitPrintD64(body, cg, *st.expr, labelId);
         } else { // Ret
-            if (mode == Mode::D64) {
+            if (retType == Type::D64) {
                 emitExprD64(body, cg, *st.expr, labelId);
             } else {
                 emitExprI64(body, cg, *st.expr, labelId);
@@ -1001,17 +1090,18 @@ static std::string genOutAsm(const Func& entry, EntryKind kind) {
     std::ostringstream out;
     const bool isMainI64 = (kind == EntryKind::MainI64);
     const bool isMainD64 = (kind == EntryKind::MainD64);
-    const Mode mode = isMainD64 ? Mode::D64 : Mode::I64;
+    const Mode mode = isMainD64 ? Mode::D64Only : (isMainI64 ? Mode::I64Only : Mode::Mixed);
+    const Type retType = isMainD64 ? Type::D64 : Type::I64;
 
     out << "global _start\n";
     out << "global " << entry.name << "\n\n";
 
     out << "extern rt_exit\n";
-    if (isMainI64) out << "extern rt_print_i64\n";
-    if (isMainD64) out << "extern rt_print_f64\n";
+    out << "extern rt_print_i64\n";
+    out << "extern rt_print_f64\n";
     out << "\nsection .text\n\n";
 
-    out << genFunctionAsm(entry, mode) << "\n";
+    out << genFunctionAsm(entry, mode, retType) << "\n";
 
     out << "_start:\n";
     out << "    and  rsp, -16\n";
