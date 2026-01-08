@@ -312,6 +312,28 @@ main:
     jmp  .while_start_3
 .while_end_4:
     mov  rax, 0
+    mov  rax, [rbp-32]
+    test rax, rax
+    jns  .str_free_done_7
+    mov  rsi, rax
+    neg  rsi
+    dec  rsi
+    mov  rdi, [rbp-24]
+    sub  rsp, 8
+    call rt_str_free
+    add  rsp, 8
+.str_free_done_7:
+    mov  rax, [rbp-56]
+    test rax, rax
+    jns  .str_free_done_8
+    mov  rsi, rax
+    neg  rsi
+    dec  rsi
+    mov  rdi, [rbp-48]
+    sub  rsp, 8
+    call rt_str_free
+    add  rsp, 8
+.str_free_done_8:
     leave
     ret
 

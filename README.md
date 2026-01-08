@@ -144,7 +144,7 @@ fn main_d64() {
 - d64 output format: fixed within [1e-17, 1e18), otherwise scientific; trailing zeros trimmed (at least one digit after the dot).
 - String literals support escapes: `\\`, `\"`, `\n`, `\t`.
 - `str` supports `=` and `+=` (concatenation). No comparisons or numeric formatting yet.
-- `+=` allocates a new buffer at runtime; reassignment frees the old dynamic buffer (no end-of-scope frees yet).
+- `+=` allocates a new buffer at runtime; reassignment frees the old dynamic buffer. Dynamic strings are freed on `ret`.
 - Comparison result: `0/1` in i64 mode, `0.0/1.0` in d64 mode.
 - i64 `sqrt`: integer result (truncates toward zero). Negative input yields `0`.
 - i64 `pow`: integer exponent. Negative exponent yields `0`.

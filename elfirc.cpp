@@ -796,6 +796,7 @@ struct CodegenCtx {
     std::unordered_map<std::string, VarInfo> varToSlot; // slot index: 1 => [rbp-8], 2 => [rbp-16], ...
     int nextSlot = 1;
     int maxSlotUsed = 0;
+    std::vector<int> strSlots;
     struct StrLit {
         std::string data;
         std::string label;
@@ -811,6 +812,9 @@ struct CodegenCtx {
         int slot = nextSlot;
         nextSlot += size;
         varToSlot[name] = VarInfo{type, slot, size};
+        if (type == Type::Str) {
+            strSlots.push_back(slot);
+        }
         int lastSlot = slot + size - 1;
         if (lastSlot > maxSlotUsed) maxSlotUsed = lastSlot;
         return slot;
@@ -1520,6 +1524,12 @@ static void emitAssignStrExpr(std::ostringstream& out, CodegenCtx& cg, const Exp
     throw Error("Expected str expression");
 }
 
+static void emitCleanupStrs(std::ostringstream& out, const CodegenCtx& cg, int& labelId) {
+    for (int slot : cg.strSlots) {
+        emitFreeStrIfOwned(out, slot, labelId);
+    }
+}
+
 static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, int& labelId, Mode mode, Type retType) {
     bool hasRet = false;
     if (st.kind == Stmt::Kind::AutoAssign) {
@@ -1771,6 +1781,7 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
         } else {
             emitExprI64(out, cg, *st.expr, labelId);
         }
+        emitCleanupStrs(out, cg, labelId);
         out << "    leave\n";
         out << "    ret\n";
         return true;
