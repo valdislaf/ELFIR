@@ -28,6 +28,10 @@ enum class TokKind {
     KwD64,
     KwStr,
     KwVoid,
+    KwU8,
+    KwU16,
+    KwU32,
+    KwU64,
     KwIf,
     KwElse,
     KwElseIf,
@@ -56,6 +60,12 @@ enum class TokKind {
     Le,
     Gt,
     Ge,
+    Amp,
+    Pipe,
+    Caret,
+    Tilde,
+    Shl,
+    Shr,
 };
 
 struct Tok {
@@ -97,6 +107,10 @@ public:
             else if (t.text == "d64") t.kind = TokKind::KwD64;
             else if (t.text == "str") t.kind = TokKind::KwStr;
             else if (t.text == "void") t.kind = TokKind::KwVoid;
+            else if (t.text == "u8") t.kind = TokKind::KwU8;
+            else if (t.text == "u16") t.kind = TokKind::KwU16;
+            else if (t.text == "u32") t.kind = TokKind::KwU32;
+            else if (t.text == "u64") t.kind = TokKind::KwU64;
             else if (t.text == "if") t.kind = TokKind::KwIf;
             else if (t.text == "else") t.kind = TokKind::KwElse;
             else if (t.text == "elseif") t.kind = TokKind::KwElseIf;
@@ -108,9 +122,27 @@ public:
             return t;
         }
 
-        // numbers (integer or float literal)
+        // numbers (integer, hex, or float literal)
         if (std::isdigit((unsigned char)c) || (c == '.' && i_ + 1 < s_.size() && std::isdigit((unsigned char)s_[i_ + 1]))) {
             size_t start = i_;
+            if (c == '0' && i_ + 1 < s_.size() && (s_[i_ + 1] == 'x' || s_[i_ + 1] == 'X')) {
+                i_ += 2;
+                size_t digits = i_;
+                while (i_ < s_.size()) {
+                    char ch = s_[i_];
+                    if (std::isxdigit((unsigned char)ch) || ch == '_') {
+                        i_++;
+                    } else {
+                        break;
+                    }
+                }
+                if (digits == i_) {
+                    throw Error("Invalid hex literal at position " + std::to_string(start));
+                }
+                t.text = s_.substr(start, i_ - start);
+                t.kind = TokKind::Number;
+                return t;
+            }
             while (i_ < s_.size() && std::isdigit((unsigned char)s_[i_])) i_++;
             if (i_ < s_.size() && s_[i_] == '.') {
                 i_++;
@@ -192,10 +224,16 @@ public:
                 throw Error(std::string("Unexpected character '") + c + "' at position " + std::to_string(t.pos));
             case '<':
                 if (i_ < s_.size() && s_[i_] == '=') { i_++; t.kind = TokKind::Le; return t; }
+                if (i_ < s_.size() && s_[i_] == '<') { i_++; t.kind = TokKind::Shl; return t; }
                 t.kind = TokKind::Lt; return t;
             case '>':
                 if (i_ < s_.size() && s_[i_] == '=') { i_++; t.kind = TokKind::Ge; return t; }
+                if (i_ < s_.size() && s_[i_] == '>') { i_++; t.kind = TokKind::Shr; return t; }
                 t.kind = TokKind::Gt; return t;
+            case '&': t.kind = TokKind::Amp; return t;
+            case '|': t.kind = TokKind::Pipe; return t;
+            case '^': t.kind = TokKind::Caret; return t;
+            case '~': t.kind = TokKind::Tilde; return t;
             default:
                 throw Error(std::string("Unexpected character '") + c + "' at position " + std::to_string(t.pos));
         }
@@ -215,10 +253,41 @@ private:
     size_t i_ = 0;
 };
 
+enum class Type { I64, D64, Str, Void, U8, U16, U32, U64 };
+enum class Mode { I64Only, D64Only, Mixed };
+
 // AST (минимально)
 struct Expr {
-    enum class Kind { Num, Str, Var, Call, Add, Sub, Mul, Div, Mod, Cmp, And, Sqrt, Pow, Min, Max, Abs, Sin, Cos, Tan } kind;
+    enum class Kind {
+        Num,
+        Str,
+        Var,
+        Call,
+        Cast,
+        Add,
+        Sub,
+        Mul,
+        Div,
+        Mod,
+        Shl,
+        Shr,
+        BitAnd,
+        BitXor,
+        BitOr,
+        BitNot,
+        Cmp,
+        And,
+        Sqrt,
+        Pow,
+        Min,
+        Max,
+        Abs,
+        Sin,
+        Cos,
+        Tan
+    } kind;
     enum class CmpOp { Eq, Ne, Lt, Le, Gt, Ge } cmpOp;
+    Type castType = Type::I64;
     std::string numText;
     std::string strText;
     std::string var;
@@ -242,6 +311,10 @@ struct Expr {
         auto e = std::make_unique<Expr>();
         e->kind = Kind::Call; e->callName = std::move(n); e->callArgs = std::move(args); return e;
     }
+    static std::unique_ptr<Expr> makeCast(Type t, std::unique_ptr<Expr> a) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Cast; e->castType = t; e->lhs = std::move(a); return e;
+    }
     static std::unique_ptr<Expr> makeMul(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
         auto e = std::make_unique<Expr>();
         e->kind = Kind::Mul; e->lhs = std::move(a); e->rhs = std::move(b); return e;
@@ -253,6 +326,30 @@ struct Expr {
     static std::unique_ptr<Expr> makeMod(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
         auto e = std::make_unique<Expr>();
         e->kind = Kind::Mod; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeShl(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Shl; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeShr(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Shr; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeBitAnd(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::BitAnd; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeBitXor(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::BitXor; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeBitOr(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::BitOr; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeBitNot(std::unique_ptr<Expr> a) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::BitNot; e->lhs = std::move(a); return e;
     }
     static std::unique_ptr<Expr> makeAdd(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
         auto e = std::make_unique<Expr>();
@@ -304,16 +401,13 @@ struct Expr {
     }
 };
 
-enum class Type { I64, D64, Str, Void };
-enum class Mode { I64Only, D64Only, Mixed };
-
 struct Stmt {
     struct IfBranch {
         std::unique_ptr<Expr> cond;
         std::vector<Stmt> body;
     };
     enum class AssignOp { Eq, AddEq, SubEq, MulEq, DivEq };
-    enum class Kind { AutoAssign, TypedAssign, Assign, Ret, PrintI64, PrintD64, PrintStr, PrintList, ExprStmt, If, While, For, Break, Continue } kind;
+    enum class Kind { AutoAssign, TypedAssign, Assign, Ret, PrintI64, PrintD64, PrintStr, PrintHex, PrintList, ExprStmt, If, While, For, Break, Continue } kind;
     Type declType = Type::I64;    // for TypedAssign
     std::string name;             // for AutoAssign
     std::unique_ptr<Expr> expr;   // for both
@@ -362,7 +456,9 @@ private:
         } else {
             expect(TokKind::KwFn, "Expected 'fn'");
         }
-        if (cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwD64 || cur_.kind == TokKind::KwStr || cur_.kind == TokKind::KwVoid) {
+        if (cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwD64 || cur_.kind == TokKind::KwStr ||
+            cur_.kind == TokKind::KwVoid || cur_.kind == TokKind::KwU8 || cur_.kind == TokKind::KwU16 ||
+            cur_.kind == TokKind::KwU32 || cur_.kind == TokKind::KwU64) {
             retType = tokenToType(cur_.kind, cur_.pos);
             advance();
         }
@@ -431,10 +527,10 @@ private:
             return st;
         }
 
-    if (cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwD64 || cur_.kind == TokKind::KwStr) {
-            Type t = (cur_.kind == TokKind::KwI64) ? Type::I64 :
-                     (cur_.kind == TokKind::KwD64) ? Type::D64 :
-                                                     Type::Str;
+    if (cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwD64 || cur_.kind == TokKind::KwStr ||
+        cur_.kind == TokKind::KwU8 || cur_.kind == TokKind::KwU16 || cur_.kind == TokKind::KwU32 ||
+        cur_.kind == TokKind::KwU64) {
+            Type t = tokenToType(cur_.kind, cur_.pos);
             advance();
             std::string var = expectIdent("Expected identifier after type");
             expect(TokKind::Equal, "Expected '=' after variable name");
@@ -466,15 +562,16 @@ private:
         return st;
     }
 
-    if (cur_.kind == TokKind::Ident && (cur_.text == "print_i64" || cur_.text == "print_d64")) {
+    if (cur_.kind == TokKind::Ident && (cur_.text == "print_i64" || cur_.text == "print_d64" || cur_.text == "print_hex")) {
         bool isI64 = (cur_.text == "print_i64");
+        bool isHex = (cur_.text == "print_hex");
         advance();
         expect(TokKind::LParen, "Expected '(' after print");
         auto e = parseComparison();
         expect(TokKind::RParen, "Expected ')' after print argument");
         expect(TokKind::Semicolon, "Expected ';' after print");
         Stmt st;
-        st.kind = isI64 ? Stmt::Kind::PrintI64 : Stmt::Kind::PrintD64;
+        st.kind = isHex ? Stmt::Kind::PrintHex : (isI64 ? Stmt::Kind::PrintI64 : Stmt::Kind::PrintD64);
         st.expr = std::move(e);
         return st;
     }
@@ -584,12 +681,14 @@ private:
         Stmt init;
         if (cur_.kind == TokKind::KwAuto) {
             init = parseAutoAssignNoSemicolon();
-        } else if (cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwD64) {
-            Type t = (cur_.kind == TokKind::KwI64) ? Type::I64 : Type::D64;
+        } else if (cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwD64 ||
+                   cur_.kind == TokKind::KwU8 || cur_.kind == TokKind::KwU16 ||
+                   cur_.kind == TokKind::KwU32 || cur_.kind == TokKind::KwU64) {
+            Type t = tokenToType(cur_.kind, cur_.pos);
             advance();
             init = parseTypedAssignNoSemicolon(t);
         } else {
-            throw Error("Expected 'auto', 'i64', or 'd64' in for init at position " + std::to_string(cur_.pos));
+            throw Error("Expected 'auto' or integer type in for init at position " + std::to_string(cur_.pos));
         }
         expectForSep("Expected ',' or ';' after for init");
         auto cond = parseComparison();
@@ -659,13 +758,19 @@ private:
             case TokKind::KwD64: return Type::D64;
             case TokKind::KwStr: return Type::Str;
             case TokKind::KwVoid: return Type::Void;
+            case TokKind::KwU8: return Type::U8;
+            case TokKind::KwU16: return Type::U16;
+            case TokKind::KwU32: return Type::U32;
+            case TokKind::KwU64: return Type::U64;
             default: break;
         }
         throw Error("Expected type keyword at position " + std::to_string(pos));
     }
 
     Param parseParam() {
-        if (!(cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwD64 || cur_.kind == TokKind::KwStr)) {
+        if (!(cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwD64 || cur_.kind == TokKind::KwStr ||
+              cur_.kind == TokKind::KwU8 || cur_.kind == TokKind::KwU16 || cur_.kind == TokKind::KwU32 ||
+              cur_.kind == TokKind::KwU64)) {
             throw Error("Expected parameter type at position " + std::to_string(cur_.pos));
         }
         Type t = tokenToType(cur_.kind, cur_.pos);
@@ -698,6 +803,19 @@ private:
             std::string v = cur_.text;
             advance();
             return Expr::makeNum(std::move(v));
+        }
+        if (cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwU8 || cur_.kind == TokKind::KwU16 ||
+            cur_.kind == TokKind::KwU32 || cur_.kind == TokKind::KwU64 || cur_.kind == TokKind::KwD64 ||
+            cur_.kind == TokKind::KwStr || cur_.kind == TokKind::KwVoid) {
+            Type t = tokenToType(cur_.kind, cur_.pos);
+            advance();
+            if (!(t == Type::I64 || t == Type::U8 || t == Type::U16 || t == Type::U32 || t == Type::U64)) {
+                throw Error("Only integer casts are supported (i64, u8, u16, u32, u64)");
+            }
+            expect(TokKind::LParen, "Expected '(' after cast type");
+            auto inner = parseComparison();
+            expect(TokKind::RParen, "Expected ')' after cast expression");
+            return Expr::makeCast(t, std::move(inner));
         }
         if (cur_.kind == TokKind::String) {
             std::string v = cur_.text;
@@ -787,6 +905,11 @@ private:
             auto rhs = parseUnary();
             return Expr::makeSub(Expr::makeNum("0"), std::move(rhs));
         }
+        if (cur_.kind == TokKind::Tilde) {
+            advance();
+            auto rhs = parseUnary();
+            return Expr::makeBitNot(std::move(rhs));
+        }
         return parsePrimary();
     }
 
@@ -804,8 +927,8 @@ private:
         return left;
     }
 
-    // expr := term { (+|-) term }
-    std::unique_ptr<Expr> parseExpr() {
+    // add := term { (+|-) term }
+    std::unique_ptr<Expr> parseAdd() {
         auto left = parseTerm();
         while (cur_.kind == TokKind::Plus || cur_.kind == TokKind::Minus) {
             TokKind op = cur_.kind;
@@ -817,11 +940,58 @@ private:
         return left;
     }
 
+    // shift := add { (<<|>>) add }
+    std::unique_ptr<Expr> parseShift() {
+        auto left = parseAdd();
+        while (cur_.kind == TokKind::Shl || cur_.kind == TokKind::Shr) {
+            TokKind op = cur_.kind;
+            advance();
+            auto right = parseAdd();
+            if (op == TokKind::Shl) left = Expr::makeShl(std::move(left), std::move(right));
+            else                   left = Expr::makeShr(std::move(left), std::move(right));
+        }
+        return left;
+    }
+
+    // bitand := shift { '&' shift }
+    std::unique_ptr<Expr> parseBitAnd() {
+        auto left = parseShift();
+        while (cur_.kind == TokKind::Amp) {
+            advance();
+            auto right = parseShift();
+            left = Expr::makeBitAnd(std::move(left), std::move(right));
+        }
+        return left;
+    }
+
+    // bitxor := bitand { '^' bitand }
+    std::unique_ptr<Expr> parseBitXor() {
+        auto left = parseBitAnd();
+        while (cur_.kind == TokKind::Caret) {
+            advance();
+            auto right = parseBitAnd();
+            left = Expr::makeBitXor(std::move(left), std::move(right));
+        }
+        return left;
+    }
+
+    // bitor := bitxor { '|' bitxor }
+    std::unique_ptr<Expr> parseBitOr() {
+        auto left = parseBitXor();
+        while (cur_.kind == TokKind::Pipe) {
+            advance();
+            auto right = parseBitXor();
+            left = Expr::makeBitOr(std::move(left), std::move(right));
+        }
+        return left;
+    }
+
     static std::unique_ptr<Expr> cloneExpr(const std::unique_ptr<Expr>& e) {
         if (!e) return nullptr;
         auto out = std::make_unique<Expr>();
         out->kind = e->kind;
         out->cmpOp = e->cmpOp;
+        out->castType = e->castType;
         out->numText = e->numText;
         out->strText = e->strText;
         out->var = e->var;
@@ -853,21 +1023,21 @@ private:
         throw Error("Internal: invalid comparison operator");
     }
 
-    // comparison := expr ( (==|!=|<|<=|>|>=) expr )*
+    // comparison := bitor ( (==|!=|<|<=|>|>=) bitor )*
     std::unique_ptr<Expr> parseComparison() {
-        auto left = parseExpr();
+        auto left = parseBitOr();
         if (!isCmpTok(cur_.kind)) return left;
 
         auto op = tokToCmpOp(cur_.kind);
         advance();
-        auto right = parseExpr();
+        auto right = parseBitOr();
         auto result = Expr::makeCmp(op, std::move(left), cloneExpr(right));
         auto prev = std::move(right);
 
         while (isCmpTok(cur_.kind)) {
             op = tokToCmpOp(cur_.kind);
             advance();
-            auto next = parseExpr();
+            auto next = parseBitOr();
             auto cmp = Expr::makeCmp(op, cloneExpr(prev), cloneExpr(next));
             result = Expr::makeAnd(std::move(result), std::move(cmp));
             prev = std::move(next);
@@ -969,6 +1139,9 @@ static int64_t parseI64Literal(const std::string& text) {
     if (text.find_first_of(".eE") != std::string::npos) {
         throw Error("Expected integer literal, got '" + text + "'");
     }
+    if (text.size() >= 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X')) {
+        throw Error("Expected decimal integer literal, got '" + text + "'");
+    }
     try {
         long long v = std::stoll(text);
         return (int64_t)v;
@@ -977,7 +1150,39 @@ static int64_t parseI64Literal(const std::string& text) {
     }
 }
 
+static bool isHexLiteralText(const std::string& text) {
+    return text.size() >= 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X');
+}
+
+static std::string stripNumSeparators(const std::string& text) {
+    std::string out;
+    out.reserve(text.size());
+    for (char c : text) {
+        if (c != '_') out.push_back(c);
+    }
+    return out;
+}
+
+static uint64_t parseU64Literal(const std::string& text) {
+    std::string cleaned = stripNumSeparators(text);
+    int base = 10;
+    size_t pos = 0;
+    if (isHexLiteralText(cleaned)) {
+        base = 16;
+        pos = 2;
+    }
+    try {
+        unsigned long long v = std::stoull(cleaned.substr(pos), nullptr, base);
+        return static_cast<uint64_t>(v);
+    } catch (...) {
+        throw Error("Number literal out of range: '" + text + "'");
+    }
+}
+
 static double parseF64Literal(const std::string& text) {
+    if (isHexLiteralText(text)) {
+        throw Error("Expected decimal float literal, got '" + text + "'");
+    }
     const char* start = text.c_str();
     char* end = nullptr;
     double v = std::strtod(start, &end);
@@ -1007,105 +1212,239 @@ static void writeFile(const std::string& path, const std::string& content) {
     out << content;
 }
 
-static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId);
+static void emitExprInt(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId);
 static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId);
 static void emitStrToRegs(std::ostringstream& out, CodegenCtx& cg, const Expr& e,
                           int& labelId, const char* ptrReg, const char* lenReg);
 static void emitCallExpr(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId);
+enum class ExprTypeTag { I64, D64, U8, U16, U32, U64, IntLiteral };
+static ExprTypeTag inferExprTypeTag(const Expr& e, const CodegenCtx& cg, Mode mode);
+static ExprTypeTag mergeNumericTags(ExprTypeTag a, ExprTypeTag b, const char* ctx);
+static Type tagToType(ExprTypeTag t);
+static Type resolveIntExprType(const Expr& e, const CodegenCtx& cg, Mode mode);
+static bool isUnsignedType(Type t);
+static bool isIntegerType(Type t);
+static bool isFloatLiteralText(const std::string& text);
+static int unsignedBits(Type t);
 
-static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId) {
+static void emitMaskUnsigned(std::ostringstream& out, Type t) {
+    switch (t) {
+        case Type::U8: out << "    and  rax, 0xFF\n"; break;
+        case Type::U16: out << "    and  rax, 0xFFFF\n"; break;
+        case Type::U32: out << "    and  eax, 0xFFFFFFFF\n"; break;
+        default: break;
+    }
+}
+
+static Type typeFromTagOrI64(ExprTypeTag tag) {
+    return (tag == ExprTypeTag::IntLiteral) ? Type::I64 : tagToType(tag);
+}
+
+static void emitExprInt(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId) {
     using K = Expr::Kind;
     switch (e.kind) {
         case K::Num:
-            out << "    mov  rax, " << parseI64Literal(e.numText) << "\n";
+            if (isHexLiteralText(e.numText)) {
+                (void)parseU64Literal(e.numText);
+                out << "    mov  rax, " << stripNumSeparators(e.numText) << "\n";
+            } else {
+                out << "    mov  rax, " << parseI64Literal(e.numText) << "\n";
+            }
             return;
         case K::Str:
-            throw Error("Type error: string is not allowed in i64 expression");
+            throw Error("Type error: string is not allowed in integer expression");
         case K::Var: {
             auto v = cg.getVar(e.var);
-            if (v.type != Type::I64) throw Error("Type error: expected i64 variable '" + e.var + "'");
+            if (!isIntegerType(v.type)) throw Error("Type error: expected integer variable '" + e.var + "'");
             out << "    mov  rax, [rbp-" << CodegenCtx::slotDisp(v.slot) << "]\n";
+            if (isUnsignedType(v.type)) {
+                emitMaskUnsigned(out, v.type);
+            }
             return;
         }
         case K::Call: {
             const auto& sig = cg.getFuncSig(e.callName);
-            if (sig.retType != Type::I64) {
-                throw Error("Type error: function '" + e.callName + "' does not return i64");
+            if (!isIntegerType(sig.retType)) {
+                throw Error("Type error: function '" + e.callName + "' does not return integer");
             }
             emitCallExpr(out, cg, e, labelId);
+            if (isUnsignedType(sig.retType)) {
+                emitMaskUnsigned(out, sig.retType);
+            }
             return;
         }
-        case K::Mul:
-            emitExprI64(out, cg, *e.lhs, labelId);
+        case K::Mul: {
+            auto lt = inferExprTypeTag(*e.lhs, cg, cg.mode);
+            auto rt = inferExprTypeTag(*e.rhs, cg, cg.mode);
+            Type resType = typeFromTagOrI64(mergeNumericTags(lt, rt, "expression"));
+            emitExprInt(out, cg, *e.lhs, labelId);
             out << "    push rax\n";
-            emitExprI64(out, cg, *e.rhs, labelId);
+            emitExprInt(out, cg, *e.rhs, labelId);
             out << "    pop  rcx\n";
-            out << "    imul rax, rcx\n"; // rax = rhs * lhs
+            out << "    imul rax, rcx\n";
+            if (isUnsignedType(resType)) {
+                emitMaskUnsigned(out, resType);
+            }
             return;
-        case K::Div:
-            emitExprI64(out, cg, *e.lhs, labelId);
+        }
+        case K::Div: {
+            auto lt = inferExprTypeTag(*e.lhs, cg, cg.mode);
+            auto rt = inferExprTypeTag(*e.rhs, cg, cg.mode);
+            Type resType = typeFromTagOrI64(mergeNumericTags(lt, rt, "expression"));
+            emitExprInt(out, cg, *e.lhs, labelId);
             out << "    push rax\n";
-            emitExprI64(out, cg, *e.rhs, labelId);
-            out << "    pop  rcx\n";        // rcx = lhs, rax = rhs
-            out << "    xchg rax, rcx\n";   // rax = lhs, rcx = rhs (divisor)
-            out << "    cqo\n";             // sign-extend rax -> rdx:rax
-            out << "    idiv rcx\n";        // rax = lhs / rhs, rdx = lhs % rhs
+            emitExprInt(out, cg, *e.rhs, labelId);
+            out << "    pop  rcx\n";
+            out << "    xchg rax, rcx\n";
+            if (isUnsignedType(resType)) {
+                out << "    xor  edx, edx\n";
+                out << "    div  rcx\n";
+            } else {
+                out << "    cqo\n";
+                out << "    idiv rcx\n";
+            }
             return;
-        case K::Mod:
-            emitExprI64(out, cg, *e.lhs, labelId);
+        }
+        case K::Mod: {
+            auto lt = inferExprTypeTag(*e.lhs, cg, cg.mode);
+            auto rt = inferExprTypeTag(*e.rhs, cg, cg.mode);
+            Type resType = typeFromTagOrI64(mergeNumericTags(lt, rt, "expression"));
+            emitExprInt(out, cg, *e.lhs, labelId);
             out << "    push rax\n";
-            emitExprI64(out, cg, *e.rhs, labelId);
-            out << "    pop  rcx\n";        // rcx = lhs, rax = rhs
+            emitExprInt(out, cg, *e.rhs, labelId);
+            out << "    pop  rcx\n";
             out << "    mov  r8, rax\n";
             out << "    mov  rax, rcx\n";
-            out << "    cqo\n";
-            out << "    idiv r8\n";
+            if (isUnsignedType(resType)) {
+                out << "    xor  edx, edx\n";
+                out << "    div  r8\n";
+            } else {
+                out << "    cqo\n";
+                out << "    idiv r8\n";
+            }
             out << "    mov  rax, rdx\n";
             return;
-        case K::Add:
-            // Evaluate lhs into rax, push, evaluate rhs into rax, pop rcx, add rax, rcx
-            emitExprI64(out, cg, *e.lhs, labelId);
+        }
+        case K::Add: {
+            auto lt = inferExprTypeTag(*e.lhs, cg, cg.mode);
+            auto rt = inferExprTypeTag(*e.rhs, cg, cg.mode);
+            Type resType = typeFromTagOrI64(mergeNumericTags(lt, rt, "expression"));
+            emitExprInt(out, cg, *e.lhs, labelId);
             out << "    push rax\n";
-            emitExprI64(out, cg, *e.rhs, labelId);
+            emitExprInt(out, cg, *e.rhs, labelId);
             out << "    pop  rcx\n";
             out << "    add  rax, rcx\n";
+            if (isUnsignedType(resType)) {
+                emitMaskUnsigned(out, resType);
+            }
             return;
-        case K::Sub:
-            // Evaluate lhs into rax, push, evaluate rhs into rax, pop rcx, compute (lhs - rhs) into rax
-            emitExprI64(out, cg, *e.lhs, labelId);
+        }
+        case K::Sub: {
+            auto lt = inferExprTypeTag(*e.lhs, cg, cg.mode);
+            auto rt = inferExprTypeTag(*e.rhs, cg, cg.mode);
+            Type resType = typeFromTagOrI64(mergeNumericTags(lt, rt, "expression"));
+            emitExprInt(out, cg, *e.lhs, labelId);
             out << "    push rax\n";
-            emitExprI64(out, cg, *e.rhs, labelId);
-            out << "    pop  rcx\n";        // rcx = lhs, rax = rhs
-            out << "    sub  rcx, rax\n";   // rcx = lhs - rhs
-            out << "    mov  rax, rcx\n";   // rax = result
+            emitExprInt(out, cg, *e.rhs, labelId);
+            out << "    pop  rcx\n";
+            out << "    sub  rcx, rax\n";
+            out << "    mov  rax, rcx\n";
+            if (isUnsignedType(resType)) {
+                emitMaskUnsigned(out, resType);
+            }
             return;
+        }
+        case K::Shl:
+        case K::Shr: {
+            auto lt = inferExprTypeTag(*e.lhs, cg, cg.mode);
+            Type resType = typeFromTagOrI64(lt);
+            emitExprInt(out, cg, *e.lhs, labelId);
+            out << "    push rax\n";
+            emitExprInt(out, cg, *e.rhs, labelId);
+            out << "    mov  rcx, rax\n";
+            out << "    pop  rax\n";
+            if (e.kind == K::Shl) {
+                out << "    shl  rax, cl\n";
+            } else {
+                if (isUnsignedType(resType)) {
+                    out << "    shr  rax, cl\n";
+                } else {
+                    out << "    sar  rax, cl\n";
+                }
+            }
+            if (isUnsignedType(resType)) {
+                emitMaskUnsigned(out, resType);
+            }
+            return;
+        }
+        case K::BitAnd:
+        case K::BitXor:
+        case K::BitOr: {
+            auto lt = inferExprTypeTag(*e.lhs, cg, cg.mode);
+            auto rt = inferExprTypeTag(*e.rhs, cg, cg.mode);
+            Type resType = typeFromTagOrI64(mergeNumericTags(lt, rt, "bitwise"));
+            emitExprInt(out, cg, *e.lhs, labelId);
+            out << "    push rax\n";
+            emitExprInt(out, cg, *e.rhs, labelId);
+            out << "    pop  rcx\n";
+            if (e.kind == K::BitAnd) out << "    and  rax, rcx\n";
+            else if (e.kind == K::BitXor) out << "    xor  rax, rcx\n";
+            else out << "    or   rax, rcx\n";
+            if (isUnsignedType(resType)) {
+                emitMaskUnsigned(out, resType);
+            }
+            return;
+        }
+        case K::BitNot: {
+            auto lt = inferExprTypeTag(*e.lhs, cg, cg.mode);
+            Type resType = typeFromTagOrI64(lt);
+            emitExprInt(out, cg, *e.lhs, labelId);
+            out << "    not  rax\n";
+            if (isUnsignedType(resType)) {
+                emitMaskUnsigned(out, resType);
+            }
+            return;
+        }
         case K::Cmp: {
-            emitExprI64(out, cg, *e.lhs, labelId);
+            Type lt = resolveIntExprType(*e.lhs, cg, cg.mode);
+            Type rt = resolveIntExprType(*e.rhs, cg, cg.mode);
+            emitExprInt(out, cg, *e.lhs, labelId);
             out << "    push rax\n";
-            emitExprI64(out, cg, *e.rhs, labelId);
+            emitExprInt(out, cg, *e.rhs, labelId);
             out << "    pop  rcx\n";
             out << "    cmp  rcx, rax\n";
+            bool unsignedCmp = isUnsignedType(lt) || isUnsignedType(rt);
             switch (e.cmpOp) {
                 case Expr::CmpOp::Eq: out << "    sete al\n"; break;
                 case Expr::CmpOp::Ne: out << "    setne al\n"; break;
-                case Expr::CmpOp::Lt: out << "    setl al\n"; break;
-                case Expr::CmpOp::Le: out << "    setle al\n"; break;
-                case Expr::CmpOp::Gt: out << "    setg al\n"; break;
-                case Expr::CmpOp::Ge: out << "    setge al\n"; break;
+                case Expr::CmpOp::Lt: out << (unsignedCmp ? "    setb al\n" : "    setl al\n"); break;
+                case Expr::CmpOp::Le: out << (unsignedCmp ? "    setbe al\n" : "    setle al\n"); break;
+                case Expr::CmpOp::Gt: out << (unsignedCmp ? "    seta al\n" : "    setg al\n"); break;
+                case Expr::CmpOp::Ge: out << (unsignedCmp ? "    setae al\n" : "    setge al\n"); break;
             }
             out << "    movzx eax, al\n";
             return;
         }
         case K::And:
-            emitExprI64(out, cg, *e.lhs, labelId);
+            emitExprInt(out, cg, *e.lhs, labelId);
             out << "    push rax\n";
-            emitExprI64(out, cg, *e.rhs, labelId);
+            emitExprInt(out, cg, *e.rhs, labelId);
             out << "    pop  rcx\n";
             out << "    and  rax, rcx\n";
             return;
+        case K::Cast: {
+            if (!isIntegerType(e.castType)) {
+                throw Error("Type error: only integer casts are supported");
+            }
+            emitExprInt(out, cg, *e.lhs, labelId);
+            if (isUnsignedType(e.castType)) {
+                emitMaskUnsigned(out, e.castType);
+            }
+            return;
+        }
         case K::Sqrt: {
             int id = labelId++;
-            emitExprI64(out, cg, *e.lhs, labelId);
+            emitExprInt(out, cg, *e.lhs, labelId);
             out << "    cmp  rax, 0\n";
             out << "    jl   .isqrt_neg_" << id << "\n";
             out << "    cvtsi2sd xmm0, rax\n";
@@ -1119,9 +1458,9 @@ static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
         }
         case K::Pow: {
             int id = labelId++;
-            emitExprI64(out, cg, *e.lhs, labelId);
+            emitExprInt(out, cg, *e.lhs, labelId);
             out << "    mov  r8, rax\n";
-            emitExprI64(out, cg, *e.rhs, labelId);
+            emitExprInt(out, cg, *e.rhs, labelId);
             out << "    mov  r9, rax\n";
             out << "    mov  rax, 1\n";
             out << "    cmp  r9, 0\n";
@@ -1142,24 +1481,24 @@ static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             return;
         }
         case K::Min:
-            emitExprI64(out, cg, *e.lhs, labelId);
+            emitExprInt(out, cg, *e.lhs, labelId);
             out << "    push rax\n";
-            emitExprI64(out, cg, *e.rhs, labelId);
+            emitExprInt(out, cg, *e.rhs, labelId);
             out << "    pop  rcx\n";
             out << "    cmp  rcx, rax\n";
             out << "    cmovle rax, rcx\n";
             return;
         case K::Max:
-            emitExprI64(out, cg, *e.lhs, labelId);
+            emitExprInt(out, cg, *e.lhs, labelId);
             out << "    push rax\n";
-            emitExprI64(out, cg, *e.rhs, labelId);
+            emitExprInt(out, cg, *e.rhs, labelId);
             out << "    pop  rcx\n";
             out << "    cmp  rcx, rax\n";
             out << "    cmovge rax, rcx\n";
             return;
         case K::Abs: {
             int id = labelId++;
-            emitExprI64(out, cg, *e.lhs, labelId);
+            emitExprInt(out, cg, *e.lhs, labelId);
             out << "    cmp  rax, 0\n";
             out << "    jge  .iabs_done_" << id << "\n";
             out << "    neg  rax\n";
@@ -1204,6 +1543,15 @@ static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             emitCallExpr(out, cg, e, labelId);
             return;
         }
+        case K::Cast:
+            throw Error("Type error: integer casts are not allowed in d64 expression");
+        case K::Shl:
+        case K::Shr:
+        case K::BitAnd:
+        case K::BitXor:
+        case K::BitOr:
+        case K::BitNot:
+            throw Error("Type error: bitwise ops are not allowed in d64 expression");
         case K::Mul:
             emitExprD64(out, cg, *e.lhs, labelId);
             out << "    sub  rsp, 8\n";
@@ -1441,15 +1789,96 @@ static const char* typeName(Type t) {
         case Type::D64: return "d64";
         case Type::Str: return "str";
         case Type::Void: return "void";
+        case Type::U8: return "u8";
+        case Type::U16: return "u16";
+        case Type::U32: return "u32";
+        case Type::U64: return "u64";
     }
     return "unknown";
 }
 
+static bool isUnsignedType(Type t) {
+    return t == Type::U8 || t == Type::U16 || t == Type::U32 || t == Type::U64;
+}
+
+static bool isIntegerType(Type t) {
+    return t == Type::I64 || isUnsignedType(t);
+}
+
+static bool isUnsignedLiteralAssignable(const Expr& e, Type target, uint64_t* outVal = nullptr) {
+    if (!isUnsignedType(target)) return false;
+    if (!(e.kind == Expr::Kind::Num && !isFloatLiteralText(e.numText))) return false;
+    uint64_t v = parseU64Literal(e.numText);
+    int bits = unsignedBits(target);
+    if (bits < 64) {
+        uint64_t max = (1ULL << bits) - 1ULL;
+        if (v > max) return false;
+    }
+    if (outVal) *outVal = v;
+    return true;
+}
+
+static int unsignedBits(Type t) {
+    switch (t) {
+        case Type::U8: return 8;
+        case Type::U16: return 16;
+        case Type::U32: return 32;
+        case Type::U64: return 64;
+        default: break;
+    }
+    return 0;
+}
+
+static Type unsignedTypeFromBits(int bits) {
+    switch (bits) {
+        case 8: return Type::U8;
+        case 16: return Type::U16;
+        case 32: return Type::U32;
+        case 64: return Type::U64;
+        default: break;
+    }
+    throw Error("Internal: invalid unsigned width");
+}
+
 static void emitPrintI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId) {
-    emitExprI64(out, cg, e, labelId);
+    Type t = resolveIntExprType(e, cg, cg.mode);
+    if (t != Type::I64) {
+        throw Error("print_i64 expects i64 expression");
+    }
+    emitExprInt(out, cg, e, labelId);
     out << "    mov  rdi, rax\n";
     out << "    sub  rsp, 8\n";
     out << "    call rt_print_i64_raw\n";
+    out << "    add  rsp, 8\n";
+}
+
+static void emitPrintInt(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId, Type t) {
+    emitExprInt(out, cg, e, labelId);
+    out << "    mov  rdi, rax\n";
+    out << "    sub  rsp, 8\n";
+    if (t == Type::I64) {
+        out << "    call rt_print_i64_raw\n";
+    } else {
+        out << "    call rt_print_u64_raw\n";
+    }
+    out << "    add  rsp, 8\n";
+}
+
+static void emitPrintHex(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId) {
+    Type t = resolveIntExprType(e, cg, cg.mode);
+    if (!isUnsignedType(t)) {
+        if (!isUnsignedLiteralAssignable(e, Type::U64)) {
+            throw Error("print_hex expects unsigned integer expression");
+        }
+        t = Type::U64;
+    }
+    emitExprInt(out, cg, e, labelId);
+    if (isUnsignedType(t)) {
+        emitMaskUnsigned(out, t);
+    }
+    out << "    mov  rdi, rax\n";
+    out << "    sub  rsp, 8\n";
+    out << "    call rt_print_hex_u64_raw\n";
     out << "    add  rsp, 8\n";
 }
 
@@ -1470,10 +1899,53 @@ static void emitPrintStr(std::ostringstream& out, CodegenCtx& cg, const Expr& e,
     out << "    add  rsp, 8\n";
 }
 
-enum class ExprTypeTag { I64, D64, NumLiteral };
-
 static bool isFloatLiteralText(const std::string& text) {
     return text.find_first_of(".eE") != std::string::npos;
+}
+
+static bool isUnsignedTag(ExprTypeTag t) {
+    return t == ExprTypeTag::U8 || t == ExprTypeTag::U16 || t == ExprTypeTag::U32 || t == ExprTypeTag::U64;
+}
+
+static bool isIntegerTag(ExprTypeTag t) {
+    return t != ExprTypeTag::D64;
+}
+
+static int unsignedBitsFromTag(ExprTypeTag t) {
+    switch (t) {
+        case ExprTypeTag::U8: return 8;
+        case ExprTypeTag::U16: return 16;
+        case ExprTypeTag::U32: return 32;
+        case ExprTypeTag::U64: return 64;
+        default: break;
+    }
+    return 0;
+}
+
+static Type tagToType(ExprTypeTag t) {
+    switch (t) {
+        case ExprTypeTag::I64: return Type::I64;
+        case ExprTypeTag::D64: return Type::D64;
+        case ExprTypeTag::U8: return Type::U8;
+        case ExprTypeTag::U16: return Type::U16;
+        case ExprTypeTag::U32: return Type::U32;
+        case ExprTypeTag::U64: return Type::U64;
+        default: break;
+    }
+    throw Error("Internal: unresolved literal type");
+}
+
+static ExprTypeTag tagFromType(Type t) {
+    switch (t) {
+        case Type::I64: return ExprTypeTag::I64;
+        case Type::D64: return ExprTypeTag::D64;
+        case Type::U8: return ExprTypeTag::U8;
+        case Type::U16: return ExprTypeTag::U16;
+        case Type::U32: return ExprTypeTag::U32;
+        case Type::U64: return ExprTypeTag::U64;
+        default: break;
+    }
+    throw Error("Internal: invalid numeric type");
 }
 
 static ExprTypeTag mergeNumericTags(ExprTypeTag a, ExprTypeTag b, const char* ctx) {
@@ -1481,12 +1953,36 @@ static ExprTypeTag mergeNumericTags(ExprTypeTag a, ExprTypeTag b, const char* ct
         if (a == ExprTypeTag::I64 || b == ExprTypeTag::I64) {
             throw Error(std::string("Type error: mixed i64/d64 in ") + ctx);
         }
-        return ExprTypeTag::D64;
+        if (a == ExprTypeTag::IntLiteral || b == ExprTypeTag::IntLiteral) {
+            return ExprTypeTag::D64;
+        }
+        if (a == ExprTypeTag::D64 && b == ExprTypeTag::D64) {
+            return ExprTypeTag::D64;
+        }
+        throw Error(std::string("Type error: mixed unsigned/d64 in ") + ctx);
+    }
+
+    if (!isIntegerTag(a) || !isIntegerTag(b)) {
+        throw Error("Internal: unexpected numeric tags");
+    }
+
+    bool aUnsigned = isUnsignedTag(a);
+    bool bUnsigned = isUnsignedTag(b);
+    if (aUnsigned != bUnsigned) {
+        throw Error(std::string("Type error: mixed signed/unsigned in ") + ctx);
+    }
+    if (aUnsigned) {
+        int bits = unsignedBitsFromTag(a);
+        int bitsB = unsignedBitsFromTag(b);
+        if (bits == 0 || bitsB == 0) {
+            throw Error("Internal: invalid unsigned tag");
+        }
+        return tagFromType(unsignedTypeFromBits((bits > bitsB) ? bits : bitsB));
     }
     if (a == ExprTypeTag::I64 || b == ExprTypeTag::I64) {
         return ExprTypeTag::I64;
     }
-    return ExprTypeTag::NumLiteral;
+    return ExprTypeTag::IntLiteral;
 }
 
 static bool isStrExpr(const Expr& e, const CodegenCtx& cg);
@@ -1496,13 +1992,16 @@ static ExprTypeTag inferExprTypeTag(const Expr& e, const CodegenCtx& cg, Mode mo
     using K = Expr::Kind;
     switch (e.kind) {
         case K::Num:
+            if (isHexLiteralText(e.numText)) {
+                return ExprTypeTag::U64;
+            }
             if (isFloatLiteralText(e.numText)) {
                 if (mode == Mode::I64Only) {
                     throw Error("Expected integer literal, got '" + e.numText + "'");
                 }
                 return ExprTypeTag::D64;
             }
-            return ExprTypeTag::NumLiteral;
+            return ExprTypeTag::IntLiteral;
         case K::Str:
             throw Error("Type error: string is not allowed in numeric expression");
         case K::Var: {
@@ -1510,7 +2009,7 @@ static ExprTypeTag inferExprTypeTag(const Expr& e, const CodegenCtx& cg, Mode mo
             if (v.type == Type::Str) {
                 throw Error("Type error: string is not allowed in numeric expression");
             }
-            return (v.type == Type::D64) ? ExprTypeTag::D64 : ExprTypeTag::I64;
+            return tagFromType(v.type);
         }
         case K::Call: {
             const auto& sig = cg.getFuncSig(e.callName);
@@ -1518,7 +2017,17 @@ static ExprTypeTag inferExprTypeTag(const Expr& e, const CodegenCtx& cg, Mode mo
             if (sig.retType == Type::Void || sig.retType == Type::Str) {
                 throw Error("Type error: function '" + e.callName + "' does not return a numeric value");
             }
-            return (sig.retType == Type::D64) ? ExprTypeTag::D64 : ExprTypeTag::I64;
+            return tagFromType(sig.retType);
+        }
+        case K::Cast: {
+            auto lt = inferExprTypeTag(*e.lhs, cg, mode);
+            if (lt == ExprTypeTag::D64) {
+                throw Error("Type error: casting from d64 is not supported");
+            }
+            if (!isIntegerType(e.castType)) {
+                throw Error("Type error: only integer casts are supported");
+            }
+            return tagFromType(e.castType);
         }
         case K::Add:
         case K::Sub:
@@ -1529,22 +2038,71 @@ static ExprTypeTag inferExprTypeTag(const Expr& e, const CodegenCtx& cg, Mode mo
             auto rt = inferExprTypeTag(*e.rhs, cg, mode);
             return mergeNumericTags(lt, rt, "expression");
         }
+        case K::Shl:
+        case K::Shr: {
+            auto lt = inferExprTypeTag(*e.lhs, cg, mode);
+            auto rt = inferExprTypeTag(*e.rhs, cg, mode);
+            if (lt == ExprTypeTag::D64 || rt == ExprTypeTag::D64) {
+                throw Error("Type error: shifts are only allowed for integer types");
+            }
+            return lt;
+        }
+        case K::BitAnd:
+        case K::BitXor:
+        case K::BitOr: {
+            auto lt = inferExprTypeTag(*e.lhs, cg, mode);
+            auto rt = inferExprTypeTag(*e.rhs, cg, mode);
+            if (lt == ExprTypeTag::D64 || rt == ExprTypeTag::D64) {
+                throw Error("Type error: bitwise ops are only allowed for integer types");
+            }
+            return mergeNumericTags(lt, rt, "bitwise");
+        }
+        case K::BitNot: {
+            auto lt = inferExprTypeTag(*e.lhs, cg, mode);
+            if (lt == ExprTypeTag::D64) {
+                throw Error("Type error: bitwise ops are only allowed for integer types");
+            }
+            return lt;
+        }
         case K::Cmp:
         case K::And: {
             auto lt = inferExprTypeTag(*e.lhs, cg, mode);
             auto rt = inferExprTypeTag(*e.rhs, cg, mode);
-            return mergeNumericTags(lt, rt, "comparison");
+            if (lt == ExprTypeTag::D64 || rt == ExprTypeTag::D64) {
+                if ((lt == ExprTypeTag::D64 && (rt == ExprTypeTag::D64 || rt == ExprTypeTag::IntLiteral)) ||
+                    (rt == ExprTypeTag::D64 && (lt == ExprTypeTag::D64 || lt == ExprTypeTag::IntLiteral))) {
+                    return ExprTypeTag::D64;
+                }
+                throw Error("Type error: mixed numeric kinds in comparison");
+            }
+            bool lUnsigned = isUnsignedTag(lt);
+            bool rUnsigned = isUnsignedTag(rt);
+            if (lUnsigned != rUnsigned) {
+                throw Error("Type error: mixed signed/unsigned in comparison");
+            }
+            if (mode == Mode::D64Only && lt == ExprTypeTag::IntLiteral && rt == ExprTypeTag::IntLiteral) {
+                return ExprTypeTag::D64;
+            }
+            return ExprTypeTag::I64;
         }
         case K::Sqrt:
         case K::Abs: {
-            return inferExprTypeTag(*e.lhs, cg, mode);
+            auto lt = inferExprTypeTag(*e.lhs, cg, mode);
+            if (isUnsignedTag(lt)) {
+                throw Error("Type error: unsigned is not allowed in sqrt/abs");
+            }
+            return lt;
         }
         case K::Pow:
         case K::Min:
         case K::Max: {
             auto lt = inferExprTypeTag(*e.lhs, cg, mode);
             auto rt = inferExprTypeTag(*e.rhs, cg, mode);
-            return mergeNumericTags(lt, rt, "expression");
+            auto merged = mergeNumericTags(lt, rt, "expression");
+            if (isUnsignedTag(merged)) {
+                throw Error("Type error: unsigned is not allowed in pow/min/max");
+            }
+            return merged;
         }
         case K::Sin:
         case K::Cos:
@@ -1555,6 +2113,17 @@ static ExprTypeTag inferExprTypeTag(const Expr& e, const CodegenCtx& cg, Mode mo
             return ExprTypeTag::D64;
     }
     throw Error("Internal: unknown expr kind");
+}
+
+static Type resolveIntExprType(const Expr& e, const CodegenCtx& cg, Mode mode) {
+    ExprTypeTag tag = inferExprTypeTag(e, cg, mode);
+    if (tag == ExprTypeTag::D64) {
+        throw Error("Type error: expected integer expression");
+    }
+    if (tag == ExprTypeTag::IntLiteral) {
+        return Type::I64;
+    }
+    return tagToType(tag);
 }
 
 static void checkCallArgs(const Expr& e, const CodegenCtx& cg, Mode mode) {
@@ -1577,33 +2146,66 @@ static void checkCallArgs(const Expr& e, const CodegenCtx& cg, Mode mode) {
             throw Error("Internal: void parameter type");
         }
         ExprTypeTag tag = inferExprTypeTag(arg, cg, mode);
-        if (tag == ExprTypeTag::NumLiteral) {
-            if (paramType != Type::I64 && paramType != Type::D64) {
+        if (tag == ExprTypeTag::IntLiteral) {
+            if (paramType == Type::I64 || paramType == Type::D64) {
+                continue;
+            }
+            if (isUnsignedType(paramType) && isUnsignedLiteralAssignable(arg, paramType)) {
+                continue;
+            }
+            throw Error("Type error: argument " + std::to_string(i + 1) + " of '" + e.callName +
+                        "' expects " + typeName(paramType));
+        }
+        Type argType = tagToType(tag);
+        if (paramType == Type::D64) {
+            if (argType != Type::D64) {
+                throw Error("Type error: argument " + std::to_string(i + 1) + " of '" + e.callName +
+                            "' expects d64");
+            }
+            continue;
+        }
+        if (paramType == Type::I64) {
+            if (argType != Type::I64) {
+                throw Error("Type error: argument " + std::to_string(i + 1) + " of '" + e.callName +
+                            "' expects i64");
+            }
+            continue;
+        }
+        if (!isUnsignedType(paramType)) {
+            throw Error("Internal: invalid parameter type");
+        }
+        if (!isUnsignedType(argType)) {
+            if (!isUnsignedLiteralAssignable(arg, paramType)) {
                 throw Error("Type error: argument " + std::to_string(i + 1) + " of '" + e.callName +
                             "' expects " + typeName(paramType));
             }
             continue;
         }
-        Type argType = (tag == ExprTypeTag::D64) ? Type::D64 : Type::I64;
-        if (argType != paramType) {
-            throw Error("Type error: argument " + std::to_string(i + 1) + " of '" + e.callName +
-                        "' expects " + typeName(paramType) + ", got " + typeName(argType));
+        if (unsignedBits(argType) > unsignedBits(paramType)) {
+            if (!isUnsignedLiteralAssignable(arg, paramType)) {
+                throw Error("Type error: argument " + std::to_string(i + 1) + " of '" + e.callName +
+                            "' expects " + typeName(paramType) + ", got " + typeName(argType));
+            }
         }
     }
 }
 
 static Type resolvePrintType(const Expr& e, const CodegenCtx& cg, Mode mode) {
     ExprTypeTag tag = inferExprTypeTag(e, cg, mode);
-    if (tag == ExprTypeTag::NumLiteral) {
+    if (tag == ExprTypeTag::IntLiteral) {
         return (mode == Mode::D64Only) ? Type::D64 : Type::I64;
     }
-    if (tag == ExprTypeTag::D64 && mode == Mode::I64Only) {
-        throw Error("d64 expression is not allowed in main_i64");
+    if (tag == ExprTypeTag::D64) {
+        if (mode == Mode::I64Only) {
+            throw Error("d64 expression is not allowed in main_i64");
+        }
+        return Type::D64;
     }
-    if (tag == ExprTypeTag::I64 && mode == Mode::D64Only) {
-        throw Error("i64 expression is not allowed in main_d64");
+    Type t = tagToType(tag);
+    if (mode == Mode::D64Only) {
+        throw Error("integer expression is not allowed in main_d64");
     }
-    return (tag == ExprTypeTag::D64) ? Type::D64 : Type::I64;
+    return t;
 }
 
 struct GenResult {
@@ -1613,10 +2215,17 @@ struct GenResult {
 
 static Type resolveCondType(const Expr& e, const CodegenCtx& cg, Mode mode) {
     ExprTypeTag tag = inferExprTypeTag(e, cg, mode);
-    if (tag == ExprTypeTag::NumLiteral) {
+    if (tag == ExprTypeTag::IntLiteral) {
         return (mode == Mode::D64Only) ? Type::D64 : Type::I64;
     }
-    return (tag == ExprTypeTag::D64) ? Type::D64 : Type::I64;
+    if (tag == ExprTypeTag::D64) {
+        return Type::D64;
+    }
+    Type t = tagToType(tag);
+    if (mode == Mode::D64Only) {
+        throw Error("integer expression is not allowed in main_d64");
+    }
+    return t;
 }
 
 static bool isStrExpr(const Expr& e, const CodegenCtx& cg) {
@@ -1642,7 +2251,7 @@ static void emitCondJumpFalse(std::ostringstream& out, CodegenCtx& cg, const Exp
         out << "    jp   " << label << "\n";
         out << "    je   " << label << "\n";
     } else {
-        emitExprI64(out, cg, cond, labelId);
+        emitExprInt(out, cg, cond, labelId);
         out << "    cmp  rax, 0\n";
         out << "    je   " << label << "\n";
     }
@@ -1706,8 +2315,8 @@ static void emitCallExpr(std::ostringstream& out, CodegenCtx& cg, const Expr& e,
     for (int i = (int)e.callArgs.size() - 1; i >= 0; --i) {
         Type paramType = sig.params[(size_t)i];
         const auto& arg = *e.callArgs[(size_t)i];
-        if (paramType == Type::I64) {
-            emitExprI64(out, cg, arg, labelId);
+        if (paramType == Type::I64 || isUnsignedType(paramType)) {
+            emitExprInt(out, cg, arg, labelId);
             out << "    push rax\n";
         } else if (paramType == Type::D64) {
             emitExprD64(out, cg, arg, labelId);
@@ -1826,7 +2435,11 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
             emitExprD64(out, cg, *st.expr, labelId);
             out << "    movsd [rbp-" << CodegenCtx::slotDisp(slot) << "], xmm0\n";
         } else {
-            emitExprI64(out, cg, *st.expr, labelId);
+            Type srcType = resolveIntExprType(*st.expr, cg, mode);
+            if (srcType != Type::I64) {
+                throw Error("Type error: expected i64 expression");
+            }
+            emitExprInt(out, cg, *st.expr, labelId);
             out << "    mov  [rbp-" << CodegenCtx::slotDisp(slot) << "], rax\n";
         }
         return false;
@@ -1836,8 +2449,8 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
         if (mode == Mode::I64Only && st.declType == Type::D64) {
             throw Error("d64 variables are not allowed in main_i64");
         }
-        if (mode == Mode::D64Only && st.declType == Type::I64) {
-            throw Error("i64 variables are not allowed in main_d64");
+        if (mode == Mode::D64Only && isIntegerType(st.declType)) {
+            throw Error("integer variables are not allowed in main_d64");
         }
         int slot = cg.allocSlot(st.name, st.declType);
         if (st.declType == Type::Str) {
@@ -1846,7 +2459,26 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
             emitExprD64(out, cg, *st.expr, labelId);
             out << "    movsd [rbp-" << CodegenCtx::slotDisp(slot) << "], xmm0\n";
         } else {
-            emitExprI64(out, cg, *st.expr, labelId);
+            Type srcType = resolveIntExprType(*st.expr, cg, mode);
+            if (st.declType == Type::I64) {
+                if (srcType != Type::I64) {
+                    throw Error("Type error: expected i64 expression");
+                }
+            } else {
+                if (!isUnsignedType(srcType)) {
+                    if (!isUnsignedLiteralAssignable(*st.expr, st.declType)) {
+                        throw Error("Type error: expected " + std::string(typeName(st.declType)) + " expression");
+                    }
+                } else if (unsignedBits(srcType) > unsignedBits(st.declType)) {
+                    if (!isUnsignedLiteralAssignable(*st.expr, st.declType)) {
+                        throw Error("Type error: expected " + std::string(typeName(st.declType)) + " expression");
+                    }
+                }
+            }
+            emitExprInt(out, cg, *st.expr, labelId);
+            if (isUnsignedType(st.declType)) {
+                emitMaskUnsigned(out, st.declType);
+            }
             out << "    mov  [rbp-" << CodegenCtx::slotDisp(slot) << "], rax\n";
         }
         return false;
@@ -1935,12 +2567,31 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
             out << "    movsd [rbp-" << CodegenCtx::slotDisp(v.slot) << "], xmm1\n";
             return false;
         } else {
+            Type srcType = resolveIntExprType(*st.expr, cg, mode);
+            if (v.type == Type::I64) {
+                if (srcType != Type::I64) {
+                    throw Error("Type error: expected i64 expression");
+                }
+            } else {
+                if (!isUnsignedType(srcType)) {
+                    if (!isUnsignedLiteralAssignable(*st.expr, v.type)) {
+                        throw Error("Type error: expected " + std::string(typeName(v.type)) + " expression");
+                    }
+                } else if (unsignedBits(srcType) > unsignedBits(v.type)) {
+                    if (!isUnsignedLiteralAssignable(*st.expr, v.type)) {
+                        throw Error("Type error: expected " + std::string(typeName(v.type)) + " expression");
+                    }
+                }
+            }
             if (st.assignOp == Stmt::AssignOp::Eq) {
-                emitExprI64(out, cg, *st.expr, labelId);
+                emitExprInt(out, cg, *st.expr, labelId);
+                if (isUnsignedType(v.type)) {
+                    emitMaskUnsigned(out, v.type);
+                }
                 out << "    mov  [rbp-" << CodegenCtx::slotDisp(v.slot) << "], rax\n";
                 return false;
             }
-            emitExprI64(out, cg, *st.expr, labelId);
+            emitExprInt(out, cg, *st.expr, labelId);
             out << "    mov  rcx, [rbp-" << CodegenCtx::slotDisp(v.slot) << "]\n";
             switch (st.assignOp) {
                 case Stmt::AssignOp::AddEq:
@@ -1956,11 +2607,19 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
                 case Stmt::AssignOp::DivEq:
                     out << "    mov  r8, rax\n";
                     out << "    mov  rax, rcx\n";
-                    out << "    cqo\n";
-                    out << "    idiv r8\n";
+                    if (isUnsignedType(v.type)) {
+                        out << "    xor  edx, edx\n";
+                        out << "    div  r8\n";
+                    } else {
+                        out << "    cqo\n";
+                        out << "    idiv r8\n";
+                    }
                     break;
                 default:
                     break;
+            }
+            if (isUnsignedType(v.type)) {
+                emitMaskUnsigned(out, v.type);
             }
             out << "    mov  [rbp-" << CodegenCtx::slotDisp(v.slot) << "], rax\n";
             return false;
@@ -1982,6 +2641,13 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
         emitPrintD64(out, cg, *st.expr, labelId);
         return false;
     }
+    if (st.kind == Stmt::Kind::PrintHex) {
+        if (mode == Mode::D64Only) {
+            throw Error("print_hex is not allowed in main_d64");
+        }
+        emitPrintHex(out, cg, *st.expr, labelId);
+        return false;
+    }
     if (st.kind == Stmt::Kind::PrintStr) {
         emitPrintStr(out, cg, *st.expr, labelId);
         return false;
@@ -1996,7 +2662,7 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
             if (t == Type::D64) {
                 emitPrintD64(out, cg, *arg, labelId);
             } else {
-                emitPrintI64(out, cg, *arg, labelId);
+                emitPrintInt(out, cg, *arg, labelId, t);
             }
         }
         return false;
@@ -2112,8 +2778,27 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
             out << "    ret\n";
             return true;
         }
-        if (retType == Type::I64) {
-            emitExprI64(out, cg, *st.expr, labelId);
+        if (isIntegerType(retType)) {
+            Type srcType = resolveIntExprType(*st.expr, cg, mode);
+            if (retType == Type::I64) {
+                if (srcType != Type::I64) {
+                    throw Error("Type error: expected i64 expression");
+                }
+            } else {
+                if (!isUnsignedType(srcType)) {
+                    if (!isUnsignedLiteralAssignable(*st.expr, retType)) {
+                        throw Error("Type error: expected " + std::string(typeName(retType)) + " expression");
+                    }
+                } else if (unsignedBits(srcType) > unsignedBits(retType)) {
+                    if (!isUnsignedLiteralAssignable(*st.expr, retType)) {
+                        throw Error("Type error: expected " + std::string(typeName(retType)) + " expression");
+                    }
+                }
+            }
+            emitExprInt(out, cg, *st.expr, labelId);
+            if (isUnsignedType(retType)) {
+                emitMaskUnsigned(out, retType);
+            }
             emitCleanupStrs(out, cg, labelId);
             out << "    leave\n";
             out << "    ret\n";
@@ -2183,8 +2868,11 @@ static GenResult genFunctionAsm(const Func& f, Mode mode, Type retType,
         paramOffset += typeSlotCount(p.type) * 8;
     }
     for (const auto& pm : paramMoves) {
-        if (pm.type == Type::I64) {
+        if (pm.type == Type::I64 || isUnsignedType(pm.type)) {
             body << "    mov  rax, [rbp+" << pm.offset << "]\n";
+            if (isUnsignedType(pm.type)) {
+                emitMaskUnsigned(body, pm.type);
+            }
             body << "    mov  [rbp-" << CodegenCtx::slotDisp(pm.slot) << "], rax\n";
         } else if (pm.type == Type::D64) {
             body << "    movsd xmm0, [rbp+" << pm.offset << "]\n";
@@ -2252,6 +2940,10 @@ static std::string genOutAsm(const std::vector<Func>& funcs, const Func& entry, 
     out << "extern rt_print_f64\n";
     out << "extern rt_print_i64_raw\n";
     out << "extern rt_print_f64_raw\n";
+    out << "extern rt_print_u64\n";
+    out << "extern rt_print_u64_raw\n";
+    out << "extern rt_print_hex_u64\n";
+    out << "extern rt_print_hex_u64_raw\n";
     out << "extern rt_print_bytes\n";
     out << "extern rt_str_concat\n";
     out << "extern rt_str_copy\n";

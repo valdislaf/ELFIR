@@ -1,4 +1,0 @@
-fn main_d64() {
-    auto x = 1e100;
-    ret x;
-}

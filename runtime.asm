@@ -5,6 +5,10 @@ global rt_exit
 global rt_write
 global rt_print_i64
 global rt_print_i64_raw
+global rt_print_u64
+global rt_print_u64_raw
+global rt_print_hex_u64
+global rt_print_hex_u64_raw
 global rt_print_f64
 global rt_print_f64_raw
 global rt_print_bytes
@@ -265,6 +269,50 @@ rt_print_i64:
     pop     rbx
     ret
 
+; utoa16_u64: unsigned 64-bit -> ASCII hex (no prefix)
+; input : rdi = value (uint64), rsi = out buffer
+; output: rax = length (>=1)
+utoa16_u64:
+    test    rdi, rdi
+    jne     .hex_nonzero
+    mov     byte [rsi], '0'
+    mov     eax, 1
+    ret
+
+.hex_nonzero:
+    sub     rsp, 32
+    lea     r8, [rsp]
+    xor     ecx, ecx
+
+.hex_loop:
+    mov     rax, rdi
+    and     rax, 0xF
+    cmp     al, 10
+    jb      .hex_digit
+    add     al, 87
+    jmp     .hex_store
+.hex_digit:
+    add     al, 48
+.hex_store:
+    mov     [r8 + rcx], al
+    inc     rcx
+    shr     rdi, 4
+    jne     .hex_loop
+
+    xor     eax, eax
+.hex_rev_copy:
+    mov     r10, rcx
+    dec     r10
+    sub     r10, rax
+    mov     dl, [r8 + r10]
+    mov     [rsi + rax], dl
+    inc     rax
+    cmp     rax, rcx
+    jne     .hex_rev_copy
+
+    add     rsp, 32
+    ret
+
 ; rt_print_i64_raw: prints signed i64 without newline
 ; input : rdi = value (int64)
 rt_print_i64_raw:
@@ -309,6 +357,99 @@ rt_print_i64_raw:
     mov     edx, ebx
     call    rt_write
 
+    add     rsp, 96
+    pop     rbx
+    ret
+
+; rt_print_u64: prints unsigned u64 in decimal + '\n'
+; input : rdi = value (uint64)
+rt_print_u64:
+    push    rbx             ; SysV ABI: RBX is callee-saved
+    sub     rsp, 96         ; keep rsp 16-byte aligned for calls
+    lea     rsi, [rsp]      ; buf base
+    xor     ebx, ebx        ; len = 0
+
+    call    utoa10_u64
+    mov     ebx, eax
+
+    mov     byte [rsp + rbx], 10
+    inc     ebx
+
+    lea     rsi, [rsp]
+    mov     edx, ebx
+    call    rt_write
+
+    add     rsp, 96
+    pop     rbx
+    ret
+
+; rt_print_u64_raw: prints unsigned u64 without newline
+; input : rdi = value (uint64)
+rt_print_u64_raw:
+    push    rbx             ; SysV ABI: RBX is callee-saved
+    sub     rsp, 96         ; keep rsp 16-byte aligned for calls
+    lea     rsi, [rsp]      ; buf base
+    xor     ebx, ebx        ; len = 0
+
+    call    utoa10_u64
+    mov     ebx, eax
+
+    xor     r10d, r10d
+.scan_zero_u64_raw:
+    cmp     r10d, ebx
+    jge     .scan_done_u64_raw
+    mov     al, [rsp + r10]
+    test    al, al
+    je      .scan_found_u64_raw
+    inc     r10d
+    jmp     .scan_zero_u64_raw
+.scan_found_u64_raw:
+    mov     ebx, r10d
+.scan_done_u64_raw:
+    lea     rsi, [rsp]
+    mov     edx, ebx
+    call    rt_write
+
+    add     rsp, 96
+    pop     rbx
+    ret
+
+; rt_print_hex_u64: prints unsigned u64 in hex + '\n' (with 0x prefix)
+; input : rdi = value (uint64)
+rt_print_hex_u64:
+    push    rbx
+    sub     rsp, 96
+    lea     rsi, [rsp]
+    mov     byte [rsi], '0'
+    mov     byte [rsi+1], 'x'
+    lea     rsi, [rsp+2]
+    call    utoa16_u64
+    mov     ebx, eax
+    lea     rsi, [rsp]
+    mov     edx, ebx
+    add     edx, 2
+    mov     byte [rsp + rdx], 10
+    inc     edx
+    call    rt_write
+    add     rsp, 96
+    pop     rbx
+    ret
+
+; rt_print_hex_u64_raw: prints unsigned u64 in hex without newline (with 0x prefix)
+; input : rdi = value (uint64)
+rt_print_hex_u64_raw:
+    push    rbx
+    sub     rsp, 96
+    lea     rsi, [rsp]
+    mov     byte [rsi], '0'
+    mov     byte [rsi+1], 'x'
+    lea     rsi, [rsp+2]
+    call    utoa16_u64
+    mov     ebx, eax
+    lea     rsi, [rsp]
+    mov     edx, ebx
+    add     edx, 2
+    call    rt_write
     add     rsp, 96
     pop     rbx
     ret

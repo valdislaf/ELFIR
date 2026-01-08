@@ -12,6 +12,30 @@ fn d64 div(d64 a, d64 b) { ret a / b; }
    fn foo2( d64 a) {
       print("div=", a, "\n");
   }
+
+fn assert_i64(str name, i64 got, i64 exp) {
+    if (got == exp) {
+        print(name, "=true\n");
+    } else {
+        print(name, "=false got=", got, " exp=", exp, "\n");
+    }
+}
+
+fn assert_u64(str name, u64 got, u64 exp) {
+    if (got == exp) {
+        print(name, "=true\n");
+    } else {
+        print(name, "=false got=", got, " exp=", exp, "\n");
+    }
+}
+
+fn assert_d64_eps(str name, d64 got, d64 exp, d64 tol) {
+    if (abs(got - exp) < tol) {
+        print(name, "=true\n");
+    } else {
+        print(name, "=false got=", got, " exp=", exp, "\n");
+    }
+}
   
 fn main() {
 i64 x= 0;
@@ -64,5 +88,99 @@ i64 i= 0;
       str s2 = shout("hi");
       foo(s2);
 	  foo2(div(30,65));
+	  
+	  u8 h8 = 128;
+	  print("h8=", h8, "\n");
+     print_hex(h8);
+	 print("\n");
+	 
+	  u16 h16 = 12316;
+	  print("h16=", h16, "\n");
+     print_hex(h16);
+	 print("\n");
+	 
+	   u32 h32 = 12332;
+	  print("h32=", h32, "\n");
+     print_hex(h32);
+	 print("\n");	 
+	  
+	   u64 h64 = 1264;
+	  print("h64=", h64, "\n");
+     print_hex(h64);
+	 print("\n");
+
+      print("\n-- unsigned/bitops tests --\n");
+      u8 w8 = u8(300);
+      print("w8=", w8, " hex=");
+      print_hex(w8);
+      print("\n");
+
+      u16 w16 = u16(0x1234);
+      print("w16=", w16, " hex=");
+      print_hex(w16);
+      print("\n");
+
+      u32 w32 = 0xFFFF_FFF0;
+      print("w32=", w32, " hex=");
+      print_hex(w32);
+      print("\n");
+
+      u64 w64 = 0x8000_0000_0000_0000;
+      print("w64=", w64, " hex=");
+      print_hex(w64);
+      print("\n");
+
+      u32 b1 = u32(0x0F0F);
+      u32 b2 = u32(0xF000);
+      u32 b_and = b1 & b2;
+      u32 b_or = b1 | b2;
+      u32 b_xor = b1 ^ b2;
+      print("b_and=");
+      print_hex(b_and);
+      print(" b_or=");
+      print_hex(b_or);
+      print(" b_xor=");
+      print_hex(b_xor);
+      print("\n");
+
+      u8 sh = u8(1);
+      sh = sh << 7;
+      print("shl u8=");
+      print_hex(sh);
+      print("\n");
+
+      u8 shr = u8(0x80) >> 1;
+      print("shr u8=");
+      print_hex(shr);
+      print("\n");
+
+      i64 sneg = -4;
+      i64 sar = sneg >> 1;
+      print("sar i64=", sar, "\n");
+
+      print("cmp u8 250>3=", u8(250) > u8(3), "\n");
+      print("cmp u8 1<2=", u8(1) < u8(2), "\n");
+      print("hex literal print_hex(0xABCD)=");
+      print_hex(0xABCD);
+      print("\n");
+
+      print("\n-- unit tests --\n");
+      assert_i64("x", x, -2);
+      assert_d64_eps("y", y, -1.1892139303482593, 1e-12);
+      assert_i64("add", x1, 5);
+      assert_u64("w8", u64(w8), 44);
+      assert_u64("w16", u64(w16), 0x1234);
+      assert_u64("w32", u64(w32), 0xFFFF_FFF0);
+      assert_u64("w64", w64, 0x8000_0000_0000_0000);
+      assert_u64("b_and", u64(b_and), 0);
+      assert_u64("b_or", u64(b_or), 0xFF0F);
+      assert_u64("b_xor", u64(b_xor), 0xFF0F);
+      assert_u64("shl_u8", u64(sh), 0x80);
+      assert_u64("shr_u8", u64(shr), 0x40);
+      assert_i64("sar_i64", sar, -2);
+      assert_i64("cmp_u8_gt", u8(250) > u8(3), 1);
+      assert_i64("cmp_u8_lt", u8(1) < u8(2), 1);
+      assert_u64("hex_abcd", u64(0xABCD), 0xABCD);
+	 
       ret 0;
   }

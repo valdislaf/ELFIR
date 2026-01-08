@@ -6,6 +6,10 @@ extern rt_print_i64
 extern rt_print_f64
 extern rt_print_i64_raw
 extern rt_print_f64_raw
+extern rt_print_u64
+extern rt_print_u64_raw
+extern rt_print_hex_u64
+extern rt_print_hex_u64_raw
 extern rt_print_bytes
 extern rt_str_concat
 extern rt_str_copy
@@ -18,6 +22,18 @@ foo_str0: db 102, 111, 111, 61
 foo_str1: db 10
 foo2_str0: db 100, 105, 118, 61
 foo2_str1: db 10
+assert_i64_str0: db 61, 116, 114, 117, 101, 10
+assert_i64_str1: db 61, 102, 97, 108, 115, 101, 32, 103, 111, 116, 61
+assert_i64_str2: db 32, 101, 120, 112, 61
+assert_i64_str3: db 10
+assert_u64_str0: db 61, 116, 114, 117, 101, 10
+assert_u64_str1: db 61, 102, 97, 108, 115, 101, 32, 103, 111, 116, 61
+assert_u64_str2: db 32, 101, 120, 112, 61
+assert_u64_str3: db 10
+assert_d64_eps_str0: db 61, 116, 114, 117, 101, 10
+assert_d64_eps_str1: db 61, 102, 97, 108, 115, 101, 32, 103, 111, 116, 61
+assert_d64_eps_str2: db 32, 101, 120, 112, 61
+assert_d64_eps_str3: db 10
 main_str0: db 120, 61
 main_str1: db 10
 main_str2: db 121, 61
@@ -31,6 +47,42 @@ main_str9: db 115, 49, 61
 main_str10: db 105, 61
 main_str11: db 120, 49, 61
 main_str12: db 104, 105
+main_str13: db 104, 56, 61
+main_str14: db 104, 49, 54, 61
+main_str15: db 104, 51, 50, 61
+main_str16: db 104, 54, 52, 61
+main_str17: db 10, 45, 45, 32, 117, 110, 115, 105, 103, 110, 101, 100, 47, 98, 105, 116, 111, 112, 115, 32, 116, 101, 115, 116, 115, 32, 45, 45, 10
+main_str18: db 119, 56, 61
+main_str19: db 32, 104, 101, 120, 61
+main_str20: db 119, 49, 54, 61
+main_str21: db 119, 51, 50, 61
+main_str22: db 119, 54, 52, 61
+main_str23: db 98, 95, 97, 110, 100, 61
+main_str24: db 32, 98, 95, 111, 114, 61
+main_str25: db 32, 98, 95, 120, 111, 114, 61
+main_str26: db 115, 104, 108, 32, 117, 56, 61
+main_str27: db 115, 104, 114, 32, 117, 56, 61
+main_str28: db 115, 97, 114, 32, 105, 54, 52, 61
+main_str29: db 99, 109, 112, 32, 117, 56, 32, 50, 53, 48, 62, 51, 61
+main_str30: db 99, 109, 112, 32, 117, 56, 32, 49, 60, 50, 61
+main_str31: db 104, 101, 120, 32, 108, 105, 116, 101, 114, 97, 108, 32, 112, 114, 105, 110, 116, 95, 104, 101, 120, 40, 48, 120, 65, 66, 67, 68, 41, 61
+main_str32: db 10, 45, 45, 32, 117, 110, 105, 116, 32, 116, 101, 115, 116, 115, 32, 45, 45, 10
+main_str33: db 120
+main_str34: db 121
+main_str35: db 97, 100, 100
+main_str36: db 119, 56
+main_str37: db 119, 49, 54
+main_str38: db 119, 51, 50
+main_str39: db 119, 54, 52
+main_str40: db 98, 95, 97, 110, 100
+main_str41: db 98, 95, 111, 114
+main_str42: db 98, 95, 120, 111, 114
+main_str43: db 115, 104, 108, 95, 117, 56
+main_str44: db 115, 104, 114, 95, 117, 56
+main_str45: db 115, 97, 114, 95, 105, 54, 52
+main_str46: db 99, 109, 112, 95, 117, 56, 95, 103, 116
+main_str47: db 99, 109, 112, 95, 117, 56, 95, 108, 116
+main_str48: db 104, 101, 120, 95, 97, 98, 99, 100
 
 section .text
 
@@ -211,10 +263,312 @@ foo2:
     leave
     ret
 
+assert_i64:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  rdx, [rbp+24]
+    test rdx, rdx
+    jns  .param_str_ok_0
+    neg  rdx
+    dec  rdx
+.param_str_ok_0:
+    mov  [rbp-8], rax
+    mov  [rbp-16], rdx
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-32]
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_2
+    mov  rdi, [rbp-8]
+    mov  rsi, [rbp-16]
+    test rsi, rsi
+    jns  .str_len_ok_3
+    neg  rsi
+    dec  rsi
+.str_len_ok_3:
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    lea  rdi, [rel assert_i64_str0]
+    mov  rsi, 6
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    jmp  .if_end_1
+.if_next_2:
+    mov  rdi, [rbp-8]
+    mov  rsi, [rbp-16]
+    test rsi, rsi
+    jns  .str_len_ok_5
+    neg  rsi
+    dec  rsi
+.str_len_ok_5:
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    lea  rdi, [rel assert_i64_str1]
+    mov  rsi, 11
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-24]
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_i64_raw
+    add  rsp, 8
+    lea  rdi, [rel assert_i64_str2]
+    mov  rsi, 5
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-32]
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_i64_raw
+    add  rsp, 8
+    lea  rdi, [rel assert_i64_str3]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    jmp  .if_end_1
+.if_next_4:
+.if_end_1:
+    mov  rax, [rbp-16]
+    test rax, rax
+    jns  .str_free_done_6
+    mov  rsi, rax
+    neg  rsi
+    dec  rsi
+    mov  rdi, [rbp-8]
+    sub  rsp, 8
+    call rt_str_free
+    add  rsp, 8
+.str_free_done_6:
+    leave
+    ret
+
+assert_u64:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  rdx, [rbp+24]
+    test rdx, rdx
+    jns  .param_str_ok_0
+    neg  rdx
+    dec  rdx
+.param_str_ok_0:
+    mov  [rbp-8], rax
+    mov  [rbp-16], rdx
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-32]
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_2
+    mov  rdi, [rbp-8]
+    mov  rsi, [rbp-16]
+    test rsi, rsi
+    jns  .str_len_ok_3
+    neg  rsi
+    dec  rsi
+.str_len_ok_3:
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    lea  rdi, [rel assert_u64_str0]
+    mov  rsi, 6
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    jmp  .if_end_1
+.if_next_2:
+    mov  rdi, [rbp-8]
+    mov  rsi, [rbp-16]
+    test rsi, rsi
+    jns  .str_len_ok_5
+    neg  rsi
+    dec  rsi
+.str_len_ok_5:
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    lea  rdi, [rel assert_u64_str1]
+    mov  rsi, 11
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-24]
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel assert_u64_str2]
+    mov  rsi, 5
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-32]
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel assert_u64_str3]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    jmp  .if_end_1
+.if_next_4:
+.if_end_1:
+    mov  rax, [rbp-16]
+    test rax, rax
+    jns  .str_free_done_6
+    mov  rsi, rax
+    neg  rsi
+    dec  rsi
+    mov  rdi, [rbp-8]
+    sub  rsp, 8
+    call rt_str_free
+    add  rsp, 8
+.str_free_done_6:
+    leave
+    ret
+
+assert_d64_eps:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 48
+    mov  rax, [rbp+16]
+    mov  rdx, [rbp+24]
+    test rdx, rdx
+    jns  .param_str_ok_0
+    neg  rdx
+    dec  rdx
+.param_str_ok_0:
+    mov  [rbp-8], rax
+    mov  [rbp-16], rdx
+    movsd xmm0, [rbp+32]
+    movsd [rbp-24], xmm0
+    movsd xmm0, [rbp+40]
+    movsd [rbp-32], xmm0
+    movsd xmm0, [rbp+48]
+    movsd [rbp-40], xmm0
+    movsd xmm0, [rbp-24]
+    sub  rsp, 8
+    movsd [rsp], xmm0
+    movsd xmm0, [rbp-32]
+    movsd xmm1, [rsp]
+    add  rsp, 8
+    subsd xmm1, xmm0
+    movapd xmm0, xmm1
+    mov  rax, 0x7fffffffffffffff
+    movq xmm1, rax
+    andpd xmm0, xmm1
+    sub  rsp, 8
+    movsd [rsp], xmm0
+    movsd xmm0, [rbp-40]
+    movsd xmm1, [rsp]
+    add  rsp, 8
+    ucomisd xmm1, xmm0
+    setb al
+    setnp dl
+    and  al, dl
+    movzx eax, al
+    cvtsi2sd xmm0, eax
+    xorpd xmm1, xmm1
+    ucomisd xmm0, xmm1
+    jp   .if_next_2
+    je   .if_next_2
+    mov  rdi, [rbp-8]
+    mov  rsi, [rbp-16]
+    test rsi, rsi
+    jns  .str_len_ok_3
+    neg  rsi
+    dec  rsi
+.str_len_ok_3:
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    lea  rdi, [rel assert_d64_eps_str0]
+    mov  rsi, 6
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    jmp  .if_end_1
+.if_next_2:
+    mov  rdi, [rbp-8]
+    mov  rsi, [rbp-16]
+    test rsi, rsi
+    jns  .str_len_ok_5
+    neg  rsi
+    dec  rsi
+.str_len_ok_5:
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    lea  rdi, [rel assert_d64_eps_str1]
+    mov  rsi, 11
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    movsd xmm0, [rbp-24]
+    sub  rsp, 8
+    call rt_print_f64_raw
+    add  rsp, 8
+    lea  rdi, [rel assert_d64_eps_str2]
+    mov  rsi, 5
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    movsd xmm0, [rbp-32]
+    sub  rsp, 8
+    call rt_print_f64_raw
+    add  rsp, 8
+    lea  rdi, [rel assert_d64_eps_str3]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    jmp  .if_end_1
+.if_next_4:
+.if_end_1:
+    mov  rax, [rbp-16]
+    test rax, rax
+    jns  .str_free_done_6
+    mov  rsi, rax
+    neg  rsi
+    dec  rsi
+    mov  rdi, [rbp-8]
+    sub  rsp, 8
+    call rt_str_free
+    add  rsp, 8
+.str_free_done_6:
+    leave
+    ret
+
 main:
     push rbp
     mov  rbp, rsp
-    sub  rsp, 80
+    sub  rsp, 224
     mov  rax, 0
     mov  [rbp-8], rax
     mov  rax, 0
@@ -651,6 +1005,741 @@ main:
     movsd [rsp], xmm0
     call foo2
     add  rsp, 8
+    mov  rax, 128
+    and  rax, 0xFF
+    mov  [rbp-88], rax
+    lea  rdi, [rel main_str13]
+    mov  rsi, 3
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-88]
+    and  rax, 0xFF
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-88]
+    and  rax, 0xFF
+    and  rax, 0xFF
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_hex_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, 12316
+    and  rax, 0xFFFF
+    mov  [rbp-96], rax
+    lea  rdi, [rel main_str14]
+    mov  rsi, 4
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-96]
+    and  rax, 0xFFFF
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-96]
+    and  rax, 0xFFFF
+    and  rax, 0xFFFF
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_hex_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, 12332
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-104], rax
+    lea  rdi, [rel main_str15]
+    mov  rsi, 4
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-104]
+    and  eax, 0xFFFFFFFF
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-104]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_hex_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, 1264
+    mov  [rbp-112], rax
+    lea  rdi, [rel main_str16]
+    mov  rsi, 4
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-112]
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-112]
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_hex_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    lea  rdi, [rel main_str17]
+    mov  rsi, 29
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, 300
+    and  rax, 0xFF
+    and  rax, 0xFF
+    mov  [rbp-120], rax
+    lea  rdi, [rel main_str18]
+    mov  rsi, 3
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-120]
+    and  rax, 0xFF
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str19]
+    mov  rsi, 5
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-120]
+    and  rax, 0xFF
+    and  rax, 0xFF
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_hex_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, 0x1234
+    and  rax, 0xFFFF
+    and  rax, 0xFFFF
+    mov  [rbp-128], rax
+    lea  rdi, [rel main_str20]
+    mov  rsi, 4
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-128]
+    and  rax, 0xFFFF
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str19]
+    mov  rsi, 5
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-128]
+    and  rax, 0xFFFF
+    and  rax, 0xFFFF
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_hex_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, 0xFFFFFFF0
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-136], rax
+    lea  rdi, [rel main_str21]
+    mov  rsi, 4
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-136]
+    and  eax, 0xFFFFFFFF
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str19]
+    mov  rsi, 5
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-136]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_hex_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, 0x8000000000000000
+    mov  [rbp-144], rax
+    lea  rdi, [rel main_str22]
+    mov  rsi, 4
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-144]
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str19]
+    mov  rsi, 5
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-144]
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_hex_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, 0x0F0F
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-152], rax
+    mov  rax, 0xF000
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-160], rax
+    mov  rax, [rbp-152]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-160]
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-168], rax
+    mov  rax, [rbp-152]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-160]
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    or   rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-176], rax
+    mov  rax, [rbp-152]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-160]
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    xor  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-184], rax
+    lea  rdi, [rel main_str23]
+    mov  rsi, 6
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-168]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_hex_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str24]
+    mov  rsi, 6
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-176]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_hex_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str25]
+    mov  rsi, 7
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-184]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_hex_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, 1
+    and  rax, 0xFF
+    and  rax, 0xFF
+    mov  [rbp-192], rax
+    mov  rax, [rbp-192]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 7
+    mov  rcx, rax
+    pop  rax
+    shl  rax, cl
+    and  rax, 0xFF
+    and  rax, 0xFF
+    mov  [rbp-192], rax
+    lea  rdi, [rel main_str26]
+    mov  rsi, 7
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-192]
+    and  rax, 0xFF
+    and  rax, 0xFF
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_hex_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, 0x80
+    and  rax, 0xFF
+    push rax
+    mov  rax, 1
+    mov  rcx, rax
+    pop  rax
+    shr  rax, cl
+    and  rax, 0xFF
+    and  rax, 0xFF
+    mov  [rbp-200], rax
+    lea  rdi, [rel main_str27]
+    mov  rsi, 7
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-200]
+    and  rax, 0xFF
+    and  rax, 0xFF
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_hex_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, 0
+    push rax
+    mov  rax, 4
+    pop  rcx
+    sub  rcx, rax
+    mov  rax, rcx
+    mov  [rbp-208], rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, 1
+    mov  rcx, rax
+    pop  rax
+    sar  rax, cl
+    mov  [rbp-216], rax
+    lea  rdi, [rel main_str28]
+    mov  rsi, 8
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-216]
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_i64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    lea  rdi, [rel main_str29]
+    mov  rsi, 13
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, 250
+    and  rax, 0xFF
+    push rax
+    mov  rax, 3
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    seta al
+    movzx eax, al
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_i64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    lea  rdi, [rel main_str30]
+    mov  rsi, 11
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, 1
+    and  rax, 0xFF
+    push rax
+    mov  rax, 2
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    setb al
+    movzx eax, al
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_i64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    lea  rdi, [rel main_str31]
+    mov  rsi, 30
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, 0xABCD
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_hex_u64_raw
+    add  rsp, 8
+    lea  rdi, [rel main_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    lea  rdi, [rel main_str32]
+    mov  rsi, 18
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    sub  rsp, 8
+    mov  rax, 0
+    push rax
+    mov  rax, 2
+    pop  rcx
+    sub  rcx, rax
+    mov  rax, rcx
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    lea  rax, [rel main_str33]
+    mov  rdx, 1
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_i64
+    add  rsp, 40
+    mov  rax, 0x3d719799812dea11
+    movq xmm0, rax
+    sub  rsp, 8
+    movsd [rsp], xmm0
+    mov  rax, 0x0
+    movq xmm0, rax
+    sub  rsp, 8
+    movsd [rsp], xmm0
+    mov  rax, 0x3ff307052facb1c0
+    movq xmm0, rax
+    movsd xmm1, [rsp]
+    add  rsp, 8
+    subsd xmm1, xmm0
+    movapd xmm0, xmm1
+    sub  rsp, 8
+    movsd [rsp], xmm0
+    movsd xmm0, [rbp-16]
+    sub  rsp, 8
+    movsd [rsp], xmm0
+    lea  rax, [rel main_str34]
+    mov  rdx, 1
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_d64_eps
+    add  rsp, 40
+    sub  rsp, 8
+    mov  rax, 5
+    push rax
+    mov  rax, [rbp-64]
+    push rax
+    lea  rax, [rel main_str35]
+    mov  rdx, 3
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_i64
+    add  rsp, 40
+    sub  rsp, 8
+    mov  rax, 44
+    push rax
+    mov  rax, [rbp-120]
+    and  rax, 0xFF
+    push rax
+    lea  rax, [rel main_str36]
+    mov  rdx, 2
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_u64
+    add  rsp, 40
+    sub  rsp, 8
+    mov  rax, 0x1234
+    push rax
+    mov  rax, [rbp-128]
+    and  rax, 0xFFFF
+    push rax
+    lea  rax, [rel main_str37]
+    mov  rdx, 3
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_u64
+    add  rsp, 40
+    sub  rsp, 8
+    mov  rax, 0xFFFFFFF0
+    push rax
+    mov  rax, [rbp-136]
+    and  eax, 0xFFFFFFFF
+    push rax
+    lea  rax, [rel main_str38]
+    mov  rdx, 3
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_u64
+    add  rsp, 40
+    sub  rsp, 8
+    mov  rax, 0x8000000000000000
+    push rax
+    mov  rax, [rbp-144]
+    push rax
+    lea  rax, [rel main_str39]
+    mov  rdx, 3
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_u64
+    add  rsp, 40
+    sub  rsp, 8
+    mov  rax, 0
+    push rax
+    mov  rax, [rbp-168]
+    and  eax, 0xFFFFFFFF
+    push rax
+    lea  rax, [rel main_str40]
+    mov  rdx, 5
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_u64
+    add  rsp, 40
+    sub  rsp, 8
+    mov  rax, 0xFF0F
+    push rax
+    mov  rax, [rbp-176]
+    and  eax, 0xFFFFFFFF
+    push rax
+    lea  rax, [rel main_str41]
+    mov  rdx, 4
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_u64
+    add  rsp, 40
+    sub  rsp, 8
+    mov  rax, 0xFF0F
+    push rax
+    mov  rax, [rbp-184]
+    and  eax, 0xFFFFFFFF
+    push rax
+    lea  rax, [rel main_str42]
+    mov  rdx, 5
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_u64
+    add  rsp, 40
+    sub  rsp, 8
+    mov  rax, 0x80
+    push rax
+    mov  rax, [rbp-192]
+    and  rax, 0xFF
+    push rax
+    lea  rax, [rel main_str43]
+    mov  rdx, 6
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_u64
+    add  rsp, 40
+    sub  rsp, 8
+    mov  rax, 0x40
+    push rax
+    mov  rax, [rbp-200]
+    and  rax, 0xFF
+    push rax
+    lea  rax, [rel main_str44]
+    mov  rdx, 6
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_u64
+    add  rsp, 40
+    sub  rsp, 8
+    mov  rax, 0
+    push rax
+    mov  rax, 2
+    pop  rcx
+    sub  rcx, rax
+    mov  rax, rcx
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    lea  rax, [rel main_str45]
+    mov  rdx, 7
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_i64
+    add  rsp, 40
+    sub  rsp, 8
+    mov  rax, 1
+    push rax
+    mov  rax, 250
+    and  rax, 0xFF
+    push rax
+    mov  rax, 3
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    seta al
+    movzx eax, al
+    push rax
+    lea  rax, [rel main_str46]
+    mov  rdx, 9
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_i64
+    add  rsp, 40
+    sub  rsp, 8
+    mov  rax, 1
+    push rax
+    mov  rax, 1
+    and  rax, 0xFF
+    push rax
+    mov  rax, 2
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    setb al
+    movzx eax, al
+    push rax
+    lea  rax, [rel main_str47]
+    mov  rdx, 9
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_i64
+    add  rsp, 40
+    sub  rsp, 8
+    mov  rax, 0xABCD
+    push rax
+    mov  rax, 0xABCD
+    push rax
+    lea  rax, [rel main_str48]
+    mov  rdx, 8
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_u64
+    add  rsp, 40
     mov  rax, 0
     mov  rax, [rbp-32]
     test rax, rax
