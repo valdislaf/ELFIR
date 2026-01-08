@@ -2,7 +2,7 @@ ELFIR (v0.1) — Minimal Compiler + Runtime (Linux x86-64)
 
 ELFIR is an experimental micro-language and compiler that translates `*.elfir` source into NASM assembly, then links to a native ELF executable for Linux x86-64 (SysV ABI). The v0 goal is maximum simplicity and determinism:
 
-- exactly one numeric type per entrypoint (i64 or d64)
+- `main_i64` is i64-only, `main_d64` is d64-only; `main` allows both with explicit types
 - no libc, only Linux syscalls
 - a small, explicit runtime
 
@@ -126,6 +126,9 @@ fn main_d64() {
 - `print_i64` is only allowed in `main`/`main_i64`; `print_d64` only in `main`/`main_d64`.
 - `ret <expr>;` returns the expression value in `rax` (i64) or `xmm0` (d64).
 - `if (<expr>) { ... } [elseif (<expr>) { ... }]* [else { ... }]` with numeric conditions (nonzero is true).
+- `while (<expr>) { ... }` repeats while condition is nonzero.
+- `for (<init>, <cond>, <step>) { ... }` or `for (<init>; <cond>; <step>) { ... }` with commas or semicolons; `<init>` is `auto` or `i64/d64` declaration.
+- `<name> = <expr>;` assigns to an existing variable.
 - Operators: `+`, `-`, `*`, `/`, `%` with standard precedence and left associativity.
 - `%` is remainder (i64) / fmod-style remainder (d64).
 - Comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=` (lower precedence than arithmetic).

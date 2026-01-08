@@ -29,6 +29,8 @@ enum class TokKind {
     KwIf,
     KwElse,
     KwElseIf,
+    KwWhile,
+    KwFor,
 
     LParen, RParen,
     LBrace, RBrace,
@@ -88,6 +90,8 @@ public:
             else if (t.text == "if") t.kind = TokKind::KwIf;
             else if (t.text == "else") t.kind = TokKind::KwElse;
             else if (t.text == "elseif") t.kind = TokKind::KwElseIf;
+            else if (t.text == "while") t.kind = TokKind::KwWhile;
+            else if (t.text == "for") t.kind = TokKind::KwFor;
             else t.kind = TokKind::Ident;
             return t;
         }
@@ -281,12 +285,16 @@ struct Stmt {
         std::unique_ptr<Expr> cond;
         std::vector<Stmt> body;
     };
-    enum class Kind { AutoAssign, TypedAssign, Ret, PrintI64, PrintD64, PrintStr, PrintList, If } kind;
+    enum class Kind { AutoAssign, TypedAssign, Assign, Ret, PrintI64, PrintD64, PrintStr, PrintList, If, While, For } kind;
     Type declType = Type::I64;    // for TypedAssign
     std::string name;             // for AutoAssign
     std::unique_ptr<Expr> expr;   // for both
     std::vector<std::unique_ptr<Expr>> exprs; // for PrintList
     std::vector<IfBranch> ifBranches;
+    std::unique_ptr<Expr> cond;
+    std::vector<Stmt> body;
+    std::unique_ptr<Stmt> init;
+    std::unique_ptr<Stmt> step;
 };
 
 struct Func {
@@ -330,6 +338,12 @@ private:
     Stmt parseStmt() {
         if (cur_.kind == TokKind::KwIf) {
             return parseIfStmt();
+        }
+        if (cur_.kind == TokKind::KwWhile) {
+            return parseWhileStmt();
+        }
+        if (cur_.kind == TokKind::KwFor) {
+            return parseForStmt();
         }
         if (cur_.kind == TokKind::KwAuto) {
             advance();
@@ -400,6 +414,9 @@ private:
         st.expr = std::move(e);
         return st;
     }
+    if (cur_.kind == TokKind::Ident) {
+        return parseAssignStmt(true);
+    }
 
         if (cur_.kind == TokKind::KwRet) {
             advance();
@@ -411,7 +428,7 @@ private:
             return st;
         }
 
-        throw Error("Expected statement ('auto', 'ret', 'print', or 'if') at position " + std::to_string(cur_.pos));
+        throw Error("Expected statement ('auto', 'ret', 'print', 'if', 'while', or 'for') at position " + std::to_string(cur_.pos));
     }
 
     std::vector<Stmt> parseBlock() {
@@ -458,6 +475,93 @@ private:
             st.ifBranches.push_back(std::move(branch));
         }
 
+        return st;
+    }
+
+    Stmt parseWhileStmt() {
+        expect(TokKind::KwWhile, "Expected 'while'");
+        expect(TokKind::LParen, "Expected '(' after while");
+        auto cond = parseComparison();
+        expect(TokKind::RParen, "Expected ')' after while condition");
+        auto body = parseBlock();
+        Stmt st;
+        st.kind = Stmt::Kind::While;
+        st.cond = std::move(cond);
+        st.body = std::move(body);
+        return st;
+    }
+
+    Stmt parseForStmt() {
+        expect(TokKind::KwFor, "Expected 'for'");
+        expect(TokKind::LParen, "Expected '(' after for");
+        Stmt init;
+        if (cur_.kind == TokKind::KwAuto) {
+            init = parseAutoAssignNoSemicolon();
+        } else if (cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwD64) {
+            Type t = (cur_.kind == TokKind::KwI64) ? Type::I64 : Type::D64;
+            advance();
+            init = parseTypedAssignNoSemicolon(t);
+        } else {
+            throw Error("Expected 'auto', 'i64', or 'd64' in for init at position " + std::to_string(cur_.pos));
+        }
+        expectForSep("Expected ',' or ';' after for init");
+        auto cond = parseComparison();
+        expectForSep("Expected ',' or ';' after for condition");
+        Stmt step = parseAssignStmt(false);
+        expect(TokKind::RParen, "Expected ')' after for step");
+        auto body = parseBlock();
+        Stmt st;
+        st.kind = Stmt::Kind::For;
+        st.init = std::make_unique<Stmt>(std::move(init));
+        st.cond = std::move(cond);
+        st.step = std::make_unique<Stmt>(std::move(step));
+        st.body = std::move(body);
+        return st;
+    }
+
+    void expectForSep(const char* msg) {
+        if (cur_.kind == TokKind::Comma || cur_.kind == TokKind::Semicolon) {
+            advance();
+            return;
+        }
+        throw Error(std::string(msg) + " at position " + std::to_string(cur_.pos));
+    }
+
+    Stmt parseAssignStmt(bool withSemicolon) {
+        std::string var = expectIdent("Expected identifier");
+        expect(TokKind::Equal, "Expected '=' after variable name");
+        auto e = parseComparison();
+        if (withSemicolon) {
+            expect(TokKind::Semicolon, "Expected ';' after assignment");
+        }
+        Stmt st;
+        st.kind = Stmt::Kind::Assign;
+        st.name = var;
+        st.expr = std::move(e);
+        return st;
+    }
+
+    Stmt parseAutoAssignNoSemicolon() {
+        expect(TokKind::KwAuto, "Expected 'auto'");
+        std::string var = expectIdent("Expected identifier after 'auto'");
+        expect(TokKind::Equal, "Expected '=' after variable name");
+        auto e = parseComparison();
+        Stmt st;
+        st.kind = Stmt::Kind::AutoAssign;
+        st.name = var;
+        st.expr = std::move(e);
+        return st;
+    }
+
+    Stmt parseTypedAssignNoSemicolon(Type t) {
+        std::string var = expectIdent("Expected identifier after type");
+        expect(TokKind::Equal, "Expected '=' after variable name");
+        auto e = parseComparison();
+        Stmt st;
+        st.kind = Stmt::Kind::TypedAssign;
+        st.declType = t;
+        st.name = var;
+        st.expr = std::move(e);
         return st;
     }
 
@@ -1270,6 +1374,22 @@ static Type resolveCondType(const Expr& e, const CodegenCtx& cg, Mode mode) {
     return (tag == ExprTypeTag::D64) ? Type::D64 : Type::I64;
 }
 
+static void emitCondJumpFalse(std::ostringstream& out, CodegenCtx& cg, const Expr& cond,
+                              int& labelId, Mode mode, const std::string& label) {
+    Type condType = resolveCondType(cond, cg, mode);
+    if (condType == Type::D64) {
+        emitExprD64(out, cg, cond, labelId);
+        out << "    xorpd xmm1, xmm1\n";
+        out << "    ucomisd xmm0, xmm1\n";
+        out << "    jp   " << label << "\n";
+        out << "    je   " << label << "\n";
+    } else {
+        emitExprI64(out, cg, cond, labelId);
+        out << "    cmp  rax, 0\n";
+        out << "    je   " << label << "\n";
+    }
+}
+
 static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, int& labelId, Mode mode, Type retType) {
     bool hasRet = false;
     if (st.kind == Stmt::Kind::AutoAssign) {
@@ -1302,6 +1422,18 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
         } else {
             emitExprI64(out, cg, *st.expr, labelId);
             out << "    mov  [rbp-" << CodegenCtx::slotDisp(slot) << "], rax\n";
+        }
+        return false;
+    }
+
+    if (st.kind == Stmt::Kind::Assign) {
+        auto v = cg.getVar(st.name);
+        if (v.type == Type::D64) {
+            emitExprD64(out, cg, *st.expr, labelId);
+            out << "    movsd [rbp-" << CodegenCtx::slotDisp(v.slot) << "], xmm0\n";
+        } else {
+            emitExprI64(out, cg, *st.expr, labelId);
+            out << "    mov  [rbp-" << CodegenCtx::slotDisp(v.slot) << "], rax\n";
         }
         return false;
     }
@@ -1345,18 +1477,7 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
             const auto& br = st.ifBranches[i];
             int nextId = labelId++;
             if (br.cond) {
-                Type condType = resolveCondType(*br.cond, cg, mode);
-                if (condType == Type::D64) {
-                    emitExprD64(out, cg, *br.cond, labelId);
-                    out << "    xorpd xmm1, xmm1\n";
-                    out << "    ucomisd xmm0, xmm1\n";
-                    out << "    jp   .if_next_" << nextId << "\n";
-                    out << "    je   .if_next_" << nextId << "\n";
-                } else {
-                    emitExprI64(out, cg, *br.cond, labelId);
-                    out << "    cmp  rax, 0\n";
-                    out << "    je   .if_next_" << nextId << "\n";
-                }
+                emitCondJumpFalse(out, cg, *br.cond, labelId, mode, ".if_next_" + std::to_string(nextId));
             }
             for (const auto& inner : br.body) {
                 if (emitStmt(out, cg, inner, labelId, mode, retType)) {
@@ -1367,6 +1488,44 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
             out << ".if_next_" << nextId << ":\n";
         }
         out << ".if_end_" << endId << ":\n";
+        return hasRet;
+    }
+    if (st.kind == Stmt::Kind::While) {
+        int startId = labelId++;
+        int endId = labelId++;
+        out << ".while_start_" << startId << ":\n";
+        emitCondJumpFalse(out, cg, *st.cond, labelId, mode, ".while_end_" + std::to_string(endId));
+        for (const auto& inner : st.body) {
+            if (emitStmt(out, cg, inner, labelId, mode, retType)) {
+                hasRet = true;
+            }
+        }
+        out << "    jmp  .while_start_" << startId << "\n";
+        out << ".while_end_" << endId << ":\n";
+        return hasRet;
+    }
+    if (st.kind == Stmt::Kind::For) {
+        if (st.init) {
+            if (emitStmt(out, cg, *st.init, labelId, mode, retType)) {
+                hasRet = true;
+            }
+        }
+        int startId = labelId++;
+        int endId = labelId++;
+        out << ".for_start_" << startId << ":\n";
+        emitCondJumpFalse(out, cg, *st.cond, labelId, mode, ".for_end_" + std::to_string(endId));
+        for (const auto& inner : st.body) {
+            if (emitStmt(out, cg, inner, labelId, mode, retType)) {
+                hasRet = true;
+            }
+        }
+        if (st.step) {
+            if (emitStmt(out, cg, *st.step, labelId, mode, retType)) {
+                hasRet = true;
+            }
+        }
+        out << "    jmp  .for_start_" << startId << "\n";
+        out << ".for_end_" << endId << ":\n";
         return hasRet;
     }
 
