@@ -54,6 +54,13 @@ main_d64:
     add  rsp, 8
     mov  rax, 0x400921fb54442d18
     movq xmm0, rax
+    sub  rsp, 8
+    movsd [rsp], xmm0
+    mov  rax, 0x3c4479d3a8e6d55b
+    movq xmm0, rax
+    movsd xmm1, [rsp]
+    add  rsp, 8
+    mulsd xmm0, xmm1
     leave
     ret
 

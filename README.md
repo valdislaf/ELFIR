@@ -133,7 +133,7 @@ fn main_d64() {
 - `()` can be used to group expressions.
 - Integer literals: decimal digits only; a leading `-` is parsed as unary minus.
 - Floating literals (d64 mode): digits with optional `.` and optional exponent `e|E[+|-]digits`.
-- d64 output format: scientific notation with trailing zeros trimmed (at least one digit after the dot).
+- d64 output format: fixed within [1e-17, 1e18), otherwise scientific; trailing zeros trimmed (at least one digit after the dot).
 - String literals support escapes: `\\`, `\"`, `\n`, `\t`.
 - Comparison result: `0/1` in i64 mode, `0.0/1.0` in d64 mode.
 - i64 `sqrt`: integer result (truncates toward zero). Negative input yields `0`.

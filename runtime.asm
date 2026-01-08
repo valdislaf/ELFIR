@@ -14,6 +14,8 @@ align 8
 const_f64_0:  dq 0x0000000000000000
 const_f64_1:  dq 0x3ff0000000000000
 const_f64_10: dq 0x4024000000000000
+const_f64_1e_17: dq 1.0e-17
+const_f64_1e18:  dq 1.0e18
 mask_f64_exp: dq 0x7ff0000000000000
 mask_f64_man: dq 0x000fffffffffffff
 mask_f64_sign: dq 0x7fffffffffffffff
@@ -173,11 +175,11 @@ rt_print_i64_raw:
     pop     rbx
     ret
 
-; rt_print_f64: prints double in scientific notation + '\n'
+; rt_print_f64: prints double in hybrid format + '\n'
 ; input : xmm0 = value (double)
 rt_print_f64:
     push    rbx             ; SysV ABI: RBX is callee-saved
-    sub     rsp, 64         ; keep rsp 16-byte aligned for calls
+    sub     rsp, 128        ; keep rsp 16-byte aligned for calls
     lea     rsi, [rsp]      ; buf base
     xor     ebx, ebx        ; len = 0
 
@@ -225,14 +227,17 @@ rt_print_f64:
     mov     byte [rsi + rbx], '0'
     mov     byte [rsi + rbx + 1], '.'
     mov     byte [rsi + rbx + 2], '0'
-    mov     byte [rsi + rbx + 3], 'e'
-    mov     byte [rsi + rbx + 4], '+'
-    mov     byte [rsi + rbx + 5], '0'
-    mov     byte [rsi + rbx + 6], '0'
-    add     ebx, 7
+    add     ebx, 3
     jmp     .emit_nl
 
 .not_zero:
+    xor     r11d, r11d
+    ucomisd xmm0, [rel const_f64_1e18]
+    jae     .range_done
+    ucomisd xmm0, [rel const_f64_1e_17]
+    jb      .range_done
+    mov     r11d, 1
+.range_done:
     xor     ecx, ecx
     movsd   xmm2, [rel const_f64_10]
     movsd   xmm3, [rel const_f64_1]
@@ -250,49 +255,161 @@ rt_print_f64:
     jmp     .norm_lo
 
 .format:
+    lea     r8, [rsp + 64]
     cvttsd2si eax, xmm0
     mov     edx, eax
     add     dl, '0'
-    mov     [rsi + rbx], dl
-    inc     ebx
-    mov     byte [rsi + rbx], '.'
-    inc     ebx
-    mov     r9d, ebx         ; first fractional digit index
+    mov     [r8], dl
     cvtsi2sd xmm4, eax
     subsd   xmm0, xmm4
     mulsd   xmm0, xmm2
 
     mov     edi, 16
+    mov     r9d, 1
 .digit_loop:
     cvttsd2si eax, xmm0
     mov     edx, eax
     add     dl, '0'
-    mov     [rsi + rbx], dl
-    inc     ebx
+    mov     [r8 + r9], dl
+    inc     r9d
     cvtsi2sd xmm4, eax
     subsd   xmm0, xmm4
     mulsd   xmm0, xmm2
     dec     edi
     jne     .digit_loop
 
-    mov     r10d, ebx
+    mov     r10d, r9d
 .trim_loop:
-    cmp     r10d, r9d
+    cmp     r10d, 1
     jle     .trim_done
-    mov     al, [rsi + r10 - 1]
+    mov     al, [r8 + r10 - 1]
     cmp     al, '0'
     jne     .trim_done
     dec     r10d
     jmp     .trim_loop
 .trim_done:
-    cmp     r10d, r9d
-    jne     .trim_set
-    mov     byte [rsi + r9], '0'
-    mov     r10d, r9d
-    inc     r10d
-.trim_set:
-    mov     ebx, r10d
+    test    r11d, r11d
+    jnz     .format_fixed
+    jmp     .format_sci
 
+.format_fixed:
+    mov     eax, ecx
+    test    eax, eax
+    js      .fixed_lt1
+    lea     r9d, [ecx + 1]
+    cmp     r9d, r10d
+    jle     .fixed_int_within
+    xor     edx, edx
+.fixed_copy_all:
+    cmp     edx, r10d
+    jge     .fixed_zero_pad
+    mov     al, [r8 + rdx]
+    mov     [rsi + rbx], al
+    inc     ebx
+    inc     edx
+    jmp     .fixed_copy_all
+.fixed_zero_pad:
+    mov     eax, r9d
+    sub     eax, r10d
+    mov     edx, eax
+.fixed_zero_loop:
+    test    edx, edx
+    jle     .fixed_add_dot_zero
+    mov     byte [rsi + rbx], '0'
+    inc     ebx
+    dec     edx
+    jmp     .fixed_zero_loop
+.fixed_add_dot_zero:
+    mov     byte [rsi + rbx], '.'
+    inc     ebx
+    mov     byte [rsi + rbx], '0'
+    inc     ebx
+    jmp     .emit_nl
+
+.fixed_int_within:
+    xor     edx, edx
+.fixed_copy_int:
+    cmp     edx, r9d
+    jge     .fixed_after_int
+    mov     al, [r8 + rdx]
+    mov     [rsi + rbx], al
+    inc     ebx
+    inc     edx
+    jmp     .fixed_copy_int
+.fixed_after_int:
+    mov     byte [rsi + rbx], '.'
+    inc     ebx
+    mov     eax, r10d
+    sub     eax, r9d
+    jg      .fixed_copy_frac
+    mov     byte [rsi + rbx], '0'
+    inc     ebx
+    jmp     .emit_nl
+.fixed_copy_frac:
+    lea     r11, [r8 + r9]
+    xor     edx, edx
+.fixed_frac_loop:
+    cmp     edx, eax
+    jge     .emit_nl
+    mov     al, [r11 + rdx]
+    mov     [rsi + rbx], al
+    inc     ebx
+    inc     edx
+    jmp     .fixed_frac_loop
+
+.fixed_lt1:
+    mov     byte [rsi + rbx], '0'
+    inc     ebx
+    mov     byte [rsi + rbx], '.'
+    inc     ebx
+    mov     eax, ecx
+    neg     eax
+    dec     eax
+    mov     edx, eax
+.fixed_leading_zeros:
+    test    edx, edx
+    jle     .fixed_lt1_digits
+    mov     byte [rsi + rbx], '0'
+    inc     ebx
+    dec     edx
+    jmp     .fixed_leading_zeros
+.fixed_lt1_digits:
+    xor     edx, edx
+.fixed_lt1_copy:
+    cmp     edx, r10d
+    jge     .emit_nl
+    mov     al, [r8 + rdx]
+    mov     [rsi + rbx], al
+    inc     ebx
+    inc     edx
+    jmp     .fixed_lt1_copy
+
+.format_sci:
+    mov     al, [r8]
+    mov     [rsi + rbx], al
+    inc     ebx
+    mov     byte [rsi + rbx], '.'
+    inc     ebx
+    cmp     r10d, 1
+    jg      .sci_frac
+    mov     byte [rsi + rbx], '0'
+    inc     ebx
+    jmp     .sci_exp
+.sci_frac:
+    lea     r11, [r8 + 1]
+    mov     eax, r10d
+    dec     eax
+    xor     edx, edx
+.sci_frac_loop:
+    cmp     edx, eax
+    jge     .sci_exp
+    mov     al, [r11 + rdx]
+    mov     [rsi + rbx], al
+    inc     ebx
+    inc     edx
+    jmp     .sci_frac_loop
+
+.sci_exp:
     mov     byte [rsi + rbx], 'e'
     inc     ebx
     mov     eax, ecx
@@ -332,15 +449,15 @@ rt_print_f64:
     mov     rdx, rbx
     call    rt_write
 
-    add     rsp, 64
+    add     rsp, 128
     pop     rbx
     ret
 
-; rt_print_f64_raw: prints double in scientific notation without newline
+; rt_print_f64_raw: prints double in hybrid format without newline
 ; input : xmm0 = value (double)
 rt_print_f64_raw:
     push    rbx             ; SysV ABI: RBX is callee-saved
-    sub     rsp, 64         ; keep rsp 16-byte aligned for calls
+    sub     rsp, 128        ; keep rsp 16-byte aligned for calls
     lea     rsi, [rsp]      ; buf base
     xor     ebx, ebx        ; len = 0
 
@@ -388,14 +505,17 @@ rt_print_f64_raw:
     mov     byte [rsi + rbx], '0'
     mov     byte [rsi + rbx + 1], '.'
     mov     byte [rsi + rbx + 2], '0'
-    mov     byte [rsi + rbx + 3], 'e'
-    mov     byte [rsi + rbx + 4], '+'
-    mov     byte [rsi + rbx + 5], '0'
-    mov     byte [rsi + rbx + 6], '0'
-    add     ebx, 7
+    add     ebx, 3
     jmp     .emit_raw
 
 .not_zero_raw:
+    xor     r11d, r11d
+    ucomisd xmm0, [rel const_f64_1e18]
+    jae     .range_done_raw
+    ucomisd xmm0, [rel const_f64_1e_17]
+    jb      .range_done_raw
+    mov     r11d, 1
+.range_done_raw:
     xor     ecx, ecx
     movsd   xmm2, [rel const_f64_10]
     movsd   xmm3, [rel const_f64_1]
@@ -413,49 +533,161 @@ rt_print_f64_raw:
     jmp     .norm_lo_raw
 
 .format_raw:
+    lea     r8, [rsp + 64]
     cvttsd2si eax, xmm0
     mov     edx, eax
     add     dl, '0'
-    mov     [rsi + rbx], dl
-    inc     ebx
-    mov     byte [rsi + rbx], '.'
-    inc     ebx
-    mov     r9d, ebx
+    mov     [r8], dl
     cvtsi2sd xmm4, eax
     subsd   xmm0, xmm4
     mulsd   xmm0, xmm2
 
     mov     edi, 16
+    mov     r9d, 1
 .digit_loop_raw:
     cvttsd2si eax, xmm0
     mov     edx, eax
     add     dl, '0'
-    mov     [rsi + rbx], dl
-    inc     ebx
+    mov     [r8 + r9], dl
+    inc     r9d
     cvtsi2sd xmm4, eax
     subsd   xmm0, xmm4
     mulsd   xmm0, xmm2
     dec     edi
     jne     .digit_loop_raw
 
-    mov     r10d, ebx
+    mov     r10d, r9d
 .trim_loop_raw:
-    cmp     r10d, r9d
+    cmp     r10d, 1
     jle     .trim_done_raw
-    mov     al, [rsi + r10 - 1]
+    mov     al, [r8 + r10 - 1]
     cmp     al, '0'
     jne     .trim_done_raw
     dec     r10d
     jmp     .trim_loop_raw
 .trim_done_raw:
-    cmp     r10d, r9d
-    jne     .trim_set_raw
-    mov     byte [rsi + r9], '0'
-    mov     r10d, r9d
-    inc     r10d
-.trim_set_raw:
-    mov     ebx, r10d
+    test    r11d, r11d
+    jnz     .format_fixed_raw
+    jmp     .format_sci_raw
 
+.format_fixed_raw:
+    mov     eax, ecx
+    test    eax, eax
+    js      .fixed_lt1_raw
+    lea     r9d, [ecx + 1]
+    cmp     r9d, r10d
+    jle     .fixed_int_within_raw
+    xor     edx, edx
+.fixed_copy_all_raw:
+    cmp     edx, r10d
+    jge     .fixed_zero_pad_raw
+    mov     al, [r8 + rdx]
+    mov     [rsi + rbx], al
+    inc     ebx
+    inc     edx
+    jmp     .fixed_copy_all_raw
+.fixed_zero_pad_raw:
+    mov     eax, r9d
+    sub     eax, r10d
+    mov     edx, eax
+.fixed_zero_loop_raw:
+    test    edx, edx
+    jle     .fixed_add_dot_zero_raw
+    mov     byte [rsi + rbx], '0'
+    inc     ebx
+    dec     edx
+    jmp     .fixed_zero_loop_raw
+.fixed_add_dot_zero_raw:
+    mov     byte [rsi + rbx], '.'
+    inc     ebx
+    mov     byte [rsi + rbx], '0'
+    inc     ebx
+    jmp     .emit_raw
+
+.fixed_int_within_raw:
+    xor     edx, edx
+.fixed_copy_int_raw:
+    cmp     edx, r9d
+    jge     .fixed_after_int_raw
+    mov     al, [r8 + rdx]
+    mov     [rsi + rbx], al
+    inc     ebx
+    inc     edx
+    jmp     .fixed_copy_int_raw
+.fixed_after_int_raw:
+    mov     byte [rsi + rbx], '.'
+    inc     ebx
+    mov     eax, r10d
+    sub     eax, r9d
+    jg      .fixed_copy_frac_raw
+    mov     byte [rsi + rbx], '0'
+    inc     ebx
+    jmp     .emit_raw
+.fixed_copy_frac_raw:
+    lea     r11, [r8 + r9]
+    xor     edx, edx
+.fixed_frac_loop_raw:
+    cmp     edx, eax
+    jge     .emit_raw
+    mov     al, [r11 + rdx]
+    mov     [rsi + rbx], al
+    inc     ebx
+    inc     edx
+    jmp     .fixed_frac_loop_raw
+
+.fixed_lt1_raw:
+    mov     byte [rsi + rbx], '0'
+    inc     ebx
+    mov     byte [rsi + rbx], '.'
+    inc     ebx
+    mov     eax, ecx
+    neg     eax
+    dec     eax
+    mov     edx, eax
+.fixed_leading_zeros_raw:
+    test    edx, edx
+    jle     .fixed_lt1_digits_raw
+    mov     byte [rsi + rbx], '0'
+    inc     ebx
+    dec     edx
+    jmp     .fixed_leading_zeros_raw
+.fixed_lt1_digits_raw:
+    xor     edx, edx
+.fixed_lt1_copy_raw:
+    cmp     edx, r10d
+    jge     .emit_raw
+    mov     al, [r8 + rdx]
+    mov     [rsi + rbx], al
+    inc     ebx
+    inc     edx
+    jmp     .fixed_lt1_copy_raw
+
+.format_sci_raw:
+    mov     al, [r8]
+    mov     [rsi + rbx], al
+    inc     ebx
+    mov     byte [rsi + rbx], '.'
+    inc     ebx
+    cmp     r10d, 1
+    jg      .sci_frac_raw
+    mov     byte [rsi + rbx], '0'
+    inc     ebx
+    jmp     .sci_exp_raw
+.sci_frac_raw:
+    lea     r11, [r8 + 1]
+    mov     eax, r10d
+    dec     eax
+    xor     edx, edx
+.sci_frac_loop_raw:
+    cmp     edx, eax
+    jge     .sci_exp_raw
+    mov     al, [r11 + rdx]
+    mov     [rsi + rbx], al
+    inc     ebx
+    inc     edx
+    jmp     .sci_frac_loop_raw
+
+.sci_exp_raw:
     mov     byte [rsi + rbx], 'e'
     inc     ebx
     mov     eax, ecx
@@ -494,6 +726,6 @@ rt_print_f64_raw:
     mov     edx, ebx
     call    rt_write
 
-    add     rsp, 64
+    add     rsp, 128
     pop     rbx
     ret

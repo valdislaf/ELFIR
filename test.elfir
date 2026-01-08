@@ -2,5 +2,5 @@ fn main_d64() {
 d64 x =202; 
 
 print(x," ","\n","x = ",202,"\n");
-    ret pi;
+    ret pi*2.22e-18;
 	}
