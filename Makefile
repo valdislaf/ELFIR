@@ -3,7 +3,7 @@ CFLAGS := -std=c++20 -O2 -Wall -Wextra -pedantic
 NASM := nasm
 LD := ld
 
-.PHONY: all clean
+.PHONY: all clean freestanding
 
 all: prog
 
@@ -23,5 +23,16 @@ prog: out.o runtime.o
 	$(LD) $^ -o $@
 	./prog
 
+out_freestanding.asm: test_freestanding.elfir elfirc
+	./elfirc --freestanding test_freestanding.elfir $@
+
+out_freestanding.o: out_freestanding.asm
+	$(NASM) -felf64 $< -o $@
+
+prog_freestanding: out_freestanding.o
+	$(LD) -e _start $< -o $@
+
+freestanding: prog_freestanding
+
 clean:
-	rm -f elfirc out.asm out.o runtime.o prog
+	rm -f elfirc out.asm out.o runtime.o prog out_freestanding.asm out_freestanding.o prog_freestanding

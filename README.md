@@ -10,13 +10,17 @@ Language specification (syntax, semantics, ABI, intrinsics) is in `LANGUAGE_SPEC
 
 ## v0.1 Entry Points
 
-Exactly one entry point must be defined:
+Normal (hosted) mode: exactly one entry point must be defined:
 
 - `main()` returns an i64 exit code. No automatic printing.
 - `main_i64()` returns an i64 that is printed to stdout, then exits with code 0.
 - `main_d64()` returns a d64 that is printed to stdout (hybrid fixed/scientific), then exits with code 0.
 
 Defining more than one is a compile-time error.
+
+Freestanding mode (kernel/boot code): compile with `--freestanding` and define:
+
+- `fn _start()` as the entry point (void, no automatic printing or exit)
 
 ## Repository Contents
 
@@ -76,6 +80,12 @@ ld out.o runtime.o -o prog
 ./elfirc test.elfir out.asm
 ```
 
+Freestanding (kernel) mode:
+
+```bash
+./elfirc --freestanding test.elfir out.asm
+```
+
 3) Assemble + link with runtime
 
 ```bash
@@ -88,6 +98,12 @@ ld out.o runtime.o -o prog
 
 ```bash
 ./prog
+```
+
+Freestanding build (kernel-style):
+
+```bash
+make freestanding
 ```
 
 Expected output:

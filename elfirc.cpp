@@ -3713,18 +3713,23 @@ static GenResult genFunctionAsm(const Func& f, Mode mode, Type retType,
     return GenResult{out.str(), cg.strLits};
 }
 
-enum class EntryKind { Main, MainI64, MainD64 };
+enum class EntryKind { Main, MainI64, MainD64, Start };
 
 static std::string genOutAsm(const std::vector<Func>& funcs, const Func& entry, EntryKind kind,
                              const std::unordered_map<std::string, FuncSig>& funcMap) {
     std::ostringstream out;
     const bool isMainI64 = (kind == EntryKind::MainI64);
     const bool isMainD64 = (kind == EntryKind::MainD64);
+    const bool isStart = (kind == EntryKind::Start);
     const Mode mode = isMainD64 ? Mode::D64Only : (isMainI64 ? Mode::I64Only : Mode::Mixed);
-    const Type retType = isMainD64 ? Type::D64 : Type::I64;
+    const Type retType = isStart ? entry.retType : (isMainD64 ? Type::D64 : Type::I64);
 
     out << "global _start\n";
-    out << "global " << entry.name << "\n\n";
+    if (entry.name != "_start") {
+        out << "global " << entry.name << "\n\n";
+    } else {
+        out << "\n";
+    }
 
     out << "extern rt_exit\n";
     out << "extern rt_print_i64\n";
@@ -3780,22 +3785,24 @@ static std::string genOutAsm(const std::vector<Func>& funcs, const Func& entry, 
         out << g.text << "\n";
     }
 
-    out << "_start:\n";
-    out << "    and  rsp, -16\n";
-    out << "    call " << entry.name << "\n";
+    if (!isStart) {
+        out << "_start:\n";
+        out << "    and  rsp, -16\n";
+        out << "    call " << entry.name << "\n";
 
-    if (isMainD64) {
-        out << "    call rt_print_f64\n";
-        out << "    xor  edi, edi\n";
-        out << "    jmp  rt_exit\n";
-    } else if (isMainI64) {
-        out << "    mov  rdi, rax\n";
-        out << "    call rt_print_i64\n";
-        out << "    xor  edi, edi\n";
-        out << "    jmp  rt_exit\n";
-    } else {
-        out << "    mov  rdi, rax\n";
-        out << "    jmp  rt_exit\n";
+        if (isMainD64) {
+            out << "    call rt_print_f64\n";
+            out << "    xor  edi, edi\n";
+            out << "    jmp  rt_exit\n";
+        } else if (isMainI64) {
+            out << "    mov  rdi, rax\n";
+            out << "    call rt_print_i64\n";
+            out << "    xor  edi, edi\n";
+            out << "    jmp  rt_exit\n";
+        } else {
+            out << "    mov  rdi, rax\n";
+            out << "    jmp  rt_exit\n";
+        }
     }
 
     return out.str();
@@ -3803,12 +3810,22 @@ static std::string genOutAsm(const std::vector<Func>& funcs, const Func& entry, 
 
 int main(int argc, char** argv) {
     try {
-        if (argc < 2) {
-            std::cerr << "Usage: " << argv[0] << " <input.elfir> [out.asm]\n";
+        bool freestanding = false;
+        int argi = 1;
+        if (argi < argc && (std::string(argv[argi]) == "--freestanding")) {
+            freestanding = true;
+            ++argi;
+        }
+        if (argc - argi < 1) {
+            std::cerr << "Usage: " << argv[0] << " [--freestanding] <input.elfir> [out.asm]\n";
             return 2;
         }
-        std::string inPath = argv[1];
-        std::string outPath = (argc >= 3) ? argv[2] : "out.asm";
+        std::string inPath = argv[argi++];
+        std::string outPath = (argi < argc) ? argv[argi++] : "out.asm";
+        if (argi < argc) {
+            std::cerr << "Usage: " << argv[0] << " [--freestanding] <input.elfir> [out.asm]\n";
+            return 2;
+        }
 
         std::string src = readFile(inPath);
 
@@ -3816,42 +3833,58 @@ int main(int argc, char** argv) {
         auto funcs = p.parseProgram();
 
         int mainIdx = -1;
-		int mainI64Idx = -1;
+        int mainI64Idx = -1;
         int mainD64Idx = -1;
+        int startIdx = -1;
 
 		for (int i = 0; i < (int)funcs.size(); ++i) {
 			if (funcs[i].name == "main") mainIdx = i;
 			else if (funcs[i].name == "main_i64") mainI64Idx = i;
             else if (funcs[i].name == "main_d64") mainD64Idx = i;
-		}
-
-        const int count = (mainIdx != -1) + (mainI64Idx != -1) + (mainD64Idx != -1);
-		if (count > 1) {
-			throw Error("Multiple entrypoints: only one of 'main', 'main_i64', 'main_d64' is allowed.");
-		}
-		if (count == 0) {
-			throw Error("Missing entrypoint: define one of 'fn main() { ... }', 'fn main_i64() { ... }', or 'fn main_d64() { ... }'.");
+            else if (funcs[i].name == "_start") startIdx = i;
 		}
 
         EntryKind kind = EntryKind::Main;
         int entryIdx = mainIdx;
-        if (mainI64Idx != -1) {
-            kind = EntryKind::MainI64;
-            entryIdx = mainI64Idx;
-        } else if (mainD64Idx != -1) {
-            kind = EntryKind::MainD64;
-            entryIdx = mainD64Idx;
+        if (!freestanding) {
+            const int count = (mainIdx != -1) + (mainI64Idx != -1) + (mainD64Idx != -1);
+            if (count > 1) {
+                throw Error("Multiple entrypoints: only one of 'main', 'main_i64', 'main_d64' is allowed.");
+            }
+            if (count == 0) {
+                throw Error("Missing entrypoint: define one of 'fn main() { ... }', 'fn main_i64() { ... }', or 'fn main_d64() { ... }'.");
+            }
+
+            if (mainI64Idx != -1) {
+                kind = EntryKind::MainI64;
+                entryIdx = mainI64Idx;
+            } else if (mainD64Idx != -1) {
+                kind = EntryKind::MainD64;
+                entryIdx = mainD64Idx;
+            }
+        } else {
+            if (startIdx == -1) {
+                throw Error("Missing entrypoint: define 'fn _start() { ... }' when using --freestanding.");
+            }
+            kind = EntryKind::Start;
+            entryIdx = startIdx;
         }
 
         Func& entry = funcs[entryIdx];
         if (!entry.params.empty()) {
             throw Error("Entrypoint '" + entry.name + "' cannot have parameters");
         }
-        Type entryRet = (kind == EntryKind::MainD64) ? Type::D64 : Type::I64;
-        if (entry.retType == Type::Void) {
-            entry.retType = entryRet;
-        } else if (entry.retType != entryRet) {
-            throw Error("Entrypoint '" + entry.name + "' must return " + std::string(typeName(entryRet)));
+        if (kind == EntryKind::Start) {
+            if (entry.retType != Type::Void) {
+                throw Error("Entrypoint '_start' must be void in --freestanding mode.");
+            }
+        } else {
+            Type entryRet = (kind == EntryKind::MainD64) ? Type::D64 : Type::I64;
+            if (entry.retType == Type::Void) {
+                entry.retType = entryRet;
+            } else if (entry.retType != entryRet) {
+                throw Error("Entrypoint '" + entry.name + "' must return " + std::string(typeName(entryRet)));
+            }
         }
 
         std::unordered_map<std::string, FuncSig> funcMap;

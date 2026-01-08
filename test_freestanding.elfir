@@ -1,0 +1,6 @@
+fn _start() {
+    i64 one = 1;
+    while (one) {
+        asm0("hlt");
+    }
+}

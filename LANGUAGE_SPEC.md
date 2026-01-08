@@ -103,14 +103,16 @@ Primary:
 4) Semantics
 
 Entry points:
-- Exactly one of: `fn main()`, `fn main_i64()`, `fn main_d64()`.
+- Hosted mode (default): exactly one of `fn main()`, `fn main_i64()`, `fn main_d64()`.
 - `main` returns i64 and is used as exit code (no automatic printing).
 - `main_i64` returns i64 and is printed to stdout.
 - `main_d64` returns d64 and is printed to stdout (hybrid format).
+- Freestanding mode (`--freestanding`): entrypoint is `fn _start()` (void, no automatic printing or exit).
+- Entrypoints cannot have parameters.
 
 auto:
 - `auto` is i64 in `main_i64`, d64 in `main_d64`.
-- `auto` is not allowed in `main`.
+- `auto` is not allowed in `main` or `_start`.
 
 Integer literals:
 - Decimal literals default to i64 unless context requires u*.
@@ -145,6 +147,14 @@ Strings:
 - `str` is (ptr,len). Literals are static. Dynamic concatenation allocates.
 - `str` supports `=` and `+=` only.
 - Owned strings use negative length internally; owned buffers are freed on `ret`.
+
+Printing:
+- `print_i64` is allowed in mixed/i64 code; `print_d64` in mixed/d64 code.
+- `print_hex` accepts only unsigned expressions.
+
+Functions:
+- Non-void functions must contain at least one `ret <expr>;` (compile-time error otherwise).
+- `for` init is limited to `auto` or an explicit type declaration (no assignments).
 
 Comparisons:
 - Integer comparisons return 0/1 (i64).
