@@ -6,6 +6,8 @@ ELFIR is an experimental micro-language and compiler that translates `*.elfir` s
 - no libc, only Linux syscalls
 - a small, explicit runtime
 
+Language specification (syntax, semantics, ABI, intrinsics) is in `LANGUAGE_SPEC.md`.
+
 ## v0.1 Entry Points
 
 Exactly one entry point must be defined:
@@ -156,6 +158,8 @@ fn main_d64() {
 - Pointer casts: `ptr<T>(u64_expr)` and `u64(p)`.
 - Volatile MMIO: `volatile_load(p)` and `volatile_store(p, v)` for integer pointers.
 - Barriers: `barrier_full()`, `barrier_load()`, `barrier_store()` emit `mfence/lfence/sfence`.
+- Port I/O: `in8(u16)`, `in16(u16)`, `in32(u16)` and `out8(u16,u8)`, `out16(u16,u16)`, `out32(u16,u32)`.
+- Minimal asm: `asm0("cli"|"sti"|"hlt"|"nop"|"pause")`, `asm1("lidt", ptr<u8>)`.
 - Floating literals (d64 mode): digits with optional `.` and optional exponent `e|E[+|-]digits`.
 - d64 output format: fixed within [1e-17, 1e18), otherwise scientific; trailing zeros trimmed (at least one digit after the dot).
 - String literals support escapes: `\\`, `\"`, `\n`, `\t`.

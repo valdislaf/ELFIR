@@ -275,6 +275,9 @@ struct Expr {
         PtrAddBytes,
         Null,
         VolatileLoad,
+        In8,
+        In16,
+        In32,
         Add,
         Sub,
         Mul,
@@ -341,6 +344,18 @@ struct Expr {
     static std::unique_ptr<Expr> makeVolatileLoad(std::unique_ptr<Expr> a) {
         auto e = std::make_unique<Expr>();
         e->kind = Kind::VolatileLoad; e->lhs = std::move(a); return e;
+    }
+    static std::unique_ptr<Expr> makeIn8(std::unique_ptr<Expr> a) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::In8; e->lhs = std::move(a); return e;
+    }
+    static std::unique_ptr<Expr> makeIn16(std::unique_ptr<Expr> a) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::In16; e->lhs = std::move(a); return e;
+    }
+    static std::unique_ptr<Expr> makeIn32(std::unique_ptr<Expr> a) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::In32; e->lhs = std::move(a); return e;
     }
     static std::unique_ptr<Expr> makeNull() {
         auto e = std::make_unique<Expr>();
@@ -438,11 +453,12 @@ struct Stmt {
         std::vector<Stmt> body;
     };
     enum class AssignOp { Eq, AddEq, SubEq, MulEq, DivEq };
-    enum class Kind { AutoAssign, TypedAssign, Assign, PtrStore, VolatileStore, BarrierFull, BarrierLoad, BarrierStore, Ret, PrintI64, PrintD64, PrintStr, PrintHex, PrintList, ExprStmt, If, While, For, Break, Continue } kind;
+    enum class Kind { AutoAssign, TypedAssign, Assign, PtrStore, VolatileStore, Out8, Out16, Out32, Asm0, Asm1, BarrierFull, BarrierLoad, BarrierStore, Ret, PrintI64, PrintD64, PrintStr, PrintHex, PrintList, ExprStmt, If, While, For, Break, Continue } kind;
     Type declType = Type::I64;    // for TypedAssign
     std::string name;             // for AutoAssign
     std::unique_ptr<Expr> expr;   // for both
     std::unique_ptr<Expr> ptrExpr; // for PtrStore/VolatileStore
+    std::unique_ptr<Expr> expr2;  // for Out*/Asm1
     std::vector<std::unique_ptr<Expr>> exprs; // for PrintList
     std::vector<IfBranch> ifBranches;
     std::unique_ptr<Expr> cond;
@@ -541,6 +557,56 @@ private:
             expect(TokKind::Semicolon, "Expected ';' after continue");
             Stmt st;
             st.kind = Stmt::Kind::Continue;
+            return st;
+        }
+        if (cur_.kind == TokKind::Ident && (cur_.text == "out8" || cur_.text == "out16" || cur_.text == "out32")) {
+            std::string name = cur_.text;
+            advance();
+            expect(TokKind::LParen, "Expected '(' after out");
+            auto p = parseComparison();
+            expect(TokKind::Comma, "Expected ',' after out port");
+            auto v = parseComparison();
+            expect(TokKind::RParen, "Expected ')' after out args");
+            expect(TokKind::Semicolon, "Expected ';' after out");
+            Stmt st;
+            if (name == "out8") st.kind = Stmt::Kind::Out8;
+            else if (name == "out16") st.kind = Stmt::Kind::Out16;
+            else st.kind = Stmt::Kind::Out32;
+            st.expr = std::move(p);
+            st.expr2 = std::move(v);
+            return st;
+        }
+        if (cur_.kind == TokKind::Ident && cur_.text == "asm0") {
+            advance();
+            expect(TokKind::LParen, "Expected '(' after asm0");
+            if (cur_.kind != TokKind::String) {
+                throw Error("Expected string literal in asm0 at position " + std::to_string(cur_.pos));
+            }
+            std::string text = cur_.text;
+            advance();
+            expect(TokKind::RParen, "Expected ')' after asm0");
+            expect(TokKind::Semicolon, "Expected ';' after asm0");
+            Stmt st;
+            st.kind = Stmt::Kind::Asm0;
+            st.name = std::move(text);
+            return st;
+        }
+        if (cur_.kind == TokKind::Ident && cur_.text == "asm1") {
+            advance();
+            expect(TokKind::LParen, "Expected '(' after asm1");
+            if (cur_.kind != TokKind::String) {
+                throw Error("Expected string literal in asm1 at position " + std::to_string(cur_.pos));
+            }
+            std::string text = cur_.text;
+            advance();
+            expect(TokKind::Comma, "Expected ',' after asm1 mnemonic");
+            auto a = parseComparison();
+            expect(TokKind::RParen, "Expected ')' after asm1");
+            expect(TokKind::Semicolon, "Expected ';' after asm1");
+            Stmt st;
+            st.kind = Stmt::Kind::Asm1;
+            st.name = std::move(text);
+            st.expr = std::move(a);
             return st;
         }
         if (cur_.kind == TokKind::Ident && cur_.text == "volatile_store") {
@@ -922,6 +988,21 @@ private:
                     auto a = parseComparison();
                     expect(TokKind::RParen, "Expected ')' after volatile_load argument");
                     return Expr::makeVolatileLoad(std::move(a));
+                }
+                if (n == "in8") {
+                    auto a = parseComparison();
+                    expect(TokKind::RParen, "Expected ')' after in8 argument");
+                    return Expr::makeIn8(std::move(a));
+                }
+                if (n == "in16") {
+                    auto a = parseComparison();
+                    expect(TokKind::RParen, "Expected ')' after in16 argument");
+                    return Expr::makeIn16(std::move(a));
+                }
+                if (n == "in32") {
+                    auto a = parseComparison();
+                    expect(TokKind::RParen, "Expected ')' after in32 argument");
+                    return Expr::makeIn32(std::move(a));
                 }
                 if (n == "byte_add") {
                     auto a = parseComparison();
@@ -1339,6 +1420,7 @@ static Type resolveIntExprType(const Expr& e, const CodegenCtx& cg, Mode mode);
 static Type resolvePtrExprType(const Expr& e, const CodegenCtx& cg, Mode mode);
 static bool isPtrExpr(const Expr& e, const CodegenCtx& cg, Mode mode);
 static bool isNullExpr(const Expr& e);
+static bool isUnsignedLiteralAssignable(const Expr& e, Type target, uint64_t* outVal = nullptr);
 static bool isUnsignedType(Type t);
 static bool isIntegerType(Type t);
 static bool isFloatLiteralText(const std::string& text);
@@ -1434,6 +1516,28 @@ static void emitExprInt(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             }
             if (isUnsignedType(base)) {
                 emitMaskUnsigned(out, base);
+            }
+            return;
+        }
+        case K::In8:
+        case K::In16:
+        case K::In32: {
+            Type portType = resolveIntExprType(*e.lhs, cg, cg.mode);
+            if (portType != Type::U16) {
+                if (!isUnsignedLiteralAssignable(*e.lhs, Type::U16)) {
+                    throw Error("Type error: in* expects u16 port");
+                }
+            }
+            emitExprInt(out, cg, *e.lhs, labelId);
+            out << "    mov  dx, ax\n";
+            if (e.kind == K::In8) {
+                out << "    in   al, dx\n";
+                out << "    movzx eax, al\n";
+            } else if (e.kind == K::In16) {
+                out << "    in   ax, dx\n";
+                out << "    movzx eax, ax\n";
+            } else {
+                out << "    in   eax, dx\n";
             }
             return;
         }
@@ -2130,7 +2234,7 @@ static int typeSizeBytes(Type t) {
 static int ptrElemSize(Type t) {
     return typeSizeBytes(ptrPointee(t));
 }
-static bool isUnsignedLiteralAssignable(const Expr& e, Type target, uint64_t* outVal = nullptr) {
+static bool isUnsignedLiteralAssignable(const Expr& e, Type target, uint64_t* outVal) {
     if (!isUnsignedType(target)) return false;
     if (!(e.kind == Expr::Kind::Num && !isFloatLiteralText(e.numText))) return false;
     uint64_t v = parseU64Literal(e.numText);
@@ -2354,6 +2458,19 @@ static ExprTypeTag inferExprTypeTag(const Expr& e, const CodegenCtx& cg, Mode mo
                 throw Error("Type error: volatile_load expects ptr to integer");
             }
             return tagFromType(base);
+        }
+        case K::In8:
+        case K::In16:
+        case K::In32: {
+            Type portType = resolveIntExprType(*e.lhs, cg, mode);
+            if (portType != Type::U16) {
+                if (!isUnsignedLiteralAssignable(*e.lhs, Type::U16)) {
+                    throw Error("Type error: in* expects u16 port");
+                }
+            }
+            if (e.kind == K::In8) return ExprTypeTag::U8;
+            if (e.kind == K::In16) return ExprTypeTag::U16;
+            return ExprTypeTag::U32;
         }
         case K::AddrOf:
         case K::Null:
@@ -3206,6 +3323,68 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
             case Type::I64: out << "    mov  qword [rcx], rax\n"; break;
             default: break;
         }
+        return false;
+    }
+    if (st.kind == Stmt::Kind::Out8 || st.kind == Stmt::Kind::Out16 || st.kind == Stmt::Kind::Out32) {
+        Type portType = resolveIntExprType(*st.expr, cg, mode);
+        if (portType != Type::U16) {
+            if (!isUnsignedLiteralAssignable(*st.expr, Type::U16)) {
+                throw Error("Type error: out* expects u16 port");
+            }
+        }
+        Type valType = resolveIntExprType(*st.expr2, cg, mode);
+        if (st.kind == Stmt::Kind::Out8) {
+            if (valType != Type::U8) {
+                if (!isUnsignedLiteralAssignable(*st.expr2, Type::U8)) {
+                    throw Error("Type error: out8 expects u8 value");
+                }
+            }
+        } else if (st.kind == Stmt::Kind::Out16) {
+            if (valType != Type::U16) {
+                if (!isUnsignedLiteralAssignable(*st.expr2, Type::U16)) {
+                    throw Error("Type error: out16 expects u16 value");
+                }
+            }
+        } else {
+            if (valType != Type::U32) {
+                if (!isUnsignedLiteralAssignable(*st.expr2, Type::U32)) {
+                    throw Error("Type error: out32 expects u32 value");
+                }
+            }
+        }
+        emitExprInt(out, cg, *st.expr, labelId);
+        out << "    mov  dx, ax\n";
+        emitExprInt(out, cg, *st.expr2, labelId);
+        if (st.kind == Stmt::Kind::Out8) {
+            out << "    out  dx, al\n";
+        } else if (st.kind == Stmt::Kind::Out16) {
+            out << "    out  dx, ax\n";
+        } else {
+            out << "    out  dx, eax\n";
+        }
+        return false;
+    }
+    if (st.kind == Stmt::Kind::Asm0) {
+        if (st.name == "cli") out << "    cli\n";
+        else if (st.name == "sti") out << "    sti\n";
+        else if (st.name == "hlt") out << "    hlt\n";
+        else if (st.name == "nop") out << "    nop\n";
+        else if (st.name == "pause") out << "    pause\n";
+        else {
+            throw Error("Unknown asm0 mnemonic '" + st.name + "'");
+        }
+        return false;
+    }
+    if (st.kind == Stmt::Kind::Asm1) {
+        if (st.name != "lidt") {
+            throw Error("Unknown asm1 mnemonic '" + st.name + "'");
+        }
+        Type pt = resolvePtrExprType(*st.expr, cg, mode);
+        if (pt != Type::PtrU8) {
+            throw Error("asm1(lidt, ...) expects ptr<u8>");
+        }
+        emitExprPtr(out, cg, *st.expr, labelId);
+        out << "    lidt [rax]\n";
         return false;
     }
     if (st.kind == Stmt::Kind::BarrierFull) {
