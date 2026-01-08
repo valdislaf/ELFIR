@@ -26,6 +26,9 @@ enum class TokKind {
     KwRet,
     KwI64,
     KwD64,
+    KwIf,
+    KwElse,
+    KwElseIf,
 
     LParen, RParen,
     LBrace, RBrace,
@@ -82,6 +85,9 @@ public:
             else if (t.text == "ret") t.kind = TokKind::KwRet;
             else if (t.text == "i64") t.kind = TokKind::KwI64;
             else if (t.text == "d64") t.kind = TokKind::KwD64;
+            else if (t.text == "if") t.kind = TokKind::KwIf;
+            else if (t.text == "else") t.kind = TokKind::KwElse;
+            else if (t.text == "elseif") t.kind = TokKind::KwElseIf;
             else t.kind = TokKind::Ident;
             return t;
         }
@@ -271,11 +277,16 @@ struct Expr {
 enum class Type { I64, D64 };
 
 struct Stmt {
-    enum class Kind { AutoAssign, TypedAssign, Ret, PrintI64, PrintD64, PrintStr, PrintList } kind;
+    struct IfBranch {
+        std::unique_ptr<Expr> cond;
+        std::vector<Stmt> body;
+    };
+    enum class Kind { AutoAssign, TypedAssign, Ret, PrintI64, PrintD64, PrintStr, PrintList, If } kind;
     Type declType = Type::I64;    // for TypedAssign
     std::string name;             // for AutoAssign
     std::unique_ptr<Expr> expr;   // for both
     std::vector<std::unique_ptr<Expr>> exprs; // for PrintList
+    std::vector<IfBranch> ifBranches;
 };
 
 struct Func {
@@ -317,6 +328,9 @@ private:
     }
 
     Stmt parseStmt() {
+        if (cur_.kind == TokKind::KwIf) {
+            return parseIfStmt();
+        }
         if (cur_.kind == TokKind::KwAuto) {
             advance();
             std::string var = expectIdent("Expected identifier after 'auto'");
@@ -397,7 +411,54 @@ private:
             return st;
         }
 
-        throw Error("Expected statement ('auto', 'ret', or 'print') at position " + std::to_string(cur_.pos));
+        throw Error("Expected statement ('auto', 'ret', 'print', or 'if') at position " + std::to_string(cur_.pos));
+    }
+
+    std::vector<Stmt> parseBlock() {
+        expect(TokKind::LBrace, "Expected '{' to start block");
+        std::vector<Stmt> body;
+        while (cur_.kind != TokKind::RBrace) {
+            if (cur_.kind == TokKind::End) {
+                throw Error("Unexpected end of file: missing '}'");
+            }
+            body.push_back(parseStmt());
+        }
+        expect(TokKind::RBrace, "Expected '}' at end of block");
+        return body;
+    }
+
+    Stmt parseIfStmt() {
+        expect(TokKind::KwIf, "Expected 'if'");
+        expect(TokKind::LParen, "Expected '(' after if");
+        auto cond = parseComparison();
+        expect(TokKind::RParen, "Expected ')' after if condition");
+        Stmt::IfBranch head;
+        head.cond = std::move(cond);
+        head.body = parseBlock();
+
+        Stmt st;
+        st.kind = Stmt::Kind::If;
+        st.ifBranches.push_back(std::move(head));
+
+        while (cur_.kind == TokKind::KwElseIf) {
+            advance();
+            expect(TokKind::LParen, "Expected '(' after elseif");
+            auto elseCond = parseComparison();
+            expect(TokKind::RParen, "Expected ')' after elseif condition");
+            Stmt::IfBranch branch;
+            branch.cond = std::move(elseCond);
+            branch.body = parseBlock();
+            st.ifBranches.push_back(std::move(branch));
+        }
+
+        if (cur_.kind == TokKind::KwElse) {
+            advance();
+            Stmt::IfBranch branch;
+            branch.body = parseBlock();
+            st.ifBranches.push_back(std::move(branch));
+        }
+
+        return st;
     }
 
     // primary := number | ident | '(' expr ')'
@@ -1201,6 +1262,128 @@ struct GenResult {
     std::vector<CodegenCtx::StrLit> strLits;
 };
 
+static Type resolveCondType(const Expr& e, const CodegenCtx& cg, Mode mode) {
+    ExprTypeTag tag = inferExprTypeTag(e, cg, mode);
+    if (tag == ExprTypeTag::NumLiteral) {
+        return (mode == Mode::D64Only) ? Type::D64 : Type::I64;
+    }
+    return (tag == ExprTypeTag::D64) ? Type::D64 : Type::I64;
+}
+
+static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, int& labelId, Mode mode, Type retType) {
+    bool hasRet = false;
+    if (st.kind == Stmt::Kind::AutoAssign) {
+        if (mode == Mode::Mixed) {
+            throw Error("auto is not allowed in 'main' (use i64 or d64)");
+        }
+        Type t = (mode == Mode::D64Only) ? Type::D64 : Type::I64;
+        int slot = cg.allocSlot(st.name, t);
+        if (t == Type::D64) {
+            emitExprD64(out, cg, *st.expr, labelId);
+            out << "    movsd [rbp-" << CodegenCtx::slotDisp(slot) << "], xmm0\n";
+        } else {
+            emitExprI64(out, cg, *st.expr, labelId);
+            out << "    mov  [rbp-" << CodegenCtx::slotDisp(slot) << "], rax\n";
+        }
+        return false;
+    }
+
+    if (st.kind == Stmt::Kind::TypedAssign) {
+        if (mode == Mode::I64Only && st.declType != Type::I64) {
+            throw Error("d64 variables are not allowed in main_i64");
+        }
+        if (mode == Mode::D64Only && st.declType != Type::D64) {
+            throw Error("i64 variables are not allowed in main_d64");
+        }
+        int slot = cg.allocSlot(st.name, st.declType);
+        if (st.declType == Type::D64) {
+            emitExprD64(out, cg, *st.expr, labelId);
+            out << "    movsd [rbp-" << CodegenCtx::slotDisp(slot) << "], xmm0\n";
+        } else {
+            emitExprI64(out, cg, *st.expr, labelId);
+            out << "    mov  [rbp-" << CodegenCtx::slotDisp(slot) << "], rax\n";
+        }
+        return false;
+    }
+
+    if (st.kind == Stmt::Kind::PrintI64) {
+        if (mode == Mode::D64Only) {
+            throw Error("print_i64 is not allowed in main_d64");
+        }
+        emitPrintI64(out, cg, *st.expr, labelId);
+        return false;
+    }
+    if (st.kind == Stmt::Kind::PrintD64) {
+        if (mode == Mode::I64Only) {
+            throw Error("print_d64 is not allowed in main_i64");
+        }
+        emitPrintD64(out, cg, *st.expr, labelId);
+        return false;
+    }
+    if (st.kind == Stmt::Kind::PrintStr) {
+        emitPrintStr(out, cg, *st.expr);
+        return false;
+    }
+    if (st.kind == Stmt::Kind::PrintList) {
+        for (const auto& arg : st.exprs) {
+            if (arg->kind == Expr::Kind::Str) {
+                emitPrintStr(out, cg, *arg);
+                continue;
+            }
+            Type t = resolvePrintType(*arg, cg, mode);
+            if (t == Type::D64) {
+                emitPrintD64(out, cg, *arg, labelId);
+            } else {
+                emitPrintI64(out, cg, *arg, labelId);
+            }
+        }
+        return false;
+    }
+    if (st.kind == Stmt::Kind::If) {
+        int endId = labelId++;
+        for (size_t i = 0; i < st.ifBranches.size(); ++i) {
+            const auto& br = st.ifBranches[i];
+            int nextId = labelId++;
+            if (br.cond) {
+                Type condType = resolveCondType(*br.cond, cg, mode);
+                if (condType == Type::D64) {
+                    emitExprD64(out, cg, *br.cond, labelId);
+                    out << "    xorpd xmm1, xmm1\n";
+                    out << "    ucomisd xmm0, xmm1\n";
+                    out << "    jp   .if_next_" << nextId << "\n";
+                    out << "    je   .if_next_" << nextId << "\n";
+                } else {
+                    emitExprI64(out, cg, *br.cond, labelId);
+                    out << "    cmp  rax, 0\n";
+                    out << "    je   .if_next_" << nextId << "\n";
+                }
+            }
+            for (const auto& inner : br.body) {
+                if (emitStmt(out, cg, inner, labelId, mode, retType)) {
+                    hasRet = true;
+                }
+            }
+            out << "    jmp  .if_end_" << endId << "\n";
+            out << ".if_next_" << nextId << ":\n";
+        }
+        out << ".if_end_" << endId << ":\n";
+        return hasRet;
+    }
+
+    if (st.kind == Stmt::Kind::Ret) {
+        if (retType == Type::D64) {
+            emitExprD64(out, cg, *st.expr, labelId);
+        } else {
+            emitExprI64(out, cg, *st.expr, labelId);
+        }
+        out << "    leave\n";
+        out << "    ret\n";
+        return true;
+    }
+
+    throw Error("Internal: unknown statement kind");
+}
+
 static GenResult genFunctionAsm(const Func& f, Mode mode, Type retType) {
     // v0: generate body for entrypoint only
     CodegenCtx cg;
@@ -1214,68 +1397,8 @@ static GenResult genFunctionAsm(const Func& f, Mode mode, Type retType) {
 
     int labelId = 0;
     for (const auto& st : f.body) {
-        if (st.kind == Stmt::Kind::AutoAssign) {
-            if (mode == Mode::Mixed) {
-                throw Error("auto is not allowed in 'main' (use i64 or d64)");
-            }
-            Type t = (mode == Mode::D64Only) ? Type::D64 : Type::I64;
-            int slot = cg.allocSlot(st.name, t);
-            if (t == Type::D64) {
-                emitExprD64(body, cg, *st.expr, labelId);
-                body << "    movsd [rbp-" << CodegenCtx::slotDisp(slot) << "], xmm0\n";
-            } else {
-                emitExprI64(body, cg, *st.expr, labelId);
-                body << "    mov  [rbp-" << CodegenCtx::slotDisp(slot) << "], rax\n";
-            }
-        } else if (st.kind == Stmt::Kind::TypedAssign) {
-            if (mode == Mode::I64Only && st.declType != Type::I64) {
-                throw Error("d64 variables are not allowed in main_i64");
-            }
-            if (mode == Mode::D64Only && st.declType != Type::D64) {
-                throw Error("i64 variables are not allowed in main_d64");
-            }
-            int slot = cg.allocSlot(st.name, st.declType);
-            if (st.declType == Type::D64) {
-                emitExprD64(body, cg, *st.expr, labelId);
-                body << "    movsd [rbp-" << CodegenCtx::slotDisp(slot) << "], xmm0\n";
-            } else {
-                emitExprI64(body, cg, *st.expr, labelId);
-                body << "    mov  [rbp-" << CodegenCtx::slotDisp(slot) << "], rax\n";
-            }
-        } else if (st.kind == Stmt::Kind::PrintI64) {
-            if (mode == Mode::D64Only) {
-                throw Error("print_i64 is not allowed in main_d64");
-            }
-            emitPrintI64(body, cg, *st.expr, labelId);
-        } else if (st.kind == Stmt::Kind::PrintD64) {
-            if (mode == Mode::I64Only) {
-                throw Error("print_d64 is not allowed in main_i64");
-            }
-            emitPrintD64(body, cg, *st.expr, labelId);
-        } else if (st.kind == Stmt::Kind::PrintStr) {
-            emitPrintStr(body, cg, *st.expr);
-        } else if (st.kind == Stmt::Kind::PrintList) {
-            for (const auto& arg : st.exprs) {
-                if (arg->kind == Expr::Kind::Str) {
-                    emitPrintStr(body, cg, *arg);
-                    continue;
-                }
-                Type t = resolvePrintType(*arg, cg, mode);
-                if (t == Type::D64) {
-                    emitPrintD64(body, cg, *arg, labelId);
-                } else {
-                    emitPrintI64(body, cg, *arg, labelId);
-                }
-            }
-        } else { // Ret
-            if (retType == Type::D64) {
-                emitExprD64(body, cg, *st.expr, labelId);
-            } else {
-                emitExprI64(body, cg, *st.expr, labelId);
-            }
+        if (emitStmt(body, cg, st, labelId, mode, retType)) {
             hasRet = true;
-            body << "    leave\n";
-            body << "    ret\n";
         }
     }
 

@@ -12,7 +12,7 @@ Exactly one entry point must be defined:
 
 - `main()` returns an i64 exit code. No automatic printing.
 - `main_i64()` returns an i64 that is printed to stdout, then exits with code 0.
-- `main_d64()` returns a d64 that is printed to stdout in scientific notation, then exits with code 0.
+- `main_d64()` returns a d64 that is printed to stdout (hybrid fixed/scientific), then exits with code 0.
 
 Defining more than one is a compile-time error.
 
@@ -23,7 +23,7 @@ Defining more than one is a compile-time error.
   - `rt_exit`
   - `rt_write`
   - `rt_print_i64` (prints signed i64 + newline)
-  - `rt_print_f64` (prints d64 in scientific notation + newline)
+  - `rt_print_f64` (prints d64 in hybrid fixed/scientific + newline)
 - `main_i64.elfir` — example ELFIR program
 - `main_d64.elfir` — example ELFIR program (d64 mode)
 - `main_d64_big.elfir` — d64 example (`1e100`)
@@ -125,6 +125,7 @@ fn main_d64() {
 - `print_i64/print_d64/print_str` do not add a newline; use `\n` inside strings when needed.
 - `print_i64` is only allowed in `main`/`main_i64`; `print_d64` only in `main`/`main_d64`.
 - `ret <expr>;` returns the expression value in `rax` (i64) or `xmm0` (d64).
+- `if (<expr>) { ... } [elseif (<expr>) { ... }]* [else { ... }]` with numeric conditions (nonzero is true).
 - Operators: `+`, `-`, `*`, `/`, `%` with standard precedence and left associativity.
 - `%` is remainder (i64) / fmod-style remainder (d64).
 - Comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=` (lower precedence than arithmetic).

@@ -1,6 +1,18 @@
-fn main_d64() {
-d64 x =202; 
-
-print(x," ","\n","x = ",202,"\n");
-    ret pi*2.22e-18;
+fn main_d64() 
+{
+	d64 x =202; 
+	if(x<201)
+	{
+		print("if(x<201)",x,"<","201\n");
 	}
+	elseif(x==pi)
+	{
+		print("elseif(x==pi)",x,"=",pi,"\n");
+	}
+	else
+	{
+		print("else(x!=pi)",x,"!=",pi,"\n");
+	}
+	print(x," ","\n","x = ",202,"\n");
+	ret 0;
+}
