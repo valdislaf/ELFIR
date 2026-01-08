@@ -117,11 +117,11 @@ fn main_d64() {
 ## ELFIR v0.1 Semantics
 
 - `auto` declares a variable (i64 in `main_i64`, d64 in `main_d64`). `auto` is not allowed in `main`.
-- `i64/u8/u16/u32/u64 x = <expr>;`, `d64 x = <expr>;`, and `str x = "..."` declare typed variables (required in `main` for numeric).
+- `i64/u8/u16/u32/u64 x = <expr>;`, `d64 x = <expr>;`, `str x = "..."`, and `ptr<T> x = <expr>;` declare typed variables (required in `main` for numeric).
 - Functions:
-  - `fn i64/u8/u16/u32/u64 foo(...)`, `fn d64 foo(...)`, `fn str foo(...)` are typed functions.
+  - `fn i64/u8/u16/u32/u64 foo(...)`, `fn d64 foo(...)`, `fn str foo(...)`, `fn ptr<T> foo(...)` are typed functions.
   - `fn foo(...) { ... }` or `void fn foo(...) { ... }` are void functions.
-  - Parameters are typed (`i64`, `u8/u16/u32/u64`, `d64`, `str`) and passed by value.
+  - Parameters are typed (`i64`, `u8/u16/u32/u64`, `d64`, `str`, `ptr<T>`) and passed by value.
   - `ret <expr>;` is required in non-void functions; `ret;` is allowed in void functions.
 - `print_i64(<expr>);` prints i64, `print_d64(<expr>);` prints d64, `print_hex(<expr>);` prints unsigned hex with `0x` prefix, `print_str(<str>);` prints a string.
 - `print(<expr or "str">, ...);` prints each argument in order (string literal/str var or integer/d64 expression).
@@ -147,6 +147,13 @@ fn main_d64() {
 - Integer literals: decimal digits only (default i64). Hex literals: `0x...` (default u64, `_` separators allowed). A leading `-` is parsed as unary minus.
 - Explicit integer casts: `i64(x)`, `u8(x)`, `u16(x)`, `u32(x)`, `u64(x)` with wrap semantics (mod 2^N for u*).
 - Signed/unsigned mixing is a type error; implicit widening is allowed only among unsigned types.
+- Pointer types: `ptr<T>` where `T` is `u8/u16/u32/u64/i64/d64`.
+- Address-of: `&var` (locals only) yields `ptr<T>`.
+- Deref: `*p` reads, `*p = expr;` writes.
+- Pointer arithmetic: `p + n`, `p - n` scale by `sizeof(T)` (elements).
+- Byte offset: `byte_add(p, n)` adds raw bytes.
+- Null: `null` can be assigned to any `ptr<T>` and compared with `==`/`!=`.
+- Pointer casts: `ptr<T>(u64_expr)` and `u64(p)`.
 - Floating literals (d64 mode): digits with optional `.` and optional exponent `e|E[+|-]digits`.
 - d64 output format: fixed within [1e-17, 1e18), otherwise scientific; trailing zeros trimmed (at least one digit after the dot).
 - String literals support escapes: `\\`, `\"`, `\n`, `\t`.

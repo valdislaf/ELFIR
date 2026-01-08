@@ -181,6 +181,26 @@ i64 i= 0;
       assert_i64("cmp_u8_gt", u8(250) > u8(3), 1);
       assert_i64("cmp_u8_lt", u8(1) < u8(2), 1);
       assert_u64("hex_abcd", u64(0xABCD), 0xABCD);
+
+      print("\n-- ptr tests --\n");
+      u64 pa = 0;
+      ptr<u64> p = &pa;
+      *p = 11;
+      assert_u64("ptr_store_a", pa, 11);
+      ptr<u64> p2 = p + 1;
+      ptr<u64> p3 = ptr<u64>(u64(p) + u64(8));
+      assert_i64("ptr_add_eq", p2 == p3, 1);
+      ptr<u64> q = byte_add(p, 8);
+      assert_i64("ptr_byte_add_eq", q == p3, 1);
+      *p = 0;
+      ptr<u8> pu = ptr<u8>(u64(p));
+      *pu = u8(0xEF);
+      *(pu + 1) = u8(0xBE);
+      assert_u64("ptr_u8_store", pa, 0xBEEF);
+      ptr<u64> pn = null;
+      assert_i64("ptr_null_eq", pn == null, 1);
+      ptr<u64> pc = ptr<u64>(0x1000);
+      assert_u64("ptr_cast", u64(pc), 0x1000);
 	 
       ret 0;
   }

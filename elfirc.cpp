@@ -32,6 +32,8 @@ enum class TokKind {
     KwU16,
     KwU32,
     KwU64,
+    KwPtr,
+    KwNull,
     KwIf,
     KwElse,
     KwElseIf,
@@ -111,6 +113,8 @@ public:
             else if (t.text == "u16") t.kind = TokKind::KwU16;
             else if (t.text == "u32") t.kind = TokKind::KwU32;
             else if (t.text == "u64") t.kind = TokKind::KwU64;
+            else if (t.text == "ptr") t.kind = TokKind::KwPtr;
+            else if (t.text == "null") t.kind = TokKind::KwNull;
             else if (t.text == "if") t.kind = TokKind::KwIf;
             else if (t.text == "else") t.kind = TokKind::KwElse;
             else if (t.text == "elseif") t.kind = TokKind::KwElseIf;
@@ -253,8 +257,10 @@ private:
     size_t i_ = 0;
 };
 
-enum class Type { I64, D64, Str, Void, U8, U16, U32, U64 };
+enum class Type { I64, D64, Str, Void, U8, U16, U32, U64, PtrU8, PtrU16, PtrU32, PtrU64, PtrI64, PtrD64 };
 enum class Mode { I64Only, D64Only, Mixed };
+
+static Type makePtrType(Type base);
 
 // AST (минимально)
 struct Expr {
@@ -264,6 +270,10 @@ struct Expr {
         Var,
         Call,
         Cast,
+        AddrOf,
+        Deref,
+        PtrAddBytes,
+        Null,
         Add,
         Sub,
         Mul,
@@ -314,6 +324,22 @@ struct Expr {
     static std::unique_ptr<Expr> makeCast(Type t, std::unique_ptr<Expr> a) {
         auto e = std::make_unique<Expr>();
         e->kind = Kind::Cast; e->castType = t; e->lhs = std::move(a); return e;
+    }
+    static std::unique_ptr<Expr> makeAddrOf(std::string n) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::AddrOf; e->var = std::move(n); return e;
+    }
+    static std::unique_ptr<Expr> makeDeref(std::unique_ptr<Expr> a) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Deref; e->lhs = std::move(a); return e;
+    }
+    static std::unique_ptr<Expr> makePtrAddBytes(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::PtrAddBytes; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeNull() {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Null; return e;
     }
     static std::unique_ptr<Expr> makeMul(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
         auto e = std::make_unique<Expr>();
@@ -407,10 +433,11 @@ struct Stmt {
         std::vector<Stmt> body;
     };
     enum class AssignOp { Eq, AddEq, SubEq, MulEq, DivEq };
-    enum class Kind { AutoAssign, TypedAssign, Assign, Ret, PrintI64, PrintD64, PrintStr, PrintHex, PrintList, ExprStmt, If, While, For, Break, Continue } kind;
+    enum class Kind { AutoAssign, TypedAssign, Assign, PtrStore, Ret, PrintI64, PrintD64, PrintStr, PrintHex, PrintList, ExprStmt, If, While, For, Break, Continue } kind;
     Type declType = Type::I64;    // for TypedAssign
     std::string name;             // for AutoAssign
     std::unique_ptr<Expr> expr;   // for both
+    std::unique_ptr<Expr> ptrExpr; // for PtrStore
     std::vector<std::unique_ptr<Expr>> exprs; // for PrintList
     std::vector<IfBranch> ifBranches;
     std::unique_ptr<Expr> cond;
@@ -456,11 +483,8 @@ private:
         } else {
             expect(TokKind::KwFn, "Expected 'fn'");
         }
-        if (cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwD64 || cur_.kind == TokKind::KwStr ||
-            cur_.kind == TokKind::KwVoid || cur_.kind == TokKind::KwU8 || cur_.kind == TokKind::KwU16 ||
-            cur_.kind == TokKind::KwU32 || cur_.kind == TokKind::KwU64) {
-            retType = tokenToType(cur_.kind, cur_.pos);
-            advance();
+        if (isTypeStart(cur_.kind)) {
+            retType = parseType(true);
         }
         std::string fname = expectIdent("Expected function name after 'fn'");
         expect(TokKind::LParen, "Expected '(' after function name");
@@ -527,11 +551,21 @@ private:
             return st;
         }
 
-    if (cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwD64 || cur_.kind == TokKind::KwStr ||
-        cur_.kind == TokKind::KwU8 || cur_.kind == TokKind::KwU16 || cur_.kind == TokKind::KwU32 ||
-        cur_.kind == TokKind::KwU64) {
-            Type t = tokenToType(cur_.kind, cur_.pos);
+        if (cur_.kind == TokKind::Star) {
             advance();
+            auto ptrExpr = parseUnary();
+            expect(TokKind::Equal, "Expected '=' after pointer dereference");
+            auto e = parseComparison();
+            expect(TokKind::Semicolon, "Expected ';' after assignment");
+            Stmt st;
+            st.kind = Stmt::Kind::PtrStore;
+            st.ptrExpr = std::move(ptrExpr);
+            st.expr = std::move(e);
+            return st;
+        }
+
+    if (isTypeStart(cur_.kind) && cur_.kind != TokKind::KwVoid) {
+            Type t = parseType(false);
             std::string var = expectIdent("Expected identifier after type");
             expect(TokKind::Equal, "Expected '=' after variable name");
             auto e = parseComparison();
@@ -681,11 +715,8 @@ private:
         Stmt init;
         if (cur_.kind == TokKind::KwAuto) {
             init = parseAutoAssignNoSemicolon();
-        } else if (cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwD64 ||
-                   cur_.kind == TokKind::KwU8 || cur_.kind == TokKind::KwU16 ||
-                   cur_.kind == TokKind::KwU32 || cur_.kind == TokKind::KwU64) {
-            Type t = tokenToType(cur_.kind, cur_.pos);
-            advance();
+        } else if (isTypeStart(cur_.kind) && cur_.kind != TokKind::KwVoid) {
+            Type t = parseType(false);
             init = parseTypedAssignNoSemicolon(t);
         } else {
             throw Error("Expected 'auto' or integer type in for init at position " + std::to_string(cur_.pos));
@@ -767,14 +798,41 @@ private:
         throw Error("Expected type keyword at position " + std::to_string(pos));
     }
 
-    Param parseParam() {
-        if (!(cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwD64 || cur_.kind == TokKind::KwStr ||
-              cur_.kind == TokKind::KwU8 || cur_.kind == TokKind::KwU16 || cur_.kind == TokKind::KwU32 ||
-              cur_.kind == TokKind::KwU64)) {
-            throw Error("Expected parameter type at position " + std::to_string(cur_.pos));
+    static bool isTypeStart(TokKind k) {
+        return k == TokKind::KwI64 || k == TokKind::KwD64 || k == TokKind::KwStr || k == TokKind::KwVoid ||
+               k == TokKind::KwU8 || k == TokKind::KwU16 || k == TokKind::KwU32 || k == TokKind::KwU64 ||
+               k == TokKind::KwPtr;
+    }
+
+    Type parseType(bool allowVoid) {
+        if (cur_.kind == TokKind::KwPtr) {
+            advance();
+            expect(TokKind::Lt, "Expected '<' after ptr");
+            if (!isTypeStart(cur_.kind) || cur_.kind == TokKind::KwPtr || cur_.kind == TokKind::KwVoid ||
+                cur_.kind == TokKind::KwStr) {
+                throw Error("Expected base type inside ptr<> at position " + std::to_string(cur_.pos));
+            }
+            Type base = tokenToType(cur_.kind, cur_.pos);
+            advance();
+            expect(TokKind::Gt, "Expected '>' after ptr base type");
+            return makePtrType(base);
+        }
+        if (!isTypeStart(cur_.kind)) {
+            throw Error("Expected type keyword at position " + std::to_string(cur_.pos));
+        }
+        if (!allowVoid && cur_.kind == TokKind::KwVoid) {
+            throw Error("void is not allowed here at position " + std::to_string(cur_.pos));
         }
         Type t = tokenToType(cur_.kind, cur_.pos);
         advance();
+        return t;
+    }
+
+    Param parseParam() {
+        if (!isTypeStart(cur_.kind) || cur_.kind == TokKind::KwVoid) {
+            throw Error("Expected parameter type at position " + std::to_string(cur_.pos));
+        }
+        Type t = parseType(false);
         std::string name = expectIdent("Expected parameter name");
         Param p;
         p.type = t;
@@ -804,13 +862,14 @@ private:
             advance();
             return Expr::makeNum(std::move(v));
         }
-        if (cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwU8 || cur_.kind == TokKind::KwU16 ||
-            cur_.kind == TokKind::KwU32 || cur_.kind == TokKind::KwU64 || cur_.kind == TokKind::KwD64 ||
-            cur_.kind == TokKind::KwStr || cur_.kind == TokKind::KwVoid) {
-            Type t = tokenToType(cur_.kind, cur_.pos);
+        if (cur_.kind == TokKind::KwNull) {
             advance();
-            if (!(t == Type::I64 || t == Type::U8 || t == Type::U16 || t == Type::U32 || t == Type::U64)) {
-                throw Error("Only integer casts are supported (i64, u8, u16, u32, u64)");
+            return Expr::makeNull();
+        }
+        if (isTypeStart(cur_.kind)) {
+            Type t = parseType(true);
+            if (t == Type::Void || t == Type::Str) {
+                throw Error("Only integer/ptr casts are supported");
             }
             expect(TokKind::LParen, "Expected '(' after cast type");
             auto inner = parseComparison();
@@ -827,6 +886,13 @@ private:
             advance();
             if (cur_.kind == TokKind::LParen) {
                 advance();
+                if (n == "byte_add") {
+                    auto a = parseComparison();
+                    expect(TokKind::Comma, "Expected ',' after byte_add ptr");
+                    auto b = parseComparison();
+                    expect(TokKind::RParen, "Expected ')' after byte_add args");
+                    return Expr::makePtrAddBytes(std::move(a), std::move(b));
+                }
                 if (n == "sqrt") {
                     auto a = parseComparison();
                     expect(TokKind::RParen, "Expected ')' after sqrt argument");
@@ -909,6 +975,16 @@ private:
             advance();
             auto rhs = parseUnary();
             return Expr::makeBitNot(std::move(rhs));
+        }
+        if (cur_.kind == TokKind::Star) {
+            advance();
+            auto rhs = parseUnary();
+            return Expr::makeDeref(std::move(rhs));
+        }
+        if (cur_.kind == TokKind::Amp) {
+            advance();
+            std::string n = expectIdent("Expected identifier after '&'");
+            return Expr::makeAddrOf(std::move(n));
         }
         return parsePrimary();
     }
@@ -1214,6 +1290,7 @@ static void writeFile(const std::string& path, const std::string& content) {
 
 static void emitExprInt(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId);
 static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId);
+static void emitExprPtr(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId);
 static void emitStrToRegs(std::ostringstream& out, CodegenCtx& cg, const Expr& e,
                           int& labelId, const char* ptrReg, const char* lenReg);
 static void emitCallExpr(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId);
@@ -1222,10 +1299,17 @@ static ExprTypeTag inferExprTypeTag(const Expr& e, const CodegenCtx& cg, Mode mo
 static ExprTypeTag mergeNumericTags(ExprTypeTag a, ExprTypeTag b, const char* ctx);
 static Type tagToType(ExprTypeTag t);
 static Type resolveIntExprType(const Expr& e, const CodegenCtx& cg, Mode mode);
+static Type resolvePtrExprType(const Expr& e, const CodegenCtx& cg, Mode mode);
+static bool isPtrExpr(const Expr& e, const CodegenCtx& cg, Mode mode);
+static bool isNullExpr(const Expr& e);
 static bool isUnsignedType(Type t);
 static bool isIntegerType(Type t);
 static bool isFloatLiteralText(const std::string& text);
 static int unsignedBits(Type t);
+static bool isPtrType(Type t);
+static Type ptrPointee(Type t);
+static int ptrElemSize(Type t);
+static Type makePtrType(Type base);
 
 static void emitMaskUnsigned(std::ostringstream& out, Type t) {
     switch (t) {
@@ -1270,6 +1354,26 @@ static void emitExprInt(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             emitCallExpr(out, cg, e, labelId);
             if (isUnsignedType(sig.retType)) {
                 emitMaskUnsigned(out, sig.retType);
+            }
+            return;
+        }
+        case K::Deref: {
+            Type pt = resolvePtrExprType(*e.lhs, cg, cg.mode);
+            Type base = ptrPointee(pt);
+            if (!isIntegerType(base)) {
+                throw Error("Type error: deref expects integer ptr");
+            }
+            emitExprPtr(out, cg, *e.lhs, labelId);
+            switch (base) {
+                case Type::U8:  out << "    movzx eax, byte [rax]\n"; break;
+                case Type::U16: out << "    movzx eax, word [rax]\n"; break;
+                case Type::U32: out << "    mov  eax, dword [rax]\n"; break;
+                case Type::U64: out << "    mov  rax, qword [rax]\n"; break;
+                case Type::I64: out << "    mov  rax, qword [rax]\n"; break;
+                default: break;
+            }
+            if (isUnsignedType(base)) {
+                emitMaskUnsigned(out, base);
             }
             return;
         }
@@ -1406,6 +1510,25 @@ static void emitExprInt(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             return;
         }
         case K::Cmp: {
+            bool lPtr = isPtrExpr(*e.lhs, cg, cg.mode) || isNullExpr(*e.lhs);
+            bool rPtr = isPtrExpr(*e.rhs, cg, cg.mode) || isNullExpr(*e.rhs);
+            if (lPtr || rPtr) {
+                if (!(lPtr && rPtr)) {
+                    throw Error("Type error: ptr comparison requires ptr on both sides");
+                }
+                if (e.cmpOp != Expr::CmpOp::Eq && e.cmpOp != Expr::CmpOp::Ne) {
+                    throw Error("Type error: only == and != are allowed for ptr");
+                }
+                emitExprPtr(out, cg, *e.lhs, labelId);
+                out << "    push rax\n";
+                emitExprPtr(out, cg, *e.rhs, labelId);
+                out << "    pop  rcx\n";
+                out << "    cmp  rcx, rax\n";
+                if (e.cmpOp == Expr::CmpOp::Eq) out << "    sete al\n";
+                else out << "    setne al\n";
+                out << "    movzx eax, al\n";
+                return;
+            }
             Type lt = resolveIntExprType(*e.lhs, cg, cg.mode);
             Type rt = resolveIntExprType(*e.rhs, cg, cg.mode);
             emitExprInt(out, cg, *e.lhs, labelId);
@@ -1433,6 +1556,16 @@ static void emitExprInt(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             out << "    and  rax, rcx\n";
             return;
         case K::Cast: {
+            if (isPtrType(e.castType)) {
+                throw Error("Type error: ptr cast is not allowed in integer expression");
+            }
+            if (isPtrExpr(*e.lhs, cg, cg.mode)) {
+                if (e.castType != Type::U64) {
+                    throw Error("Type error: ptr can only be cast to u64");
+                }
+                emitExprPtr(out, cg, *e.lhs, labelId);
+                return;
+            }
             if (!isIntegerType(e.castType)) {
                 throw Error("Type error: only integer casts are supported");
             }
@@ -1518,6 +1651,75 @@ static void emitExprInt(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
     throw Error("Internal: unknown expr kind");
 }
 
+static void emitExprPtr(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId) {
+    using K = Expr::Kind;
+    switch (e.kind) {
+        case K::Var: {
+            auto v = cg.getVar(e.var);
+            if (!isPtrType(v.type)) throw Error("Type error: expected ptr variable '" + e.var + "'");
+            out << "    mov  rax, [rbp-" << CodegenCtx::slotDisp(v.slot) << "]\n";
+            return;
+        }
+        case K::Call: {
+            const auto& sig = cg.getFuncSig(e.callName);
+            if (!isPtrType(sig.retType)) {
+                throw Error("Type error: function '" + e.callName + "' does not return ptr");
+            }
+            emitCallExpr(out, cg, e, labelId);
+            return;
+        }
+        case K::AddrOf: {
+            auto v = cg.getVar(e.var);
+            if (!isIntegerType(v.type) && v.type != Type::D64) {
+                throw Error("Type error: '&' is only allowed on numeric variables");
+            }
+            out << "    lea  rax, [rbp-" << CodegenCtx::slotDisp(v.slot) << "]\n";
+            return;
+        }
+        case K::Cast: {
+            if (!isPtrType(e.castType)) {
+                throw Error("Type error: expected ptr cast");
+            }
+            emitExprInt(out, cg, *e.lhs, labelId);
+            return;
+        }
+        case K::Add:
+        case K::Sub: {
+            Type pt = resolvePtrExprType(*e.lhs, cg, cg.mode);
+            int scale = ptrElemSize(pt);
+            emitExprPtr(out, cg, *e.lhs, labelId);
+            out << "    push rax\n";
+            emitExprInt(out, cg, *e.rhs, labelId);
+            out << "    mov  rcx, rax\n";
+            out << "    pop  rax\n";
+            if (scale != 1) {
+                out << "    imul rcx, " << scale << "\n";
+            }
+            if (e.kind == K::Add) {
+                out << "    add  rax, rcx\n";
+            } else {
+                out << "    sub  rax, rcx\n";
+            }
+            return;
+        }
+        case K::PtrAddBytes: {
+            emitExprPtr(out, cg, *e.lhs, labelId);
+            out << "    push rax\n";
+            emitExprInt(out, cg, *e.rhs, labelId);
+            out << "    mov  rcx, rax\n";
+            out << "    pop  rax\n";
+            out << "    add  rax, rcx\n";
+            return;
+        }
+        case K::Null:
+            out << "    xor  eax, eax\n";
+            return;
+        default:
+            break;
+    }
+    throw Error("Internal: unknown ptr expr kind");
+}
+
 static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId) {
     using K = Expr::Kind;
     switch (e.kind) {
@@ -1541,6 +1743,16 @@ static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
                 throw Error("Type error: function '" + e.callName + "' does not return d64");
             }
             emitCallExpr(out, cg, e, labelId);
+            return;
+        }
+        case K::Deref: {
+            Type pt = resolvePtrExprType(*e.lhs, cg, cg.mode);
+            Type base = ptrPointee(pt);
+            if (base != Type::D64) {
+                throw Error("Type error: deref expects ptr<d64>");
+            }
+            emitExprPtr(out, cg, *e.lhs, labelId);
+            out << "    movsd xmm0, [rax]\n";
             return;
         }
         case K::Cast:
@@ -1793,6 +2005,12 @@ static const char* typeName(Type t) {
         case Type::U16: return "u16";
         case Type::U32: return "u32";
         case Type::U64: return "u64";
+        case Type::PtrU8: return "ptr<u8>";
+        case Type::PtrU16: return "ptr<u16>";
+        case Type::PtrU32: return "ptr<u32>";
+        case Type::PtrU64: return "ptr<u64>";
+        case Type::PtrI64: return "ptr<i64>";
+        case Type::PtrD64: return "ptr<d64>";
     }
     return "unknown";
 }
@@ -1805,6 +2023,53 @@ static bool isIntegerType(Type t) {
     return t == Type::I64 || isUnsignedType(t);
 }
 
+static bool isPtrType(Type t) {
+    return t == Type::PtrU8 || t == Type::PtrU16 || t == Type::PtrU32 || t == Type::PtrU64 ||
+           t == Type::PtrI64 || t == Type::PtrD64;
+}
+
+static Type ptrPointee(Type t) {
+    switch (t) {
+        case Type::PtrU8: return Type::U8;
+        case Type::PtrU16: return Type::U16;
+        case Type::PtrU32: return Type::U32;
+        case Type::PtrU64: return Type::U64;
+        case Type::PtrI64: return Type::I64;
+        case Type::PtrD64: return Type::D64;
+        default: break;
+    }
+    throw Error("Internal: expected ptr type");
+}
+
+static Type makePtrType(Type base) {
+    switch (base) {
+        case Type::U8: return Type::PtrU8;
+        case Type::U16: return Type::PtrU16;
+        case Type::U32: return Type::PtrU32;
+        case Type::U64: return Type::PtrU64;
+        case Type::I64: return Type::PtrI64;
+        case Type::D64: return Type::PtrD64;
+        default: break;
+    }
+    throw Error("ptr<T> only supports u8/u16/u32/u64/i64/d64");
+}
+
+static int typeSizeBytes(Type t) {
+    switch (t) {
+        case Type::U8: return 1;
+        case Type::U16: return 2;
+        case Type::U32: return 4;
+        case Type::U64: return 8;
+        case Type::I64: return 8;
+        case Type::D64: return 8;
+        default: break;
+    }
+    throw Error("Internal: invalid type size");
+}
+
+static int ptrElemSize(Type t) {
+    return typeSizeBytes(ptrPointee(t));
+}
 static bool isUnsignedLiteralAssignable(const Expr& e, Type target, uint64_t* outVal = nullptr) {
     if (!isUnsignedType(target)) return false;
     if (!(e.kind == Expr::Kind::Num && !isFloatLiteralText(e.numText))) return false;
@@ -2019,7 +2284,20 @@ static ExprTypeTag inferExprTypeTag(const Expr& e, const CodegenCtx& cg, Mode mo
             }
             return tagFromType(sig.retType);
         }
+        case K::AddrOf:
+        case K::Null:
+        case K::PtrAddBytes:
+            throw Error("Type error: ptr expression is not allowed in numeric context");
         case K::Cast: {
+            if (isPtrType(e.castType)) {
+                throw Error("Type error: ptr cast is not allowed in numeric context");
+            }
+            if (isPtrExpr(*e.lhs, cg, mode)) {
+                if (e.castType != Type::U64) {
+                    throw Error("Type error: ptr can only be cast to u64");
+                }
+                return ExprTypeTag::U64;
+            }
             auto lt = inferExprTypeTag(*e.lhs, cg, mode);
             if (lt == ExprTypeTag::D64) {
                 throw Error("Type error: casting from d64 is not supported");
@@ -2064,8 +2342,35 @@ static ExprTypeTag inferExprTypeTag(const Expr& e, const CodegenCtx& cg, Mode mo
             }
             return lt;
         }
+        case K::Deref: {
+            Type pt = resolvePtrExprType(*e.lhs, cg, mode);
+            Type base = ptrPointee(pt);
+            if (base == Type::D64) return ExprTypeTag::D64;
+            if (!isIntegerType(base)) {
+                throw Error("Type error: invalid dereference type");
+            }
+            return tagFromType(base);
+        }
         case K::Cmp:
         case K::And: {
+            bool lPtr = isPtrExpr(*e.lhs, cg, mode) || isNullExpr(*e.lhs);
+            bool rPtr = isPtrExpr(*e.rhs, cg, mode) || isNullExpr(*e.rhs);
+            if (lPtr || rPtr) {
+                if (!(lPtr && rPtr)) {
+                    throw Error("Type error: ptr comparison requires ptr on both sides");
+                }
+                if (e.cmpOp != Expr::CmpOp::Eq && e.cmpOp != Expr::CmpOp::Ne) {
+                    throw Error("Type error: only == and != are allowed for ptr");
+                }
+                if (!isNullExpr(*e.lhs) && !isNullExpr(*e.rhs)) {
+                    Type lt = resolvePtrExprType(*e.lhs, cg, mode);
+                    Type rt = resolvePtrExprType(*e.rhs, cg, mode);
+                    if (lt != rt) {
+                        throw Error("Type error: ptr comparison requires same element type");
+                    }
+                }
+                return ExprTypeTag::I64;
+            }
             auto lt = inferExprTypeTag(*e.lhs, cg, mode);
             auto rt = inferExprTypeTag(*e.rhs, cg, mode);
             if (lt == ExprTypeTag::D64 || rt == ExprTypeTag::D64) {
@@ -2126,6 +2431,75 @@ static Type resolveIntExprType(const Expr& e, const CodegenCtx& cg, Mode mode) {
     return tagToType(tag);
 }
 
+static bool isNullExpr(const Expr& e) {
+    return e.kind == Expr::Kind::Null;
+}
+
+static Type resolvePtrExprType(const Expr& e, const CodegenCtx& cg, Mode mode) {
+    using K = Expr::Kind;
+    switch (e.kind) {
+        case K::Var: {
+            auto v = cg.getVar(e.var);
+            if (!isPtrType(v.type)) {
+                throw Error("Type error: expected ptr expression");
+            }
+            return v.type;
+        }
+        case K::Call: {
+            const auto& sig = cg.getFuncSig(e.callName);
+            checkCallArgs(e, cg, mode);
+            if (!isPtrType(sig.retType)) {
+                throw Error("Type error: function '" + e.callName + "' does not return ptr");
+            }
+            return sig.retType;
+        }
+        case K::AddrOf: {
+            auto v = cg.getVar(e.var);
+            if (!isIntegerType(v.type) && v.type != Type::D64) {
+                throw Error("Type error: '&' is only allowed on numeric variables");
+            }
+            return makePtrType(v.type);
+        }
+        case K::Cast: {
+            if (!isPtrType(e.castType)) {
+                throw Error("Type error: expected ptr cast");
+            }
+            Type src = resolveIntExprType(*e.lhs, cg, mode);
+            if (src != Type::U64 && src != Type::I64) {
+                throw Error("Type error: ptr cast expects u64/i64 expression");
+            }
+            return e.castType;
+        }
+        case K::Add:
+        case K::Sub: {
+            Type base = resolvePtrExprType(*e.lhs, cg, mode);
+            Type idx = resolveIntExprType(*e.rhs, cg, mode);
+            (void)idx;
+            return base;
+        }
+        case K::PtrAddBytes: {
+            Type base = resolvePtrExprType(*e.lhs, cg, mode);
+            Type idx = resolveIntExprType(*e.rhs, cg, mode);
+            (void)idx;
+            return base;
+        }
+        case K::Null:
+            throw Error("Type error: null needs a ptr context");
+        default:
+            break;
+    }
+    throw Error("Type error: expected ptr expression");
+}
+
+static bool isPtrExpr(const Expr& e, const CodegenCtx& cg, Mode mode) {
+    try {
+        (void)resolvePtrExprType(e, cg, mode);
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
 static void checkCallArgs(const Expr& e, const CodegenCtx& cg, Mode mode) {
     const auto& sig = cg.getFuncSig(e.callName);
     if (e.callArgs.size() != sig.params.size()) {
@@ -2139,6 +2513,17 @@ static void checkCallArgs(const Expr& e, const CodegenCtx& cg, Mode mode) {
             if (!isStrExpr(arg, cg)) {
                 throw Error("Type error: argument " + std::to_string(i + 1) + " of '" + e.callName +
                             "' expects str");
+            }
+            continue;
+        }
+        if (isPtrType(paramType)) {
+            if (isNullExpr(arg)) {
+                continue;
+            }
+            Type argPtr = resolvePtrExprType(arg, cg, mode);
+            if (argPtr != paramType) {
+                throw Error("Type error: argument " + std::to_string(i + 1) + " of '" + e.callName +
+                            "' expects " + typeName(paramType));
             }
             continue;
         }
@@ -2243,6 +2628,12 @@ static bool isStrExpr(const Expr& e, const CodegenCtx& cg) {
 
 static void emitCondJumpFalse(std::ostringstream& out, CodegenCtx& cg, const Expr& cond,
                               int& labelId, Mode mode, const std::string& label) {
+    if (isPtrExpr(cond, cg, mode) || isNullExpr(cond)) {
+        emitExprPtr(out, cg, cond, labelId);
+        out << "    cmp  rax, 0\n";
+        out << "    je   " << label << "\n";
+        return;
+    }
     Type condType = resolveCondType(cond, cg, mode);
     if (condType == Type::D64) {
         emitExprD64(out, cg, cond, labelId);
@@ -2317,6 +2708,9 @@ static void emitCallExpr(std::ostringstream& out, CodegenCtx& cg, const Expr& e,
         const auto& arg = *e.callArgs[(size_t)i];
         if (paramType == Type::I64 || isUnsignedType(paramType)) {
             emitExprInt(out, cg, arg, labelId);
+            out << "    push rax\n";
+        } else if (isPtrType(paramType)) {
+            emitExprPtr(out, cg, arg, labelId);
             out << "    push rax\n";
         } else if (paramType == Type::D64) {
             emitExprD64(out, cg, arg, labelId);
@@ -2458,6 +2852,19 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
         } else if (st.declType == Type::D64) {
             emitExprD64(out, cg, *st.expr, labelId);
             out << "    movsd [rbp-" << CodegenCtx::slotDisp(slot) << "], xmm0\n";
+        } else if (isPtrType(st.declType)) {
+            if (isNullExpr(*st.expr)) {
+                out << "    xor  eax, eax\n";
+                out << "    mov  [rbp-" << CodegenCtx::slotDisp(slot) << "], rax\n";
+                return false;
+            }
+            Type srcPtr = resolvePtrExprType(*st.expr, cg, mode);
+            if (srcPtr != st.declType) {
+                throw Error("Type error: expected " + std::string(typeName(st.declType)) + " expression");
+            }
+            emitExprPtr(out, cg, *st.expr, labelId);
+            out << "    mov  [rbp-" << CodegenCtx::slotDisp(slot) << "], rax\n";
+            return false;
         } else {
             Type srcType = resolveIntExprType(*st.expr, cg, mode);
             if (st.declType == Type::I64) {
@@ -2549,6 +2956,22 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
                 return false;
             }
             throw Error("str assignment supports only '=' and '+='");
+        } else if (isPtrType(v.type)) {
+            if (st.assignOp != Stmt::AssignOp::Eq) {
+                throw Error("ptr assignment supports only '='");
+            }
+            if (isNullExpr(*st.expr)) {
+                out << "    xor  eax, eax\n";
+                out << "    mov  [rbp-" << CodegenCtx::slotDisp(v.slot) << "], rax\n";
+                return false;
+            }
+            Type srcPtr = resolvePtrExprType(*st.expr, cg, mode);
+            if (srcPtr != v.type) {
+                throw Error("Type error: expected " + std::string(typeName(v.type)) + " expression");
+            }
+            emitExprPtr(out, cg, *st.expr, labelId);
+            out << "    mov  [rbp-" << CodegenCtx::slotDisp(v.slot) << "], rax\n";
+            return false;
         } else if (v.type == Type::D64) {
             if (st.assignOp == Stmt::AssignOp::Eq) {
                 emitExprD64(out, cg, *st.expr, labelId);
@@ -2623,6 +3046,52 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
             }
             out << "    mov  [rbp-" << CodegenCtx::slotDisp(v.slot) << "], rax\n";
             return false;
+        }
+        return false;
+    }
+
+    if (st.kind == Stmt::Kind::PtrStore) {
+        Type pt = resolvePtrExprType(*st.ptrExpr, cg, mode);
+        Type base = ptrPointee(pt);
+        emitExprPtr(out, cg, *st.ptrExpr, labelId);
+        out << "    push rax\n";
+        if (base == Type::D64) {
+            emitExprD64(out, cg, *st.expr, labelId);
+            out << "    pop  rax\n";
+            out << "    movsd [rax], xmm0\n";
+            return false;
+        }
+        if (!isIntegerType(base)) {
+            throw Error("Type error: ptr store supports only integer/d64");
+        }
+        Type srcType = resolveIntExprType(*st.expr, cg, mode);
+        if (base == Type::I64) {
+            if (srcType != Type::I64) {
+                throw Error("Type error: expected i64 expression");
+            }
+        } else {
+            if (!isUnsignedType(srcType)) {
+                if (!isUnsignedLiteralAssignable(*st.expr, base)) {
+                    throw Error("Type error: expected " + std::string(typeName(base)) + " expression");
+                }
+            } else if (unsignedBits(srcType) > unsignedBits(base)) {
+                if (!isUnsignedLiteralAssignable(*st.expr, base)) {
+                    throw Error("Type error: expected " + std::string(typeName(base)) + " expression");
+                }
+            }
+        }
+        emitExprInt(out, cg, *st.expr, labelId);
+        if (isUnsignedType(base)) {
+            emitMaskUnsigned(out, base);
+        }
+        out << "    pop  rcx\n";
+        switch (base) {
+            case Type::U8:  out << "    mov  byte [rcx], al\n"; break;
+            case Type::U16: out << "    mov  word [rcx], ax\n"; break;
+            case Type::U32: out << "    mov  dword [rcx], eax\n"; break;
+            case Type::U64: out << "    mov  qword [rcx], rax\n"; break;
+            case Type::I64: out << "    mov  qword [rcx], rax\n"; break;
+            default: break;
         }
         return false;
     }
@@ -2832,6 +3301,24 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
             out << "    ret\n";
             return true;
         }
+        if (isPtrType(retType)) {
+            if (isNullExpr(*st.expr)) {
+                out << "    xor  eax, eax\n";
+                emitCleanupStrs(out, cg, labelId);
+                out << "    leave\n";
+                out << "    ret\n";
+                return true;
+            }
+            Type srcPtr = resolvePtrExprType(*st.expr, cg, mode);
+            if (srcPtr != retType) {
+                throw Error("Type error: expected " + std::string(typeName(retType)) + " expression");
+            }
+            emitExprPtr(out, cg, *st.expr, labelId);
+            emitCleanupStrs(out, cg, labelId);
+            out << "    leave\n";
+            out << "    ret\n";
+            return true;
+        }
         throw Error("Internal: invalid return type");
     }
 
@@ -2868,7 +3355,7 @@ static GenResult genFunctionAsm(const Func& f, Mode mode, Type retType,
         paramOffset += typeSlotCount(p.type) * 8;
     }
     for (const auto& pm : paramMoves) {
-        if (pm.type == Type::I64 || isUnsignedType(pm.type)) {
+        if (pm.type == Type::I64 || isUnsignedType(pm.type) || isPtrType(pm.type)) {
             body << "    mov  rax, [rbp+" << pm.offset << "]\n";
             if (isUnsignedType(pm.type)) {
                 emitMaskUnsigned(body, pm.type);

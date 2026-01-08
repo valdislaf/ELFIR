@@ -83,6 +83,13 @@ main_str45: db 115, 97, 114, 95, 105, 54, 52
 main_str46: db 99, 109, 112, 95, 117, 56, 95, 103, 116
 main_str47: db 99, 109, 112, 95, 117, 56, 95, 108, 116
 main_str48: db 104, 101, 120, 95, 97, 98, 99, 100
+main_str49: db 10, 45, 45, 32, 112, 116, 114, 32, 116, 101, 115, 116, 115, 32, 45, 45, 10
+main_str50: db 112, 116, 114, 95, 115, 116, 111, 114, 101, 95, 97
+main_str51: db 112, 116, 114, 95, 97, 100, 100, 95, 101, 113
+main_str52: db 112, 116, 114, 95, 98, 121, 116, 101, 95, 97, 100, 100, 95, 101, 113
+main_str53: db 112, 116, 114, 95, 117, 56, 95, 115, 116, 111, 114, 101
+main_str54: db 112, 116, 114, 95, 110, 117, 108, 108, 95, 101, 113
+main_str55: db 112, 116, 114, 95, 99, 97, 115, 116
 
 section .text
 
@@ -568,7 +575,7 @@ assert_d64_eps:
 main:
     push rbp
     mov  rbp, rsp
-    sub  rsp, 224
+    sub  rsp, 288
     mov  rax, 0
     mov  [rbp-8], rax
     mov  rax, 0
@@ -1733,6 +1740,167 @@ main:
     mov  rax, 0xABCD
     push rax
     lea  rax, [rel main_str48]
+    mov  rdx, 8
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_u64
+    add  rsp, 40
+    lea  rdi, [rel main_str49]
+    mov  rsi, 17
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, 0
+    mov  [rbp-224], rax
+    lea  rax, [rbp-224]
+    mov  [rbp-232], rax
+    mov  rax, [rbp-232]
+    push rax
+    mov  rax, 11
+    pop  rcx
+    mov  qword [rcx], rax
+    sub  rsp, 8
+    mov  rax, 11
+    push rax
+    mov  rax, [rbp-224]
+    push rax
+    lea  rax, [rel main_str50]
+    mov  rdx, 11
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_u64
+    add  rsp, 40
+    mov  rax, [rbp-232]
+    push rax
+    mov  rax, 1
+    mov  rcx, rax
+    pop  rax
+    imul rcx, 8
+    add  rax, rcx
+    mov  [rbp-240], rax
+    mov  rax, [rbp-232]
+    push rax
+    mov  rax, 8
+    pop  rcx
+    add  rax, rcx
+    mov  [rbp-248], rax
+    sub  rsp, 8
+    mov  rax, 1
+    push rax
+    mov  rax, [rbp-240]
+    push rax
+    mov  rax, [rbp-248]
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    push rax
+    lea  rax, [rel main_str51]
+    mov  rdx, 10
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_i64
+    add  rsp, 40
+    mov  rax, [rbp-232]
+    push rax
+    mov  rax, 8
+    mov  rcx, rax
+    pop  rax
+    add  rax, rcx
+    mov  [rbp-256], rax
+    sub  rsp, 8
+    mov  rax, 1
+    push rax
+    mov  rax, [rbp-256]
+    push rax
+    mov  rax, [rbp-248]
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    push rax
+    lea  rax, [rel main_str52]
+    mov  rdx, 15
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_i64
+    add  rsp, 40
+    mov  rax, [rbp-232]
+    push rax
+    mov  rax, 0
+    pop  rcx
+    mov  qword [rcx], rax
+    mov  rax, [rbp-232]
+    mov  [rbp-264], rax
+    mov  rax, [rbp-264]
+    push rax
+    mov  rax, 0xEF
+    and  rax, 0xFF
+    and  rax, 0xFF
+    pop  rcx
+    mov  byte [rcx], al
+    mov  rax, [rbp-264]
+    push rax
+    mov  rax, 1
+    mov  rcx, rax
+    pop  rax
+    add  rax, rcx
+    push rax
+    mov  rax, 0xBE
+    and  rax, 0xFF
+    and  rax, 0xFF
+    pop  rcx
+    mov  byte [rcx], al
+    sub  rsp, 8
+    mov  rax, 0xBEEF
+    push rax
+    mov  rax, [rbp-224]
+    push rax
+    lea  rax, [rel main_str53]
+    mov  rdx, 12
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_u64
+    add  rsp, 40
+    xor  eax, eax
+    mov  [rbp-272], rax
+    sub  rsp, 8
+    mov  rax, 1
+    push rax
+    mov  rax, [rbp-272]
+    push rax
+    xor  eax, eax
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    push rax
+    lea  rax, [rel main_str54]
+    mov  rdx, 11
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_i64
+    add  rsp, 40
+    mov  rax, 0x1000
+    mov  [rbp-280], rax
+    sub  rsp, 8
+    mov  rax, 0x1000
+    push rax
+    mov  rax, [rbp-280]
+    push rax
+    lea  rax, [rel main_str55]
     mov  rdx, 8
     sub  rsp, 8
     mov  [rsp], rdx
