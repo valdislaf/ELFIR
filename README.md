@@ -123,11 +123,18 @@ fn main_d64() {
 
 - `auto` declares a variable (i64 in `main_i64`, d64 in `main_d64`). `auto` is not allowed in `main`.
 - `i64 x = <expr>;`, `d64 x = <expr>;`, and `str x = "..."` declare typed variables (required in `main` for numeric).
+- Functions:
+  - `fn i64 foo(i64 x, d64 y) { ... }`, `fn d64 foo(...)`, `fn str foo(...)` are typed functions.
+  - `fn foo(...) { ... }` or `void fn foo(...) { ... }` are void functions.
+  - Parameters are typed (`i64`, `d64`, `str`) and passed by value.
+  - `ret <expr>;` is required in non-void functions; `ret;` is allowed in void functions.
 - `print_i64(<expr>);` prints i64, `print_d64(<expr>);` prints d64, `print_str(<str>);` prints a string.
 - `print(<expr or "str">, ...);` prints each argument in order (string literal/str var or i64/d64 expression).
 - `print_i64/print_d64/print_str` do not add a newline; use `\n` inside strings when needed.
 - `print_i64` is only allowed in `main`/`main_i64`; `print_d64` only in `main`/`main_d64`.
-- `ret <expr>;` returns the expression value in `rax` (i64) or `xmm0` (d64).
+- Function calls: `foo(a, b)` can be used in expressions; `foo(...);` is allowed for void functions.
+- `ret <expr>;` returns the expression value in `rax` (i64), `xmm0` (d64), or `rax`+`rdx` (str).
+- `ret;` returns from void functions.
 - `if (<expr>) { ... } [elseif (<expr>) { ... }]* [else { ... }]` with numeric conditions (nonzero is true).
 - `while (<expr>) { ... }` repeats while condition is nonzero.
 - `for (<init>, <cond>, <step>) { ... }` or `for (<init>; <cond>; <step>) { ... }` with commas or semicolons; `<init>` is `auto` or `i64/d64` declaration.

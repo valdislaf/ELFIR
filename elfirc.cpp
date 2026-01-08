@@ -27,6 +27,7 @@ enum class TokKind {
     KwI64,
     KwD64,
     KwStr,
+    KwVoid,
     KwIf,
     KwElse,
     KwElseIf,
@@ -95,6 +96,7 @@ public:
             else if (t.text == "i64") t.kind = TokKind::KwI64;
             else if (t.text == "d64") t.kind = TokKind::KwD64;
             else if (t.text == "str") t.kind = TokKind::KwStr;
+            else if (t.text == "void") t.kind = TokKind::KwVoid;
             else if (t.text == "if") t.kind = TokKind::KwIf;
             else if (t.text == "else") t.kind = TokKind::KwElse;
             else if (t.text == "elseif") t.kind = TokKind::KwElseIf;
@@ -215,11 +217,13 @@ private:
 
 // AST (минимально)
 struct Expr {
-    enum class Kind { Num, Str, Var, Add, Sub, Mul, Div, Mod, Cmp, And, Sqrt, Pow, Min, Max, Abs, Sin, Cos, Tan } kind;
+    enum class Kind { Num, Str, Var, Call, Add, Sub, Mul, Div, Mod, Cmp, And, Sqrt, Pow, Min, Max, Abs, Sin, Cos, Tan } kind;
     enum class CmpOp { Eq, Ne, Lt, Le, Gt, Ge } cmpOp;
     std::string numText;
     std::string strText;
     std::string var;
+    std::string callName;
+    std::vector<std::unique_ptr<Expr>> callArgs;
     std::unique_ptr<Expr> lhs, rhs;
 
     static std::unique_ptr<Expr> makeNum(std::string v) {
@@ -233,6 +237,10 @@ struct Expr {
     static std::unique_ptr<Expr> makeVar(std::string n) {
         auto e = std::make_unique<Expr>();
         e->kind = Kind::Var; e->var = std::move(n); return e;
+    }
+    static std::unique_ptr<Expr> makeCall(std::string n, std::vector<std::unique_ptr<Expr>> args) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Call; e->callName = std::move(n); e->callArgs = std::move(args); return e;
     }
     static std::unique_ptr<Expr> makeMul(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
         auto e = std::make_unique<Expr>();
@@ -296,7 +304,8 @@ struct Expr {
     }
 };
 
-enum class Type { I64, D64, Str };
+enum class Type { I64, D64, Str, Void };
+enum class Mode { I64Only, D64Only, Mixed };
 
 struct Stmt {
     struct IfBranch {
@@ -304,7 +313,7 @@ struct Stmt {
         std::vector<Stmt> body;
     };
     enum class AssignOp { Eq, AddEq, SubEq, MulEq, DivEq };
-    enum class Kind { AutoAssign, TypedAssign, Assign, Ret, PrintI64, PrintD64, PrintStr, PrintList, If, While, For, Break, Continue } kind;
+    enum class Kind { AutoAssign, TypedAssign, Assign, Ret, PrintI64, PrintD64, PrintStr, PrintList, ExprStmt, If, While, For, Break, Continue } kind;
     Type declType = Type::I64;    // for TypedAssign
     std::string name;             // for AutoAssign
     std::unique_ptr<Expr> expr;   // for both
@@ -317,14 +326,24 @@ struct Stmt {
     AssignOp assignOp = AssignOp::Eq;
 };
 
+struct Param {
+    Type type = Type::I64;
+    std::string name;
+};
+
 struct Func {
     std::string name;
+    Type retType = Type::Void;
+    std::vector<Param> params;
     std::vector<Stmt> body;
 };
 
 class Parser {
 public:
-    explicit Parser(Lexer lex) : lex_(std::move(lex)) { cur_ = lex_.next(); }
+    explicit Parser(Lexer lex) : lex_(std::move(lex)) {
+        cur_ = lex_.next();
+        next_ = lex_.next();
+    }
 
     std::vector<Func> parseProgram() {
         std::vector<Func> funcs;
@@ -336,14 +355,34 @@ public:
 
 private:
     Func parseFunction() {
-        expect(TokKind::KwFn, "Expected 'fn'");
+        Type retType = Type::Void;
+        if (cur_.kind == TokKind::KwVoid) {
+            advance();
+            expect(TokKind::KwFn, "Expected 'fn' after 'void'");
+        } else {
+            expect(TokKind::KwFn, "Expected 'fn'");
+        }
+        if (cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwD64 || cur_.kind == TokKind::KwStr || cur_.kind == TokKind::KwVoid) {
+            retType = tokenToType(cur_.kind, cur_.pos);
+            advance();
+        }
         std::string fname = expectIdent("Expected function name after 'fn'");
         expect(TokKind::LParen, "Expected '(' after function name");
-        expect(TokKind::RParen, "Expected ')' after '(' (v0: no parameters)");
+        std::vector<Param> params;
+        if (cur_.kind != TokKind::RParen) {
+            params.push_back(parseParam());
+            while (cur_.kind == TokKind::Comma) {
+                advance();
+                params.push_back(parseParam());
+            }
+        }
+        expect(TokKind::RParen, "Expected ')' after function parameters");
         expect(TokKind::LBrace, "Expected '{' to start function body");
 
         Func f;
         f.name = fname;
+        f.retType = retType;
+        f.params = std::move(params);
 
         while (cur_.kind != TokKind::RBrace) {
             if (cur_.kind == TokKind::End) {
@@ -450,16 +489,28 @@ private:
         st.expr = std::move(e);
         return st;
     }
+    if (cur_.kind == TokKind::Ident && next_.kind == TokKind::LParen) {
+        auto e = parseComparison();
+        expect(TokKind::Semicolon, "Expected ';' after call");
+        Stmt st;
+        st.kind = Stmt::Kind::ExprStmt;
+        st.expr = std::move(e);
+        return st;
+    }
     if (cur_.kind == TokKind::Ident) {
         return parseAssignStmt(true);
     }
 
         if (cur_.kind == TokKind::KwRet) {
             advance();
-            auto e = parseComparison();
-            expect(TokKind::Semicolon, "Expected ';' after ret expression");
             Stmt st;
             st.kind = Stmt::Kind::Ret;
+            if (cur_.kind == TokKind::Semicolon) {
+                advance();
+                return st;
+            }
+            auto e = parseComparison();
+            expect(TokKind::Semicolon, "Expected ';' after ret expression");
             st.expr = std::move(e);
             return st;
         }
@@ -602,6 +653,30 @@ private:
         return st;
     }
 
+    static Type tokenToType(TokKind k, size_t pos) {
+        switch (k) {
+            case TokKind::KwI64: return Type::I64;
+            case TokKind::KwD64: return Type::D64;
+            case TokKind::KwStr: return Type::Str;
+            case TokKind::KwVoid: return Type::Void;
+            default: break;
+        }
+        throw Error("Expected type keyword at position " + std::to_string(pos));
+    }
+
+    Param parseParam() {
+        if (!(cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwD64 || cur_.kind == TokKind::KwStr)) {
+            throw Error("Expected parameter type at position " + std::to_string(cur_.pos));
+        }
+        Type t = tokenToType(cur_.kind, cur_.pos);
+        advance();
+        std::string name = expectIdent("Expected parameter name");
+        Param p;
+        p.type = t;
+        p.name = std::move(name);
+        return p;
+    }
+
     Stmt::AssignOp parseAssignOp() {
         Stmt::AssignOp op = Stmt::AssignOp::Eq;
         switch (cur_.kind) {
@@ -680,7 +755,16 @@ private:
                     expect(TokKind::RParen, "Expected ')' after tan argument");
                     return Expr::makeTan(std::move(a));
                 }
-                throw Error("Unknown function '" + n + "'");
+                std::vector<std::unique_ptr<Expr>> args;
+                if (cur_.kind != TokKind::RParen) {
+                    args.push_back(parseComparison());
+                    while (cur_.kind == TokKind::Comma) {
+                        advance();
+                        args.push_back(parseComparison());
+                    }
+                }
+                expect(TokKind::RParen, "Expected ')' after call arguments");
+                return Expr::makeCall(n, std::move(args));
             }
             if (n == "pi") {
                 return Expr::makeNum("3.14159265358979323846264338327950288");
@@ -741,6 +825,11 @@ private:
         out->numText = e->numText;
         out->strText = e->strText;
         out->var = e->var;
+        out->callName = e->callName;
+        out->callArgs.reserve(e->callArgs.size());
+        for (const auto& arg : e->callArgs) {
+            out->callArgs.push_back(cloneExpr(arg));
+        }
         out->lhs = cloneExpr(e->lhs);
         out->rhs = cloneExpr(e->rhs);
         return out;
@@ -787,7 +876,10 @@ private:
         return result;
     }
 
-    void advance() { cur_ = lex_.next(); }
+    void advance() {
+        cur_ = next_;
+        next_ = lex_.next();
+    }
 
     void expect(TokKind k, const char* msg) {
         if (cur_.kind != k) throw Error(std::string(msg) + " at position " + std::to_string(cur_.pos));
@@ -803,6 +895,12 @@ private:
 
     Lexer lex_;
     Tok cur_;
+    Tok next_;
+};
+
+struct FuncSig {
+    Type retType = Type::Void;
+    std::vector<Type> params;
 };
 
 struct CodegenCtx {
@@ -821,6 +919,9 @@ struct CodegenCtx {
     };
     std::vector<StrLit> strLits;
     std::unordered_map<std::string, int> strToId;
+    const std::unordered_map<std::string, struct FuncSig>* funcs = nullptr;
+    Mode mode = Mode::Mixed;
+    std::string labelPrefix;
 
     int allocSlot(const std::string& name, Type type) {
         if (varToSlot.contains(name)) {
@@ -844,13 +945,20 @@ struct CodegenCtx {
         return it->second;
     }
 
+    const struct FuncSig& getFuncSig(const std::string& name) const {
+        if (!funcs) throw Error("Internal: missing function table");
+        auto it = funcs->find(name);
+        if (it == funcs->end()) throw Error("Unknown function '" + name + "'");
+        return it->second;
+    }
+
     static int slotDisp(int slot) { return slot * 8; } // [rbp-8*slot]
 
     const StrLit& getOrAddStr(const std::string& s) {
         auto it = strToId.find(s);
         if (it != strToId.end()) return strLits[it->second];
         int id = (int)strLits.size();
-        std::string label = "str" + std::to_string(id);
+        std::string label = labelPrefix + "str" + std::to_string(id);
         strToId.emplace(s, id);
         strLits.push_back(StrLit{s, label});
         return strLits.back();
@@ -899,6 +1007,12 @@ static void writeFile(const std::string& path, const std::string& content) {
     out << content;
 }
 
+static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId);
+static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId);
+static void emitStrToRegs(std::ostringstream& out, CodegenCtx& cg, const Expr& e,
+                          int& labelId, const char* ptrReg, const char* lenReg);
+static void emitCallExpr(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId);
+
 static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId) {
     using K = Expr::Kind;
     switch (e.kind) {
@@ -911,6 +1025,14 @@ static void emitExprI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             auto v = cg.getVar(e.var);
             if (v.type != Type::I64) throw Error("Type error: expected i64 variable '" + e.var + "'");
             out << "    mov  rax, [rbp-" << CodegenCtx::slotDisp(v.slot) << "]\n";
+            return;
+        }
+        case K::Call: {
+            const auto& sig = cg.getFuncSig(e.callName);
+            if (sig.retType != Type::I64) {
+                throw Error("Type error: function '" + e.callName + "' does not return i64");
+            }
+            emitCallExpr(out, cg, e, labelId);
             return;
         }
         case K::Mul:
@@ -1072,6 +1194,14 @@ static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             auto v = cg.getVar(e.var);
             if (v.type != Type::D64) throw Error("Type error: expected d64 variable '" + e.var + "'");
             out << "    movsd xmm0, [rbp-" << CodegenCtx::slotDisp(v.slot) << "]\n";
+            return;
+        }
+        case K::Call: {
+            const auto& sig = cg.getFuncSig(e.callName);
+            if (sig.retType != Type::D64) {
+                throw Error("Type error: function '" + e.callName + "' does not return d64");
+            }
+            emitCallExpr(out, cg, e, labelId);
             return;
         }
         case K::Mul:
@@ -1305,7 +1435,15 @@ static void emitExprD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
     throw Error("Internal: unknown expr kind");
 }
 
-enum class Mode { I64Only, D64Only, Mixed };
+static const char* typeName(Type t) {
+    switch (t) {
+        case Type::I64: return "i64";
+        case Type::D64: return "d64";
+        case Type::Str: return "str";
+        case Type::Void: return "void";
+    }
+    return "unknown";
+}
 
 static void emitPrintI64(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId) {
     emitExprI64(out, cg, e, labelId);
@@ -1351,6 +1489,9 @@ static ExprTypeTag mergeNumericTags(ExprTypeTag a, ExprTypeTag b, const char* ct
     return ExprTypeTag::NumLiteral;
 }
 
+static bool isStrExpr(const Expr& e, const CodegenCtx& cg);
+static void checkCallArgs(const Expr& e, const CodegenCtx& cg, Mode mode);
+
 static ExprTypeTag inferExprTypeTag(const Expr& e, const CodegenCtx& cg, Mode mode) {
     using K = Expr::Kind;
     switch (e.kind) {
@@ -1370,6 +1511,14 @@ static ExprTypeTag inferExprTypeTag(const Expr& e, const CodegenCtx& cg, Mode mo
                 throw Error("Type error: string is not allowed in numeric expression");
             }
             return (v.type == Type::D64) ? ExprTypeTag::D64 : ExprTypeTag::I64;
+        }
+        case K::Call: {
+            const auto& sig = cg.getFuncSig(e.callName);
+            checkCallArgs(e, cg, mode);
+            if (sig.retType == Type::Void || sig.retType == Type::Str) {
+                throw Error("Type error: function '" + e.callName + "' does not return a numeric value");
+            }
+            return (sig.retType == Type::D64) ? ExprTypeTag::D64 : ExprTypeTag::I64;
         }
         case K::Add:
         case K::Sub:
@@ -1408,6 +1557,41 @@ static ExprTypeTag inferExprTypeTag(const Expr& e, const CodegenCtx& cg, Mode mo
     throw Error("Internal: unknown expr kind");
 }
 
+static void checkCallArgs(const Expr& e, const CodegenCtx& cg, Mode mode) {
+    const auto& sig = cg.getFuncSig(e.callName);
+    if (e.callArgs.size() != sig.params.size()) {
+        throw Error("Function '" + e.callName + "' expects " + std::to_string(sig.params.size()) +
+                    " args, got " + std::to_string(e.callArgs.size()));
+    }
+    for (size_t i = 0; i < e.callArgs.size(); ++i) {
+        Type paramType = sig.params[i];
+        const Expr& arg = *e.callArgs[i];
+        if (paramType == Type::Str) {
+            if (!isStrExpr(arg, cg)) {
+                throw Error("Type error: argument " + std::to_string(i + 1) + " of '" + e.callName +
+                            "' expects str");
+            }
+            continue;
+        }
+        if (paramType == Type::Void) {
+            throw Error("Internal: void parameter type");
+        }
+        ExprTypeTag tag = inferExprTypeTag(arg, cg, mode);
+        if (tag == ExprTypeTag::NumLiteral) {
+            if (paramType != Type::I64 && paramType != Type::D64) {
+                throw Error("Type error: argument " + std::to_string(i + 1) + " of '" + e.callName +
+                            "' expects " + typeName(paramType));
+            }
+            continue;
+        }
+        Type argType = (tag == ExprTypeTag::D64) ? Type::D64 : Type::I64;
+        if (argType != paramType) {
+            throw Error("Type error: argument " + std::to_string(i + 1) + " of '" + e.callName +
+                        "' expects " + typeName(paramType) + ", got " + typeName(argType));
+        }
+    }
+}
+
 static Type resolvePrintType(const Expr& e, const CodegenCtx& cg, Mode mode) {
     ExprTypeTag tag = inferExprTypeTag(e, cg, mode);
     if (tag == ExprTypeTag::NumLiteral) {
@@ -1440,6 +1624,10 @@ static bool isStrExpr(const Expr& e, const CodegenCtx& cg) {
     if (e.kind == Expr::Kind::Var) {
         auto v = cg.getVar(e.var);
         return v.type == Type::Str;
+    }
+    if (e.kind == Expr::Kind::Call) {
+        const auto& sig = cg.getFuncSig(e.callName);
+        return sig.retType == Type::Str;
     }
     return false;
 }
@@ -1481,7 +1669,70 @@ static void emitStrToRegs(std::ostringstream& out, CodegenCtx& cg, const Expr& e
         out << ".str_len_ok_" << id << ":\n";
         return;
     }
+    if (e.kind == Expr::Kind::Call) {
+        const auto& sig = cg.getFuncSig(e.callName);
+        if (sig.retType != Type::Str) {
+            throw Error("Type error: function '" + e.callName + "' does not return str");
+        }
+        emitCallExpr(out, cg, e, labelId);
+        if (std::string(ptrReg) != "rax") {
+            out << "    mov  " << ptrReg << ", rax\n";
+        }
+        if (std::string(lenReg) != "rdx") {
+            out << "    mov  " << lenReg << ", rdx\n";
+        }
+        int id = labelId++;
+        out << "    test " << lenReg << ", " << lenReg << "\n";
+        out << "    jns  .str_len_ok_call_" << id << "\n";
+        out << "    neg  " << lenReg << "\n";
+        out << "    dec  " << lenReg << "\n";
+        out << ".str_len_ok_call_" << id << ":\n";
+        return;
+    }
     throw Error("Expected str expression");
+}
+
+static int typeSlotCount(Type t) {
+    return (t == Type::Str) ? 2 : 1;
+}
+
+static void emitCallExpr(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId) {
+    checkCallArgs(e, cg, cg.mode);
+    const auto& sig = cg.getFuncSig(e.callName);
+    int totalSlots = 0;
+    for (Type t : sig.params) totalSlots += typeSlotCount(t);
+    int alignPad = (totalSlots % 2 == 0) ? 8 : 0;
+    if (alignPad) out << "    sub  rsp, 8\n";
+    for (int i = (int)e.callArgs.size() - 1; i >= 0; --i) {
+        Type paramType = sig.params[(size_t)i];
+        const auto& arg = *e.callArgs[(size_t)i];
+        if (paramType == Type::I64) {
+            emitExprI64(out, cg, arg, labelId);
+            out << "    push rax\n";
+        } else if (paramType == Type::D64) {
+            emitExprD64(out, cg, arg, labelId);
+            out << "    sub  rsp, 8\n";
+            out << "    movsd [rsp], xmm0\n";
+        } else if (paramType == Type::Str) {
+            emitStrToRegs(out, cg, arg, labelId, "rax", "rdx");
+            out << "    sub  rsp, 8\n";
+            out << "    mov  [rsp], rdx\n";
+            out << "    sub  rsp, 8\n";
+            out << "    mov  [rsp], rax\n";
+        } else {
+            throw Error("Internal: invalid parameter type");
+        }
+    }
+    out << "    call " << e.callName << "\n";
+    int cleanup = totalSlots * 8 + alignPad;
+    if (cleanup) out << "    add  rsp, " << cleanup << "\n";
+    if (sig.retType == Type::Void) {
+        // no result
+    } else if (sig.retType == Type::Str) {
+        // rax=ptr, rdx=len
+    } else {
+        // rax or xmm0 already set
+    }
 }
 
 static void emitFreeStrIfOwned(std::ostringstream& out, int slot, int& labelId) {
@@ -1539,11 +1790,20 @@ static void emitAssignStrExpr(std::ostringstream& out, CodegenCtx& cg, const Exp
         out << ".str_copy_done_" << id << ":\n";
         return;
     }
+    if (e.kind == Expr::Kind::Call) {
+        const auto& sig = cg.getFuncSig(e.callName);
+        if (sig.retType != Type::Str) throw Error("Expected str expression");
+        emitCallExpr(out, cg, e, labelId);
+        out << "    mov  [rbp-" << CodegenCtx::slotDisp(slot) << "], rax\n";
+        out << "    mov  [rbp-" << CodegenCtx::slotDisp(slot + 1) << "], rdx\n";
+        return;
+    }
     throw Error("Expected str expression");
 }
 
-static void emitCleanupStrs(std::ostringstream& out, const CodegenCtx& cg, int& labelId) {
+static void emitCleanupStrs(std::ostringstream& out, const CodegenCtx& cg, int& labelId, int skipSlot = -1) {
     for (int slot : cg.strSlots) {
+        if (slot == skipSlot) continue;
         emitFreeStrIfOwned(out, slot, labelId);
     }
 }
@@ -1741,6 +2001,17 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
         }
         return false;
     }
+    if (st.kind == Stmt::Kind::ExprStmt) {
+        if (!st.expr || st.expr->kind != Expr::Kind::Call) {
+            throw Error("Only function calls are allowed as statements");
+        }
+        const auto& sig = cg.getFuncSig(st.expr->callName);
+        if (sig.retType != Type::Void) {
+            throw Error("Discarding return value of '" + st.expr->callName + "' is not allowed");
+        }
+        emitCallExpr(out, cg, *st.expr, labelId);
+        return false;
+    }
     if (st.kind == Stmt::Kind::If) {
         int endId = labelId++;
         for (size_t i = 0; i < st.ifBranches.size(); ++i) {
@@ -1822,23 +2093,73 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
     }
 
     if (st.kind == Stmt::Kind::Ret) {
+        if (retType == Type::Void) {
+            if (st.expr) {
+                throw Error("Return value is not allowed in void function");
+            }
+            emitCleanupStrs(out, cg, labelId);
+            out << "    leave\n";
+            out << "    ret\n";
+            return true;
+        }
+        if (!st.expr) {
+            throw Error("Missing return value");
+        }
         if (retType == Type::D64) {
             emitExprD64(out, cg, *st.expr, labelId);
-        } else {
-            emitExprI64(out, cg, *st.expr, labelId);
+            emitCleanupStrs(out, cg, labelId);
+            out << "    leave\n";
+            out << "    ret\n";
+            return true;
         }
-        emitCleanupStrs(out, cg, labelId);
-        out << "    leave\n";
-        out << "    ret\n";
-        return true;
+        if (retType == Type::I64) {
+            emitExprI64(out, cg, *st.expr, labelId);
+            emitCleanupStrs(out, cg, labelId);
+            out << "    leave\n";
+            out << "    ret\n";
+            return true;
+        }
+        if (retType == Type::Str) {
+            int skipSlot = -1;
+            if (st.expr->kind == Expr::Kind::Var) {
+                auto v = cg.getVar(st.expr->var);
+                if (v.type != Type::Str) {
+                    throw Error("Return type mismatch for '" + st.expr->var + "'");
+                }
+                out << "    mov  rax, [rbp-" << CodegenCtx::slotDisp(v.slot) << "]\n";
+                out << "    mov  rdx, [rbp-" << CodegenCtx::slotDisp(v.slot + 1) << "]\n";
+                skipSlot = v.slot;
+            } else if (st.expr->kind == Expr::Kind::Call) {
+                const auto& sig = cg.getFuncSig(st.expr->callName);
+                if (sig.retType != Type::Str) {
+                    throw Error("Type error: function '" + st.expr->callName + "' does not return str");
+                }
+                emitCallExpr(out, cg, *st.expr, labelId);
+            } else if (st.expr->kind == Expr::Kind::Str) {
+                const auto& lit = cg.getOrAddStr(st.expr->strText);
+                out << "    lea  rax, [rel " << lit.label << "]\n";
+                out << "    mov  rdx, " << lit.data.size() << "\n";
+            } else {
+                throw Error("Invalid return expression for str");
+            }
+            emitCleanupStrs(out, cg, labelId, skipSlot);
+            out << "    leave\n";
+            out << "    ret\n";
+            return true;
+        }
+        throw Error("Internal: invalid return type");
     }
 
     throw Error("Internal: unknown statement kind");
 }
 
-static GenResult genFunctionAsm(const Func& f, Mode mode, Type retType) {
+static GenResult genFunctionAsm(const Func& f, Mode mode, Type retType,
+                                const std::unordered_map<std::string, FuncSig>& funcs) {
     // v0: generate body for entrypoint only
     CodegenCtx cg;
+    cg.funcs = &funcs;
+    cg.mode = mode;
+    cg.labelPrefix = f.name + "_";
     bool hasRet = false;
 
     // First pass: allocate slots on first encounter of auto
@@ -1848,6 +2169,42 @@ static GenResult genFunctionAsm(const Func& f, Mode mode, Type retType) {
     std::ostringstream body;
 
     int labelId = 0;
+
+    struct ParamMove {
+        Type type;
+        int slot;
+        int offset;
+    };
+    std::vector<ParamMove> paramMoves;
+    int paramOffset = 16;
+    for (const auto& p : f.params) {
+        int slot = cg.allocSlot(p.name, p.type);
+        paramMoves.push_back(ParamMove{p.type, slot, paramOffset});
+        paramOffset += typeSlotCount(p.type) * 8;
+    }
+    for (const auto& pm : paramMoves) {
+        if (pm.type == Type::I64) {
+            body << "    mov  rax, [rbp+" << pm.offset << "]\n";
+            body << "    mov  [rbp-" << CodegenCtx::slotDisp(pm.slot) << "], rax\n";
+        } else if (pm.type == Type::D64) {
+            body << "    movsd xmm0, [rbp+" << pm.offset << "]\n";
+            body << "    movsd [rbp-" << CodegenCtx::slotDisp(pm.slot) << "], xmm0\n";
+        } else if (pm.type == Type::Str) {
+            int id = labelId++;
+            body << "    mov  rax, [rbp+" << pm.offset << "]\n";
+            body << "    mov  rdx, [rbp+" << (pm.offset + 8) << "]\n";
+            body << "    test rdx, rdx\n";
+            body << "    jns  .param_str_ok_" << id << "\n";
+            body << "    neg  rdx\n";
+            body << "    dec  rdx\n";
+            body << ".param_str_ok_" << id << ":\n";
+            body << "    mov  [rbp-" << CodegenCtx::slotDisp(pm.slot) << "], rax\n";
+            body << "    mov  [rbp-" << CodegenCtx::slotDisp(pm.slot + 1) << "], rdx\n";
+        } else {
+            throw Error("Invalid parameter type for '" + f.name + "'");
+        }
+    }
+
     std::vector<LoopContext> loops;
     for (const auto& st : f.body) {
         if (emitStmt(body, cg, st, labelId, mode, retType, loops)) {
@@ -1855,8 +2212,13 @@ static GenResult genFunctionAsm(const Func& f, Mode mode, Type retType) {
         }
     }
 
-    if (!hasRet) {
+    if (!hasRet && retType != Type::Void) {
         throw Error("Function '" + f.name + "' must contain 'ret <expr>;' in v0");
+    }
+    if (!hasRet && retType == Type::Void) {
+        emitCleanupStrs(body, cg, labelId);
+        body << "    leave\n";
+        body << "    ret\n";
     }
 
     // stack size: maxSlotUsed*8, round up to 16 for alignment (after push rbp)
@@ -1874,7 +2236,8 @@ static GenResult genFunctionAsm(const Func& f, Mode mode, Type retType) {
 
 enum class EntryKind { Main, MainI64, MainD64 };
 
-static std::string genOutAsm(const Func& entry, EntryKind kind) {
+static std::string genOutAsm(const std::vector<Func>& funcs, const Func& entry, EntryKind kind,
+                             const std::unordered_map<std::string, FuncSig>& funcMap) {
     std::ostringstream out;
     const bool isMainI64 = (kind == EntryKind::MainI64);
     const bool isMainD64 = (kind == EntryKind::MainD64);
@@ -1895,27 +2258,44 @@ static std::string genOutAsm(const Func& entry, EntryKind kind) {
     out << "extern rt_str_free\n";
     out << "\n";
 
-    auto gen = genFunctionAsm(entry, mode, retType);
+    std::vector<GenResult> gens;
+    gens.reserve(funcs.size());
+    for (const auto& f : funcs) {
+        Mode fMode = (f.name == entry.name) ? mode : Mode::Mixed;
+        Type fRet = (f.name == entry.name) ? retType : f.retType;
+        gens.push_back(genFunctionAsm(f, fMode, fRet, funcMap));
+    }
 
-    if (!gen.strLits.empty()) {
+    bool hasStrs = false;
+    for (const auto& g : gens) {
+        if (!g.strLits.empty()) {
+            hasStrs = true;
+            break;
+        }
+    }
+    if (hasStrs) {
         out << "section .rodata\n\n";
-        for (const auto& lit : gen.strLits) {
-            out << lit.label << ": db ";
-            if (lit.data.empty()) {
-                out << "0";
-            } else {
-                for (size_t i = 0; i < lit.data.size(); ++i) {
-                    if (i) out << ", ";
-                    out << (int)(unsigned char)lit.data[i];
+        for (const auto& g : gens) {
+            for (const auto& lit : g.strLits) {
+                out << lit.label << ": db ";
+                if (lit.data.empty()) {
+                    out << "0";
+                } else {
+                    for (size_t i = 0; i < lit.data.size(); ++i) {
+                        if (i) out << ", ";
+                        out << (int)(unsigned char)lit.data[i];
+                    }
                 }
+                out << "\n";
             }
-            out << "\n";
         }
         out << "\n";
     }
 
     out << "section .text\n\n";
-    out << gen.text << "\n";
+    for (const auto& g : gens) {
+        out << g.text << "\n";
+    }
 
     out << "_start:\n";
     out << "    and  rsp, -16\n";
@@ -1980,9 +2360,29 @@ int main(int argc, char** argv) {
             entryIdx = mainD64Idx;
         }
 
-		const Func& entry = funcs[entryIdx];
+        Func& entry = funcs[entryIdx];
+        if (!entry.params.empty()) {
+            throw Error("Entrypoint '" + entry.name + "' cannot have parameters");
+        }
+        Type entryRet = (kind == EntryKind::MainD64) ? Type::D64 : Type::I64;
+        if (entry.retType == Type::Void) {
+            entry.retType = entryRet;
+        } else if (entry.retType != entryRet) {
+            throw Error("Entrypoint '" + entry.name + "' must return " + std::string(typeName(entryRet)));
+        }
 
-        std::string asmText = genOutAsm(entry, kind);
+        std::unordered_map<std::string, FuncSig> funcMap;
+        for (const auto& f : funcs) {
+            if (funcMap.contains(f.name)) {
+                throw Error("Duplicate function name '" + f.name + "'");
+            }
+            FuncSig sig;
+            sig.retType = f.retType;
+            for (const auto& p : f.params) sig.params.push_back(p.type);
+            funcMap.emplace(f.name, std::move(sig));
+        }
+
+        std::string asmText = genOutAsm(funcs, entry, kind, funcMap);
         writeFile(outPath, asmText);
 
         std::cerr << "OK: generated " << outPath

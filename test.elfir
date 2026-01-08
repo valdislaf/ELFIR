@@ -1,4 +1,18 @@
 
+  fn i64 add(i64 a, i64 b) { ret a + b; }
+fn d64 div(d64 a, d64 b) { ret a / b; }
+  fn str shout(str s) {
+      s += "!";
+      ret s;
+  }
+
+  fn foo(str s) {
+      print("foo=", s, "\n");
+  }
+   fn foo2( d64 a) {
+      print("div=", a, "\n");
+  }
+  
 fn main() {
 i64 x= 0;
 x=-1;
@@ -45,6 +59,10 @@ i64 i= 0;
           print("i=", i, "\n");
       }
 	  
-	  
+	    i64 x1 = add(2, 3);
+      print("x1=", x1, "\n");
+      str s2 = shout("hi");
+      foo(s2);
+	  foo2(div(30,65));
       ret 0;
   }
