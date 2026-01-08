@@ -1,14 +1,23 @@
-fn main() {
 
-      for (i64 i = 0; i < 100; i = i + 1) {
-          print("i= ", i, "\n");
-      }
+fn main() {
+i64 x= 0;
+x=-1;
+x*=2;
+x-=6;
+x/=2;
+x+=2;
+print("x=", x, "\n");
+d64 y= 0.01;
+y=-1.0001;
+y*=2.2;
+y-=6.2;
+y/=2.01;
+y+=2.99;
+ print("y=", y, "\n");
+	    str s = "hello";
+		s = "hello!";
+		s +="!!";
+      print("s=", s, "\n");  
 	  
-	  d64 x = 0;
-	  while(x<10)
-	  {
-	    print("x= ", x, "\n");
-		x=x+2;
-	  }
       ret 0;
   }

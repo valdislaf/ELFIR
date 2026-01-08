@@ -26,6 +26,7 @@ enum class TokKind {
     KwRet,
     KwI64,
     KwD64,
+    KwStr,
     KwIf,
     KwElse,
     KwElseIf,
@@ -37,6 +38,10 @@ enum class TokKind {
     Semicolon,
     Comma,
     Equal,
+    PlusEq,
+    MinusEq,
+    StarEq,
+    SlashEq,
     Star,
     Slash,
     Percent,
@@ -87,6 +92,7 @@ public:
             else if (t.text == "ret") t.kind = TokKind::KwRet;
             else if (t.text == "i64") t.kind = TokKind::KwI64;
             else if (t.text == "d64") t.kind = TokKind::KwD64;
+            else if (t.text == "str") t.kind = TokKind::KwStr;
             else if (t.text == "if") t.kind = TokKind::KwIf;
             else if (t.text == "else") t.kind = TokKind::KwElse;
             else if (t.text == "elseif") t.kind = TokKind::KwElseIf;
@@ -162,11 +168,19 @@ public:
             case '=':
                 if (i_ < s_.size() && s_[i_] == '=') { i_++; t.kind = TokKind::EqEq; return t; }
                 t.kind = TokKind::Equal; return t;
-            case '*': t.kind = TokKind::Star;  return t;
-            case '/': t.kind = TokKind::Slash; return t;
+            case '*':
+                if (i_ < s_.size() && s_[i_] == '=') { i_++; t.kind = TokKind::StarEq; return t; }
+                t.kind = TokKind::Star;  return t;
+            case '/':
+                if (i_ < s_.size() && s_[i_] == '=') { i_++; t.kind = TokKind::SlashEq; return t; }
+                t.kind = TokKind::Slash; return t;
             case '%': t.kind = TokKind::Percent; return t;
-            case '+': t.kind = TokKind::Plus; return t;
-            case '-': t.kind = TokKind::Minus; return t;
+            case '+':
+                if (i_ < s_.size() && s_[i_] == '=') { i_++; t.kind = TokKind::PlusEq; return t; }
+                t.kind = TokKind::Plus; return t;
+            case '-':
+                if (i_ < s_.size() && s_[i_] == '=') { i_++; t.kind = TokKind::MinusEq; return t; }
+                t.kind = TokKind::Minus; return t;
             case '!':
                 if (i_ < s_.size() && s_[i_] == '=') { i_++; t.kind = TokKind::NotEq; return t; }
                 throw Error(std::string("Unexpected character '") + c + "' at position " + std::to_string(t.pos));
@@ -278,13 +292,14 @@ struct Expr {
     }
 };
 
-enum class Type { I64, D64 };
+enum class Type { I64, D64, Str };
 
 struct Stmt {
     struct IfBranch {
         std::unique_ptr<Expr> cond;
         std::vector<Stmt> body;
     };
+    enum class AssignOp { Eq, AddEq, SubEq, MulEq, DivEq };
     enum class Kind { AutoAssign, TypedAssign, Assign, Ret, PrintI64, PrintD64, PrintStr, PrintList, If, While, For } kind;
     Type declType = Type::I64;    // for TypedAssign
     std::string name;             // for AutoAssign
@@ -295,6 +310,7 @@ struct Stmt {
     std::vector<Stmt> body;
     std::unique_ptr<Stmt> init;
     std::unique_ptr<Stmt> step;
+    AssignOp assignOp = AssignOp::Eq;
 };
 
 struct Func {
@@ -358,8 +374,10 @@ private:
             return st;
         }
 
-        if (cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwD64) {
-            Type t = (cur_.kind == TokKind::KwI64) ? Type::I64 : Type::D64;
+    if (cur_.kind == TokKind::KwI64 || cur_.kind == TokKind::KwD64 || cur_.kind == TokKind::KwStr) {
+            Type t = (cur_.kind == TokKind::KwI64) ? Type::I64 :
+                     (cur_.kind == TokKind::KwD64) ? Type::D64 :
+                                                     Type::Str;
             advance();
             std::string var = expectIdent("Expected identifier after type");
             expect(TokKind::Equal, "Expected '=' after variable name");
@@ -529,7 +547,7 @@ private:
 
     Stmt parseAssignStmt(bool withSemicolon) {
         std::string var = expectIdent("Expected identifier");
-        expect(TokKind::Equal, "Expected '=' after variable name");
+        Stmt::AssignOp op = parseAssignOp();
         auto e = parseComparison();
         if (withSemicolon) {
             expect(TokKind::Semicolon, "Expected ';' after assignment");
@@ -538,6 +556,7 @@ private:
         st.kind = Stmt::Kind::Assign;
         st.name = var;
         st.expr = std::move(e);
+        st.assignOp = op;
         return st;
     }
 
@@ -563,6 +582,21 @@ private:
         st.name = var;
         st.expr = std::move(e);
         return st;
+    }
+
+    Stmt::AssignOp parseAssignOp() {
+        Stmt::AssignOp op = Stmt::AssignOp::Eq;
+        switch (cur_.kind) {
+            case TokKind::Equal:   op = Stmt::AssignOp::Eq; break;
+            case TokKind::PlusEq:  op = Stmt::AssignOp::AddEq; break;
+            case TokKind::MinusEq: op = Stmt::AssignOp::SubEq; break;
+            case TokKind::StarEq:  op = Stmt::AssignOp::MulEq; break;
+            case TokKind::SlashEq: op = Stmt::AssignOp::DivEq; break;
+            default:
+                throw Error("Expected assignment operator after variable name at position " + std::to_string(cur_.pos));
+        }
+        advance();
+        return op;
     }
 
     // primary := number | ident | '(' expr ')'
@@ -767,6 +801,7 @@ struct CodegenCtx {
     };
     std::vector<StrLit> strLits;
     std::unordered_map<std::string, int> strToId;
+    std::unordered_map<std::string, int> strVarToId;
 
     int allocSlot(const std::string& name, Type type) {
         if (varToSlot.contains(name)) {
@@ -794,6 +829,32 @@ struct CodegenCtx {
         strToId.emplace(s, id);
         strLits.push_back(StrLit{s, label});
         return strLits.back();
+    }
+
+    int getOrAddStrId(const std::string& s) {
+        auto it = strToId.find(s);
+        if (it != strToId.end()) return it->second;
+        int id = (int)strLits.size();
+        std::string label = "str" + std::to_string(id);
+        strToId.emplace(s, id);
+        strLits.push_back(StrLit{s, label});
+        return id;
+    }
+
+    const StrLit& getStrLitById(int id) const {
+        return strLits[id];
+    }
+
+    void setStrVarId(const std::string& name, int id) {
+        strVarToId[name] = id;
+    }
+
+    int getStrVarId(const std::string& name) const {
+        auto it = strVarToId.find(name);
+        if (it == strVarToId.end()) {
+            throw Error("Uninitialized str variable '" + name + "'");
+        }
+        return it->second;
     }
 };
 
@@ -1263,12 +1324,19 @@ static void emitPrintD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e,
 }
 
 static void emitPrintStr(std::ostringstream& out, CodegenCtx& cg, const Expr& e) {
-    if (e.kind != Expr::Kind::Str) {
-        throw Error("print_str expects a string literal");
+    const CodegenCtx::StrLit* lit = nullptr;
+    if (e.kind == Expr::Kind::Str) {
+        lit = &cg.getOrAddStr(e.strText);
+    } else if (e.kind == Expr::Kind::Var) {
+        auto v = cg.getVar(e.var);
+        if (v.type != Type::Str) throw Error("print_str expects a string");
+        int id = cg.getStrVarId(e.var);
+        lit = &cg.getStrLitById(id);
+    } else {
+        throw Error("print_str expects a string");
     }
-    const auto& lit = cg.getOrAddStr(e.strText);
-    out << "    lea  rdi, [rel " << lit.label << "]\n";
-    out << "    mov  rsi, " << lit.data.size() << "\n";
+    out << "    lea  rdi, [rel " << lit->label << "]\n";
+    out << "    mov  rsi, " << lit->data.size() << "\n";
     out << "    sub  rsp, 8\n";
     out << "    call rt_print_bytes\n";
     out << "    add  rsp, 8\n";
@@ -1308,6 +1376,9 @@ static ExprTypeTag inferExprTypeTag(const Expr& e, const CodegenCtx& cg, Mode mo
             throw Error("Type error: string is not allowed in numeric expression");
         case K::Var: {
             auto v = cg.getVar(e.var);
+            if (v.type == Type::Str) {
+                throw Error("Type error: string is not allowed in numeric expression");
+            }
             return (v.type == Type::D64) ? ExprTypeTag::D64 : ExprTypeTag::I64;
         }
         case K::Add:
@@ -1374,6 +1445,32 @@ static Type resolveCondType(const Expr& e, const CodegenCtx& cg, Mode mode) {
     return (tag == ExprTypeTag::D64) ? Type::D64 : Type::I64;
 }
 
+static int resolveStrExprToId(const Expr& e, CodegenCtx& cg) {
+    if (e.kind == Expr::Kind::Str) {
+        return cg.getOrAddStrId(e.strText);
+    }
+    if (e.kind == Expr::Kind::Var) {
+        auto v = cg.getVar(e.var);
+        if (v.type != Type::Str) throw Error("Expected str expression");
+        return cg.getStrVarId(e.var);
+    }
+    throw Error("Expected str expression");
+}
+
+static int concatStrIds(CodegenCtx& cg, int leftId, int rightId) {
+    std::string combined = cg.getStrLitById(leftId).data + cg.getStrLitById(rightId).data;
+    return cg.getOrAddStrId(combined);
+}
+
+static bool isStrExpr(const Expr& e, const CodegenCtx& cg) {
+    if (e.kind == Expr::Kind::Str) return true;
+    if (e.kind == Expr::Kind::Var) {
+        auto v = cg.getVar(e.var);
+        return v.type == Type::Str;
+    }
+    return false;
+}
+
 static void emitCondJumpFalse(std::ostringstream& out, CodegenCtx& cg, const Expr& cond,
                               int& labelId, Mode mode, const std::string& label) {
     Type condType = resolveCondType(cond, cg, mode);
@@ -1409,14 +1506,17 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
     }
 
     if (st.kind == Stmt::Kind::TypedAssign) {
-        if (mode == Mode::I64Only && st.declType != Type::I64) {
+        if (mode == Mode::I64Only && st.declType == Type::D64) {
             throw Error("d64 variables are not allowed in main_i64");
         }
-        if (mode == Mode::D64Only && st.declType != Type::D64) {
+        if (mode == Mode::D64Only && st.declType == Type::I64) {
             throw Error("i64 variables are not allowed in main_d64");
         }
         int slot = cg.allocSlot(st.name, st.declType);
-        if (st.declType == Type::D64) {
+        if (st.declType == Type::Str) {
+            int id = resolveStrExprToId(*st.expr, cg);
+            cg.setStrVarId(st.name, id);
+        } else if (st.declType == Type::D64) {
             emitExprD64(out, cg, *st.expr, labelId);
             out << "    movsd [rbp-" << CodegenCtx::slotDisp(slot) << "], xmm0\n";
         } else {
@@ -1428,12 +1528,67 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
 
     if (st.kind == Stmt::Kind::Assign) {
         auto v = cg.getVar(st.name);
-        if (v.type == Type::D64) {
+        if (v.type == Type::Str) {
+            if (st.assignOp == Stmt::AssignOp::Eq) {
+                int id = resolveStrExprToId(*st.expr, cg);
+                cg.setStrVarId(st.name, id);
+                return false;
+            }
+            if (st.assignOp == Stmt::AssignOp::AddEq) {
+                int leftId = cg.getStrVarId(st.name);
+                int rightId = resolveStrExprToId(*st.expr, cg);
+                int combinedId = concatStrIds(cg, leftId, rightId);
+                cg.setStrVarId(st.name, combinedId);
+                return false;
+            }
+            throw Error("str assignment supports only '=' and '+='");
+        } else if (v.type == Type::D64) {
+            if (st.assignOp == Stmt::AssignOp::Eq) {
+                emitExprD64(out, cg, *st.expr, labelId);
+                out << "    movsd [rbp-" << CodegenCtx::slotDisp(v.slot) << "], xmm0\n";
+                return false;
+            }
             emitExprD64(out, cg, *st.expr, labelId);
-            out << "    movsd [rbp-" << CodegenCtx::slotDisp(v.slot) << "], xmm0\n";
+            out << "    movsd xmm1, [rbp-" << CodegenCtx::slotDisp(v.slot) << "]\n";
+            switch (st.assignOp) {
+                case Stmt::AssignOp::AddEq: out << "    addsd xmm1, xmm0\n"; break;
+                case Stmt::AssignOp::SubEq: out << "    subsd xmm1, xmm0\n"; break;
+                case Stmt::AssignOp::MulEq: out << "    mulsd xmm1, xmm0\n"; break;
+                case Stmt::AssignOp::DivEq: out << "    divsd xmm1, xmm0\n"; break;
+                default: break;
+            }
+            out << "    movsd [rbp-" << CodegenCtx::slotDisp(v.slot) << "], xmm1\n";
+            return false;
         } else {
+            if (st.assignOp == Stmt::AssignOp::Eq) {
+                emitExprI64(out, cg, *st.expr, labelId);
+                out << "    mov  [rbp-" << CodegenCtx::slotDisp(v.slot) << "], rax\n";
+                return false;
+            }
             emitExprI64(out, cg, *st.expr, labelId);
+            out << "    mov  rcx, [rbp-" << CodegenCtx::slotDisp(v.slot) << "]\n";
+            switch (st.assignOp) {
+                case Stmt::AssignOp::AddEq:
+                    out << "    add  rax, rcx\n";
+                    break;
+                case Stmt::AssignOp::SubEq:
+                    out << "    sub  rcx, rax\n";
+                    out << "    mov  rax, rcx\n";
+                    break;
+                case Stmt::AssignOp::MulEq:
+                    out << "    imul rax, rcx\n";
+                    break;
+                case Stmt::AssignOp::DivEq:
+                    out << "    mov  r8, rax\n";
+                    out << "    mov  rax, rcx\n";
+                    out << "    cqo\n";
+                    out << "    idiv r8\n";
+                    break;
+                default:
+                    break;
+            }
             out << "    mov  [rbp-" << CodegenCtx::slotDisp(v.slot) << "], rax\n";
+            return false;
         }
         return false;
     }
@@ -1458,7 +1613,7 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
     }
     if (st.kind == Stmt::Kind::PrintList) {
         for (const auto& arg : st.exprs) {
-            if (arg->kind == Expr::Kind::Str) {
+            if (isStrExpr(*arg, cg)) {
                 emitPrintStr(out, cg, *arg);
                 continue;
             }

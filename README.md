@@ -119,16 +119,17 @@ fn main_d64() {
 ## ELFIR v0.1 Semantics
 
 - `auto` declares a variable (i64 in `main_i64`, d64 in `main_d64`). `auto` is not allowed in `main`.
-- `i64 x = <expr>;` and `d64 x = <expr>;` declare typed variables (required in `main`).
-- `print_i64(<expr>);` prints i64, `print_d64(<expr>);` prints d64, `print_str("...");` prints a string literal.
-- `print(<expr or "str">, ...);` prints each argument in order (string literal or i64/d64 expression).
+- `i64 x = <expr>;`, `d64 x = <expr>;`, and `str x = "..."` declare typed variables (required in `main` for numeric).
+- `print_i64(<expr>);` prints i64, `print_d64(<expr>);` prints d64, `print_str(<str>);` prints a string.
+- `print(<expr or "str">, ...);` prints each argument in order (string literal/str var or i64/d64 expression).
 - `print_i64/print_d64/print_str` do not add a newline; use `\n` inside strings when needed.
 - `print_i64` is only allowed in `main`/`main_i64`; `print_d64` only in `main`/`main_d64`.
 - `ret <expr>;` returns the expression value in `rax` (i64) or `xmm0` (d64).
 - `if (<expr>) { ... } [elseif (<expr>) { ... }]* [else { ... }]` with numeric conditions (nonzero is true).
 - `while (<expr>) { ... }` repeats while condition is nonzero.
 - `for (<init>, <cond>, <step>) { ... }` or `for (<init>; <cond>; <step>) { ... }` with commas or semicolons; `<init>` is `auto` or `i64/d64` declaration.
-- `<name> = <expr>;` assigns to an existing variable.
+- `<name> = <expr>;` assigns to an existing variable (str assignment is allowed for literals/str vars).
+- `<name> += <expr>;`, `<name> -= <expr>;`, `<name> *= <expr>;`, `<name> /= <expr>;` for numeric types; `str` supports `=` and `+=` only.
 - Operators: `+`, `-`, `*`, `/`, `%` with standard precedence and left associativity.
 - `%` is remainder (i64) / fmod-style remainder (d64).
 - Comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=` (lower precedence than arithmetic).
@@ -139,6 +140,7 @@ fn main_d64() {
 - Floating literals (d64 mode): digits with optional `.` and optional exponent `e|E[+|-]digits`.
 - d64 output format: fixed within [1e-17, 1e18), otherwise scientific; trailing zeros trimmed (at least one digit after the dot).
 - String literals support escapes: `\\`, `\"`, `\n`, `\t`.
+- `str` values are string literals only (no concatenation or comparisons yet).
 - Comparison result: `0/1` in i64 mode, `0.0/1.0` in d64 mode.
 - i64 `sqrt`: integer result (truncates toward zero). Negative input yields `0`.
 - i64 `pow`: integer exponent. Negative exponent yields `0`.
