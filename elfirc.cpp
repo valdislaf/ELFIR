@@ -791,6 +791,7 @@ struct CodegenCtx {
     struct VarInfo {
         Type type;
         int slot;
+        int size;
     };
     std::unordered_map<std::string, VarInfo> varToSlot; // slot index: 1 => [rbp-8], 2 => [rbp-16], ...
     int nextSlot = 1;
@@ -801,15 +802,17 @@ struct CodegenCtx {
     };
     std::vector<StrLit> strLits;
     std::unordered_map<std::string, int> strToId;
-    std::unordered_map<std::string, int> strVarToId;
 
     int allocSlot(const std::string& name, Type type) {
         if (varToSlot.contains(name)) {
             throw Error("Variable '" + name + "' already declared");
         }
-        int slot = nextSlot++;
-        varToSlot[name] = VarInfo{type, slot};
-        if (slot > maxSlotUsed) maxSlotUsed = slot;
+        int size = (type == Type::Str) ? 2 : 1;
+        int slot = nextSlot;
+        nextSlot += size;
+        varToSlot[name] = VarInfo{type, slot, size};
+        int lastSlot = slot + size - 1;
+        if (lastSlot > maxSlotUsed) maxSlotUsed = lastSlot;
         return slot;
     }
 
@@ -829,32 +832,6 @@ struct CodegenCtx {
         strToId.emplace(s, id);
         strLits.push_back(StrLit{s, label});
         return strLits.back();
-    }
-
-    int getOrAddStrId(const std::string& s) {
-        auto it = strToId.find(s);
-        if (it != strToId.end()) return it->second;
-        int id = (int)strLits.size();
-        std::string label = "str" + std::to_string(id);
-        strToId.emplace(s, id);
-        strLits.push_back(StrLit{s, label});
-        return id;
-    }
-
-    const StrLit& getStrLitById(int id) const {
-        return strLits[id];
-    }
-
-    void setStrVarId(const std::string& name, int id) {
-        strVarToId[name] = id;
-    }
-
-    int getStrVarId(const std::string& name) const {
-        auto it = strVarToId.find(name);
-        if (it == strVarToId.end()) {
-            throw Error("Uninitialized str variable '" + name + "'");
-        }
-        return it->second;
     }
 };
 
@@ -1323,20 +1300,11 @@ static void emitPrintD64(std::ostringstream& out, CodegenCtx& cg, const Expr& e,
     out << "    add  rsp, 8\n";
 }
 
-static void emitPrintStr(std::ostringstream& out, CodegenCtx& cg, const Expr& e) {
-    const CodegenCtx::StrLit* lit = nullptr;
-    if (e.kind == Expr::Kind::Str) {
-        lit = &cg.getOrAddStr(e.strText);
-    } else if (e.kind == Expr::Kind::Var) {
-        auto v = cg.getVar(e.var);
-        if (v.type != Type::Str) throw Error("print_str expects a string");
-        int id = cg.getStrVarId(e.var);
-        lit = &cg.getStrLitById(id);
-    } else {
-        throw Error("print_str expects a string");
-    }
-    out << "    lea  rdi, [rel " << lit->label << "]\n";
-    out << "    mov  rsi, " << lit->data.size() << "\n";
+static void emitStrToRegs(std::ostringstream& out, CodegenCtx& cg, const Expr& e,
+                          int& labelId, const char* ptrReg, const char* lenReg);
+
+static void emitPrintStr(std::ostringstream& out, CodegenCtx& cg, const Expr& e, int& labelId) {
+    emitStrToRegs(out, cg, e, labelId, "rdi", "rsi");
     out << "    sub  rsp, 8\n";
     out << "    call rt_print_bytes\n";
     out << "    add  rsp, 8\n";
@@ -1445,23 +1413,6 @@ static Type resolveCondType(const Expr& e, const CodegenCtx& cg, Mode mode) {
     return (tag == ExprTypeTag::D64) ? Type::D64 : Type::I64;
 }
 
-static int resolveStrExprToId(const Expr& e, CodegenCtx& cg) {
-    if (e.kind == Expr::Kind::Str) {
-        return cg.getOrAddStrId(e.strText);
-    }
-    if (e.kind == Expr::Kind::Var) {
-        auto v = cg.getVar(e.var);
-        if (v.type != Type::Str) throw Error("Expected str expression");
-        return cg.getStrVarId(e.var);
-    }
-    throw Error("Expected str expression");
-}
-
-static int concatStrIds(CodegenCtx& cg, int leftId, int rightId) {
-    std::string combined = cg.getStrLitById(leftId).data + cg.getStrLitById(rightId).data;
-    return cg.getOrAddStrId(combined);
-}
-
 static bool isStrExpr(const Expr& e, const CodegenCtx& cg) {
     if (e.kind == Expr::Kind::Str) return true;
     if (e.kind == Expr::Kind::Var) {
@@ -1485,6 +1436,88 @@ static void emitCondJumpFalse(std::ostringstream& out, CodegenCtx& cg, const Exp
         out << "    cmp  rax, 0\n";
         out << "    je   " << label << "\n";
     }
+}
+
+static void emitStrToRegs(std::ostringstream& out, CodegenCtx& cg, const Expr& e,
+                          int& labelId, const char* ptrReg, const char* lenReg) {
+    if (e.kind == Expr::Kind::Str) {
+        const auto& lit = cg.getOrAddStr(e.strText);
+        out << "    lea  " << ptrReg << ", [rel " << lit.label << "]\n";
+        out << "    mov  " << lenReg << ", " << lit.data.size() << "\n";
+        return;
+    }
+    if (e.kind == Expr::Kind::Var) {
+        auto v = cg.getVar(e.var);
+        if (v.type != Type::Str) throw Error("Expected str expression");
+        out << "    mov  " << ptrReg << ", [rbp-" << CodegenCtx::slotDisp(v.slot) << "]\n";
+        out << "    mov  " << lenReg << ", [rbp-" << CodegenCtx::slotDisp(v.slot + 1) << "]\n";
+        int id = labelId++;
+        out << "    test " << lenReg << ", " << lenReg << "\n";
+        out << "    jns  .str_len_ok_" << id << "\n";
+        out << "    neg  " << lenReg << "\n";
+        out << "    dec  " << lenReg << "\n";
+        out << ".str_len_ok_" << id << ":\n";
+        return;
+    }
+    throw Error("Expected str expression");
+}
+
+static void emitFreeStrIfOwned(std::ostringstream& out, int slot, int& labelId) {
+    int id = labelId++;
+    out << "    mov  rax, [rbp-" << CodegenCtx::slotDisp(slot + 1) << "]\n";
+    out << "    test rax, rax\n";
+    out << "    jns  .str_free_done_" << id << "\n";
+    out << "    mov  rsi, rax\n";
+    out << "    neg  rsi\n";
+    out << "    dec  rsi\n";
+    out << "    mov  rdi, [rbp-" << CodegenCtx::slotDisp(slot) << "]\n";
+    out << "    sub  rsp, 8\n";
+    out << "    call rt_str_free\n";
+    out << "    add  rsp, 8\n";
+    out << ".str_free_done_" << id << ":\n";
+}
+
+static void emitAssignStrExpr(std::ostringstream& out, CodegenCtx& cg, const Expr& e,
+                              int slot, int& labelId, bool freeOld) {
+    if (freeOld) {
+        emitFreeStrIfOwned(out, slot, labelId);
+    }
+    if (e.kind == Expr::Kind::Str) {
+        const auto& lit = cg.getOrAddStr(e.strText);
+        out << "    lea  rax, [rel " << lit.label << "]\n";
+        out << "    mov  rdx, " << lit.data.size() << "\n";
+        out << "    mov  [rbp-" << CodegenCtx::slotDisp(slot) << "], rax\n";
+        out << "    mov  [rbp-" << CodegenCtx::slotDisp(slot + 1) << "], rdx\n";
+        return;
+    }
+    if (e.kind == Expr::Kind::Var) {
+        auto v = cg.getVar(e.var);
+        if (v.type != Type::Str) throw Error("Expected str expression");
+        int id = labelId++;
+        out << "    mov  rdi, [rbp-" << CodegenCtx::slotDisp(v.slot) << "]\n";
+        out << "    mov  rsi, [rbp-" << CodegenCtx::slotDisp(v.slot + 1) << "]\n";
+        out << "    test rsi, rsi\n";
+        out << "    jns  .str_copy_len_ok_" << id << "\n";
+        out << "    neg  rsi\n";
+        out << "    dec  rsi\n";
+        out << ".str_copy_len_ok_" << id << ":\n";
+        out << "    cmp  rsi, 0\n";
+        out << "    je   .str_copy_empty_" << id << "\n";
+        out << "    sub  rsp, 8\n";
+        out << "    call rt_str_copy\n";
+        out << "    add  rsp, 8\n";
+        out << "    neg  rdx\n";
+        out << "    dec  rdx\n";
+        out << "    mov  [rbp-" << CodegenCtx::slotDisp(slot) << "], rax\n";
+        out << "    mov  [rbp-" << CodegenCtx::slotDisp(slot + 1) << "], rdx\n";
+        out << "    jmp  .str_copy_done_" << id << "\n";
+        out << ".str_copy_empty_" << id << ":\n";
+        out << "    mov  [rbp-" << CodegenCtx::slotDisp(slot) << "], rdi\n";
+        out << "    mov  qword [rbp-" << CodegenCtx::slotDisp(slot + 1) << "], 0\n";
+        out << ".str_copy_done_" << id << ":\n";
+        return;
+    }
+    throw Error("Expected str expression");
 }
 
 static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, int& labelId, Mode mode, Type retType) {
@@ -1514,8 +1547,7 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
         }
         int slot = cg.allocSlot(st.name, st.declType);
         if (st.declType == Type::Str) {
-            int id = resolveStrExprToId(*st.expr, cg);
-            cg.setStrVarId(st.name, id);
+            emitAssignStrExpr(out, cg, *st.expr, slot, labelId, false);
         } else if (st.declType == Type::D64) {
             emitExprD64(out, cg, *st.expr, labelId);
             out << "    movsd [rbp-" << CodegenCtx::slotDisp(slot) << "], xmm0\n";
@@ -1530,15 +1562,64 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
         auto v = cg.getVar(st.name);
         if (v.type == Type::Str) {
             if (st.assignOp == Stmt::AssignOp::Eq) {
-                int id = resolveStrExprToId(*st.expr, cg);
-                cg.setStrVarId(st.name, id);
+                emitAssignStrExpr(out, cg, *st.expr, v.slot, labelId, true);
                 return false;
             }
             if (st.assignOp == Stmt::AssignOp::AddEq) {
-                int leftId = cg.getStrVarId(st.name);
-                int rightId = resolveStrExprToId(*st.expr, cg);
-                int combinedId = concatStrIds(cg, leftId, rightId);
-                cg.setStrVarId(st.name, combinedId);
+                int id = labelId++;
+                out << "    mov  r8, [rbp-" << CodegenCtx::slotDisp(v.slot) << "]\n";
+                out << "    mov  r9, [rbp-" << CodegenCtx::slotDisp(v.slot + 1) << "]\n";
+                out << "    mov  rsi, r9\n";
+                out << "    test rsi, rsi\n";
+                out << "    jns  .str_add_len_ok_" << id << "\n";
+                out << "    neg  rsi\n";
+                out << "    dec  rsi\n";
+                out << ".str_add_len_ok_" << id << ":\n";
+                emitStrToRegs(out, cg, *st.expr, labelId, "rdx", "rcx");
+                out << "    cmp  rcx, 0\n";
+                out << "    je   .str_add_done_" << id << "\n";
+                out << "    cmp  rsi, 0\n";
+                out << "    je   .str_add_take_rhs_" << id << "\n";
+                out << "    mov  rdi, r8\n";
+                out << "    sub  rsp, 8\n";
+                out << "    call rt_str_concat\n";
+                out << "    add  rsp, 8\n";
+                out << "    test r9, r9\n";
+                out << "    jns  .str_add_store_" << id << "\n";
+                out << "    mov  rdi, r8\n";
+                out << "    mov  rsi, r9\n";
+                out << "    neg  rsi\n";
+                out << "    dec  rsi\n";
+                out << "    sub  rsp, 8\n";
+                out << "    call rt_str_free\n";
+                out << "    add  rsp, 8\n";
+                out << ".str_add_store_" << id << ":\n";
+                out << "    neg  rdx\n";
+                out << "    dec  rdx\n";
+                out << "    mov  [rbp-" << CodegenCtx::slotDisp(v.slot) << "], rax\n";
+                out << "    mov  [rbp-" << CodegenCtx::slotDisp(v.slot + 1) << "], rdx\n";
+                out << "    jmp  .str_add_done_" << id << "\n";
+                out << ".str_add_take_rhs_" << id << ":\n";
+                out << "    test r9, r9\n";
+                out << "    jns  .str_add_copy_rhs_" << id << "\n";
+                out << "    mov  rdi, r8\n";
+                out << "    mov  rsi, r9\n";
+                out << "    neg  rsi\n";
+                out << "    dec  rsi\n";
+                out << "    sub  rsp, 8\n";
+                out << "    call rt_str_free\n";
+                out << "    add  rsp, 8\n";
+                out << ".str_add_copy_rhs_" << id << ":\n";
+                out << "    mov  rdi, rdx\n";
+                out << "    mov  rsi, rcx\n";
+                out << "    sub  rsp, 8\n";
+                out << "    call rt_str_copy\n";
+                out << "    add  rsp, 8\n";
+                out << "    neg  rdx\n";
+                out << "    dec  rdx\n";
+                out << "    mov  [rbp-" << CodegenCtx::slotDisp(v.slot) << "], rax\n";
+                out << "    mov  [rbp-" << CodegenCtx::slotDisp(v.slot + 1) << "], rdx\n";
+                out << ".str_add_done_" << id << ":\n";
                 return false;
             }
             throw Error("str assignment supports only '=' and '+='");
@@ -1608,13 +1689,13 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
         return false;
     }
     if (st.kind == Stmt::Kind::PrintStr) {
-        emitPrintStr(out, cg, *st.expr);
+        emitPrintStr(out, cg, *st.expr, labelId);
         return false;
     }
     if (st.kind == Stmt::Kind::PrintList) {
         for (const auto& arg : st.exprs) {
             if (isStrExpr(*arg, cg)) {
-                emitPrintStr(out, cg, *arg);
+                emitPrintStr(out, cg, *arg, labelId);
                 continue;
             }
             Type t = resolvePrintType(*arg, cg, mode);
@@ -1751,6 +1832,9 @@ static std::string genOutAsm(const Func& entry, EntryKind kind) {
     out << "extern rt_print_i64_raw\n";
     out << "extern rt_print_f64_raw\n";
     out << "extern rt_print_bytes\n";
+    out << "extern rt_str_concat\n";
+    out << "extern rt_str_copy\n";
+    out << "extern rt_str_free\n";
     out << "\n";
 
     auto gen = genFunctionAsm(entry, mode, retType);

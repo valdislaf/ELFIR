@@ -7,6 +7,9 @@ extern rt_print_f64
 extern rt_print_i64_raw
 extern rt_print_f64_raw
 extern rt_print_bytes
+extern rt_str_concat
+extern rt_str_copy
+extern rt_str_free
 
 section .rodata
 
@@ -16,15 +19,17 @@ str2: db 121, 61
 str3: db 104, 101, 108, 108, 111
 str4: db 104, 101, 108, 108, 111, 33
 str5: db 33, 33
-str6: db 104, 101, 108, 108, 111, 33, 33, 33
-str7: db 115, 61
+str6: db 115, 61
+str7: db 0
+str8: db 35
+str9: db 115, 49, 61
 
 section .text
 
 main:
     push rbp
     mov  rbp, rsp
-    sub  rsp, 32
+    sub  rsp, 64
     mov  rax, 0
     mov  [rbp-8], rax
     mov  rax, 0
@@ -117,13 +122,91 @@ main:
     sub  rsp, 8
     call rt_print_bytes
     add  rsp, 8
-    lea  rdi, [rel str7]
+    lea  rax, [rel str3]
+    mov  rdx, 5
+    mov  [rbp-24], rax
+    mov  [rbp-32], rdx
+    mov  rax, [rbp-32]
+    test rax, rax
+    jns  .str_free_done_0
+    mov  rsi, rax
+    neg  rsi
+    dec  rsi
+    mov  rdi, [rbp-24]
+    sub  rsp, 8
+    call rt_str_free
+    add  rsp, 8
+.str_free_done_0:
+    lea  rax, [rel str4]
+    mov  rdx, 6
+    mov  [rbp-24], rax
+    mov  [rbp-32], rdx
+    mov  r8, [rbp-24]
+    mov  r9, [rbp-32]
+    mov  rsi, r9
+    test rsi, rsi
+    jns  .str_add_len_ok_1
+    neg  rsi
+    dec  rsi
+.str_add_len_ok_1:
+    lea  rdx, [rel str5]
+    mov  rcx, 2
+    cmp  rcx, 0
+    je   .str_add_done_1
+    cmp  rsi, 0
+    je   .str_add_take_rhs_1
+    mov  rdi, r8
+    sub  rsp, 8
+    call rt_str_concat
+    add  rsp, 8
+    test r9, r9
+    jns  .str_add_store_1
+    mov  rdi, r8
+    mov  rsi, r9
+    neg  rsi
+    dec  rsi
+    sub  rsp, 8
+    call rt_str_free
+    add  rsp, 8
+.str_add_store_1:
+    neg  rdx
+    dec  rdx
+    mov  [rbp-24], rax
+    mov  [rbp-32], rdx
+    jmp  .str_add_done_1
+.str_add_take_rhs_1:
+    test r9, r9
+    jns  .str_add_copy_rhs_1
+    mov  rdi, r8
+    mov  rsi, r9
+    neg  rsi
+    dec  rsi
+    sub  rsp, 8
+    call rt_str_free
+    add  rsp, 8
+.str_add_copy_rhs_1:
+    mov  rdi, rdx
+    mov  rsi, rcx
+    sub  rsp, 8
+    call rt_str_copy
+    add  rsp, 8
+    neg  rdx
+    dec  rdx
+    mov  [rbp-24], rax
+    mov  [rbp-32], rdx
+.str_add_done_1:
+    lea  rdi, [rel str6]
     mov  rsi, 2
     sub  rsp, 8
     call rt_print_bytes
     add  rsp, 8
-    lea  rdi, [rel str6]
-    mov  rsi, 8
+    mov  rdi, [rbp-24]
+    mov  rsi, [rbp-32]
+    test rsi, rsi
+    jns  .str_len_ok_2
+    neg  rsi
+    dec  rsi
+.str_len_ok_2:
     sub  rsp, 8
     call rt_print_bytes
     add  rsp, 8
@@ -132,6 +215,102 @@ main:
     sub  rsp, 8
     call rt_print_bytes
     add  rsp, 8
+    mov  rax, 0
+    mov  [rbp-40], rax
+    lea  rax, [rel str7]
+    mov  rdx, 0
+    mov  [rbp-48], rax
+    mov  [rbp-56], rdx
+.while_start_3:
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, 3
+    pop  rcx
+    cmp  rcx, rax
+    setl al
+    movzx eax, al
+    cmp  rax, 0
+    je   .while_end_4
+    mov  r8, [rbp-48]
+    mov  r9, [rbp-56]
+    mov  rsi, r9
+    test rsi, rsi
+    jns  .str_add_len_ok_5
+    neg  rsi
+    dec  rsi
+.str_add_len_ok_5:
+    lea  rdx, [rel str8]
+    mov  rcx, 1
+    cmp  rcx, 0
+    je   .str_add_done_5
+    cmp  rsi, 0
+    je   .str_add_take_rhs_5
+    mov  rdi, r8
+    sub  rsp, 8
+    call rt_str_concat
+    add  rsp, 8
+    test r9, r9
+    jns  .str_add_store_5
+    mov  rdi, r8
+    mov  rsi, r9
+    neg  rsi
+    dec  rsi
+    sub  rsp, 8
+    call rt_str_free
+    add  rsp, 8
+.str_add_store_5:
+    neg  rdx
+    dec  rdx
+    mov  [rbp-48], rax
+    mov  [rbp-56], rdx
+    jmp  .str_add_done_5
+.str_add_take_rhs_5:
+    test r9, r9
+    jns  .str_add_copy_rhs_5
+    mov  rdi, r8
+    mov  rsi, r9
+    neg  rsi
+    dec  rsi
+    sub  rsp, 8
+    call rt_str_free
+    add  rsp, 8
+.str_add_copy_rhs_5:
+    mov  rdi, rdx
+    mov  rsi, rcx
+    sub  rsp, 8
+    call rt_str_copy
+    add  rsp, 8
+    neg  rdx
+    dec  rdx
+    mov  [rbp-48], rax
+    mov  [rbp-56], rdx
+.str_add_done_5:
+    lea  rdi, [rel str9]
+    mov  rsi, 3
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rdi, [rbp-48]
+    mov  rsi, [rbp-56]
+    test rsi, rsi
+    jns  .str_len_ok_6
+    neg  rsi
+    dec  rsi
+.str_len_ok_6:
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    lea  rdi, [rel str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, 1
+    mov  rcx, [rbp-40]
+    add  rax, rcx
+    mov  [rbp-40], rax
+    jmp  .while_start_3
+.while_end_4:
     mov  rax, 0
     leave
     ret

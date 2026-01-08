@@ -8,6 +8,9 @@ global rt_print_i64_raw
 global rt_print_f64
 global rt_print_f64_raw
 global rt_print_bytes
+global rt_str_concat
+global rt_str_copy
+global rt_str_free
 
 section .rodata
 align 8
@@ -38,6 +41,129 @@ rt_print_bytes:
     sub     rsp, 8
     call    rt_write
     add     rsp, 8
+    ret
+
+; rt_alloc: allocate memory via mmap (no free)
+; in:  rdi = size
+; out: rax = ptr (or -1 on error)
+rt_alloc:
+    mov     rsi, rdi        ; len
+    xor     edi, edi        ; addr = NULL
+    mov     edx, 3          ; PROT_READ | PROT_WRITE
+    mov     r10d, 0x22      ; MAP_PRIVATE | MAP_ANONYMOUS
+    mov     r8, -1          ; fd = -1
+    xor     r9d, r9d        ; offset = 0
+    mov     eax, 9          ; SYS_mmap
+    syscall
+    ret
+
+; rt_memcpy: byte copy
+; in: rdi=dst, rsi=src, rdx=len
+rt_memcpy:
+    test    rdx, rdx
+    jz      .mem_done
+.mem_loop:
+    mov     al, [rsi]
+    mov     [rdi], al
+    inc     rsi
+    inc     rdi
+    dec     rdx
+    jne     .mem_loop
+.mem_done:
+    ret
+
+; rt_str_concat: concat two strings
+; in:  rdi=ptr1, rsi=len1, rdx=ptr2, rcx=len2
+; out: rax=ptr, rdx=len
+rt_str_concat:
+    push    rbx             ; preserve callee-saved
+    push    r12
+    push    r13
+
+    mov     r8, rsi
+    add     r8, rcx         ; total len
+    test    r8, r8
+    jne     .concat_alloc
+    xor     eax, eax
+    xor     edx, edx
+    pop     r13
+    pop     r12
+    pop     rbx
+    ret
+.concat_alloc:
+    push    rdi             ; ptr1
+    push    rsi             ; len1
+    push    rdx             ; ptr2
+    push    rcx             ; len2
+    mov     rdi, r8
+    call    rt_alloc
+    mov     rbx, rax        ; base ptr
+    pop     rcx             ; len2
+    pop     rdx             ; ptr2
+    pop     rsi             ; len1
+    pop     rdi             ; ptr1
+
+    mov     r12, rdx        ; ptr2
+    mov     r13, rcx        ; len2
+    mov     r10, rsi        ; len1
+    mov     r11, rdi        ; ptr1
+
+    mov     rdi, rbx
+    mov     rsi, r11
+    mov     rdx, r10
+    call    rt_memcpy
+
+    lea     rdi, [rbx + r10]
+    mov     rsi, r12
+    mov     rdx, r13
+    call    rt_memcpy
+
+    mov     rax, rbx
+    mov     rdx, r10
+    add     rdx, r13
+
+    pop     r13
+    pop     r12
+    pop     rbx
+    ret
+
+; rt_str_copy: copy string to new buffer
+; in:  rdi=ptr, rsi=len
+; out: rax=ptr, rdx=len
+rt_str_copy:
+    test    rsi, rsi
+    jne     .copy_alloc
+    xor     eax, eax
+    xor     edx, edx
+    ret
+.copy_alloc:
+    push    rbx
+    mov     rbx, rsi
+    push    rdi
+    push    rsi
+    mov     rdi, rsi
+    call    rt_alloc
+    pop     rsi
+    pop     rdi
+    mov     rcx, rax
+    mov     rsi, rdi
+    mov     rdi, rcx
+    call    rt_memcpy
+    mov     rax, rcx
+    mov     rdx, rbx
+    pop     rbx
+    ret
+
+; rt_str_free: free string buffer (mmap)
+; in: rdi=ptr, rsi=len
+rt_str_free:
+    test    rsi, rsi
+    jz      .free_done
+    test    rdi, rdi
+    jz      .free_done
+    mov     rax, 11         ; SYS_munmap
+    syscall
+.free_done:
     ret
 
 ; rt_exit: exit(rdi)
@@ -167,6 +293,18 @@ rt_print_i64_raw:
     mov     ebx, eax
 
 .emit_raw:
+    xor     r10d, r10d
+.scan_zero_raw:
+    cmp     r10d, ebx
+    jge     .scan_done_raw
+    mov     al, [rsp + r10]
+    test    al, al
+    je      .scan_found_raw
+    inc     r10d
+    jmp     .scan_zero_raw
+.scan_found_raw:
+    mov     ebx, r10d
+.scan_done_raw:
     lea     rsi, [rsp]
     mov     edx, ebx
     call    rt_write
@@ -722,6 +860,18 @@ rt_print_f64_raw:
     inc     ebx
 
 .emit_raw:
+    xor     r10d, r10d
+.scan_zero_f64_raw:
+    cmp     r10d, ebx
+    jge     .scan_done_f64_raw
+    mov     al, [rsp + r10]
+    test    al, al
+    je      .scan_found_f64_raw
+    inc     r10d
+    jmp     .scan_zero_f64_raw
+.scan_found_f64_raw:
+    mov     ebx, r10d
+.scan_done_f64_raw:
     lea     rsi, [rsp]
     mov     edx, ebx
     call    rt_write

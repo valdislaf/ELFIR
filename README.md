@@ -22,8 +22,11 @@ Defining more than one is a compile-time error.
 - `runtime.asm` — minimal syscall-based runtime:
   - `rt_exit`
   - `rt_write`
-  - `rt_print_i64` (prints signed i64 + newline)
-  - `rt_print_f64` (prints d64 in hybrid fixed/scientific + newline)
+- `rt_print_i64` (prints signed i64 + newline)
+- `rt_print_f64` (prints d64 in hybrid fixed/scientific + newline)
+- `rt_str_concat` (concatenates two strings, returns new string)
+- `rt_str_copy` (copies a string into a new buffer)
+- `rt_str_free` (frees a dynamic string buffer)
 - `main_i64.elfir` — example ELFIR program
 - `main_d64.elfir` — example ELFIR program (d64 mode)
 - `main_d64_big.elfir` — d64 example (`1e100`)
@@ -140,7 +143,8 @@ fn main_d64() {
 - Floating literals (d64 mode): digits with optional `.` and optional exponent `e|E[+|-]digits`.
 - d64 output format: fixed within [1e-17, 1e18), otherwise scientific; trailing zeros trimmed (at least one digit after the dot).
 - String literals support escapes: `\\`, `\"`, `\n`, `\t`.
-- `str` values are string literals only (no concatenation or comparisons yet).
+- `str` supports `=` and `+=` (concatenation). No comparisons or numeric formatting yet.
+- `+=` allocates a new buffer at runtime; reassignment frees the old dynamic buffer (no end-of-scope frees yet).
 - Comparison result: `0/1` in i64 mode, `0.0/1.0` in d64 mode.
 - i64 `sqrt`: integer result (truncates toward zero). Negative input yields `0`.
 - i64 `pow`: integer exponent. Negative exponent yields `0`.
