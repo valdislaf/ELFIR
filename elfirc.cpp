@@ -274,6 +274,7 @@ struct Expr {
         Deref,
         PtrAddBytes,
         Null,
+        VolatileLoad,
         Add,
         Sub,
         Mul,
@@ -336,6 +337,10 @@ struct Expr {
     static std::unique_ptr<Expr> makePtrAddBytes(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
         auto e = std::make_unique<Expr>();
         e->kind = Kind::PtrAddBytes; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeVolatileLoad(std::unique_ptr<Expr> a) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::VolatileLoad; e->lhs = std::move(a); return e;
     }
     static std::unique_ptr<Expr> makeNull() {
         auto e = std::make_unique<Expr>();
@@ -433,11 +438,11 @@ struct Stmt {
         std::vector<Stmt> body;
     };
     enum class AssignOp { Eq, AddEq, SubEq, MulEq, DivEq };
-    enum class Kind { AutoAssign, TypedAssign, Assign, PtrStore, Ret, PrintI64, PrintD64, PrintStr, PrintHex, PrintList, ExprStmt, If, While, For, Break, Continue } kind;
+    enum class Kind { AutoAssign, TypedAssign, Assign, PtrStore, VolatileStore, BarrierFull, BarrierLoad, BarrierStore, Ret, PrintI64, PrintD64, PrintStr, PrintHex, PrintList, ExprStmt, If, While, For, Break, Continue } kind;
     Type declType = Type::I64;    // for TypedAssign
     std::string name;             // for AutoAssign
     std::unique_ptr<Expr> expr;   // for both
-    std::unique_ptr<Expr> ptrExpr; // for PtrStore
+    std::unique_ptr<Expr> ptrExpr; // for PtrStore/VolatileStore
     std::vector<std::unique_ptr<Expr>> exprs; // for PrintList
     std::vector<IfBranch> ifBranches;
     std::unique_ptr<Expr> cond;
@@ -536,6 +541,33 @@ private:
             expect(TokKind::Semicolon, "Expected ';' after continue");
             Stmt st;
             st.kind = Stmt::Kind::Continue;
+            return st;
+        }
+        if (cur_.kind == TokKind::Ident && cur_.text == "volatile_store") {
+            advance();
+            expect(TokKind::LParen, "Expected '(' after volatile_store");
+            auto p = parseComparison();
+            expect(TokKind::Comma, "Expected ',' after volatile_store ptr");
+            auto v = parseComparison();
+            expect(TokKind::RParen, "Expected ')' after volatile_store args");
+            expect(TokKind::Semicolon, "Expected ';' after volatile_store");
+            Stmt st;
+            st.kind = Stmt::Kind::VolatileStore;
+            st.ptrExpr = std::move(p);
+            st.expr = std::move(v);
+            return st;
+        }
+        if (cur_.kind == TokKind::Ident &&
+            (cur_.text == "barrier_full" || cur_.text == "barrier_load" || cur_.text == "barrier_store")) {
+            std::string name = cur_.text;
+            advance();
+            expect(TokKind::LParen, "Expected '(' after barrier");
+            expect(TokKind::RParen, "Expected ')' after barrier");
+            expect(TokKind::Semicolon, "Expected ';' after barrier");
+            Stmt st;
+            if (name == "barrier_full") st.kind = Stmt::Kind::BarrierFull;
+            else if (name == "barrier_load") st.kind = Stmt::Kind::BarrierLoad;
+            else st.kind = Stmt::Kind::BarrierStore;
             return st;
         }
         if (cur_.kind == TokKind::KwAuto) {
@@ -886,6 +918,11 @@ private:
             advance();
             if (cur_.kind == TokKind::LParen) {
                 advance();
+                if (n == "volatile_load") {
+                    auto a = parseComparison();
+                    expect(TokKind::RParen, "Expected ')' after volatile_load argument");
+                    return Expr::makeVolatileLoad(std::move(a));
+                }
                 if (n == "byte_add") {
                     auto a = parseComparison();
                     expect(TokKind::Comma, "Expected ',' after byte_add ptr");
@@ -1362,6 +1399,29 @@ static void emitExprInt(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             Type base = ptrPointee(pt);
             if (!isIntegerType(base)) {
                 throw Error("Type error: deref expects integer ptr");
+            }
+            emitExprPtr(out, cg, *e.lhs, labelId);
+            switch (base) {
+                case Type::U8:  out << "    movzx eax, byte [rax]\n"; break;
+                case Type::U16: out << "    movzx eax, word [rax]\n"; break;
+                case Type::U32: out << "    mov  eax, dword [rax]\n"; break;
+                case Type::U64: out << "    mov  rax, qword [rax]\n"; break;
+                case Type::I64: out << "    mov  rax, qword [rax]\n"; break;
+                default: break;
+            }
+            if (isUnsignedType(base)) {
+                emitMaskUnsigned(out, base);
+            }
+            return;
+        }
+        case K::VolatileLoad: {
+            Type pt = resolvePtrExprType(*e.lhs, cg, cg.mode);
+            Type base = ptrPointee(pt);
+            if (base == Type::D64) {
+                throw Error("Type error: volatile_load does not support d64");
+            }
+            if (!isIntegerType(base)) {
+                throw Error("Type error: volatile_load expects ptr to integer");
             }
             emitExprPtr(out, cg, *e.lhs, labelId);
             switch (base) {
@@ -2284,6 +2344,17 @@ static ExprTypeTag inferExprTypeTag(const Expr& e, const CodegenCtx& cg, Mode mo
             }
             return tagFromType(sig.retType);
         }
+        case K::VolatileLoad: {
+            Type pt = resolvePtrExprType(*e.lhs, cg, mode);
+            Type base = ptrPointee(pt);
+            if (base == Type::D64) {
+                throw Error("Type error: volatile_load does not support d64");
+            }
+            if (!isIntegerType(base)) {
+                throw Error("Type error: volatile_load expects ptr to integer");
+            }
+            return tagFromType(base);
+        }
         case K::AddrOf:
         case K::Null:
         case K::PtrAddBytes:
@@ -3093,6 +3164,60 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
             case Type::I64: out << "    mov  qword [rcx], rax\n"; break;
             default: break;
         }
+        return false;
+    }
+    if (st.kind == Stmt::Kind::VolatileStore) {
+        Type pt = resolvePtrExprType(*st.ptrExpr, cg, mode);
+        Type base = ptrPointee(pt);
+        if (base == Type::D64) {
+            throw Error("Type error: volatile_store does not support d64");
+        }
+        emitExprPtr(out, cg, *st.ptrExpr, labelId);
+        out << "    push rax\n";
+        if (!isIntegerType(base)) {
+            throw Error("Type error: volatile_store expects ptr to integer");
+        }
+        Type srcType = resolveIntExprType(*st.expr, cg, mode);
+        if (base == Type::I64) {
+            if (srcType != Type::I64) {
+                throw Error("Type error: expected i64 expression");
+            }
+        } else {
+            if (!isUnsignedType(srcType)) {
+                if (!isUnsignedLiteralAssignable(*st.expr, base)) {
+                    throw Error("Type error: expected " + std::string(typeName(base)) + " expression");
+                }
+            } else if (unsignedBits(srcType) > unsignedBits(base)) {
+                if (!isUnsignedLiteralAssignable(*st.expr, base)) {
+                    throw Error("Type error: expected " + std::string(typeName(base)) + " expression");
+                }
+            }
+        }
+        emitExprInt(out, cg, *st.expr, labelId);
+        if (isUnsignedType(base)) {
+            emitMaskUnsigned(out, base);
+        }
+        out << "    pop  rcx\n";
+        switch (base) {
+            case Type::U8:  out << "    mov  byte [rcx], al\n"; break;
+            case Type::U16: out << "    mov  word [rcx], ax\n"; break;
+            case Type::U32: out << "    mov  dword [rcx], eax\n"; break;
+            case Type::U64: out << "    mov  qword [rcx], rax\n"; break;
+            case Type::I64: out << "    mov  qword [rcx], rax\n"; break;
+            default: break;
+        }
+        return false;
+    }
+    if (st.kind == Stmt::Kind::BarrierFull) {
+        out << "    mfence\n";
+        return false;
+    }
+    if (st.kind == Stmt::Kind::BarrierLoad) {
+        out << "    lfence\n";
+        return false;
+    }
+    if (st.kind == Stmt::Kind::BarrierStore) {
+        out << "    sfence\n";
         return false;
     }
 

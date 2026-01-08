@@ -90,6 +90,8 @@ main_str52: db 112, 116, 114, 95, 98, 121, 116, 101, 95, 97, 100, 100, 95, 101, 
 main_str53: db 112, 116, 114, 95, 117, 56, 95, 115, 116, 111, 114, 101
 main_str54: db 112, 116, 114, 95, 110, 117, 108, 108, 95, 101, 113
 main_str55: db 112, 116, 114, 95, 99, 97, 115, 116
+main_str56: db 10, 45, 45, 32, 118, 111, 108, 97, 116, 105, 108, 101, 47, 98, 97, 114, 114, 105, 101, 114, 32, 116, 101, 115, 116, 115, 32, 45, 45, 10
+main_str57: db 118, 111, 108, 97, 116, 105, 108, 101, 95, 108, 111, 97, 100
 
 section .text
 
@@ -575,7 +577,7 @@ assert_d64_eps:
 main:
     push rbp
     mov  rbp, rsp
-    sub  rsp, 288
+    sub  rsp, 304
     mov  rax, 0
     mov  [rbp-8], rax
     mov  rax, 0
@@ -1902,6 +1904,45 @@ main:
     push rax
     lea  rax, [rel main_str55]
     mov  rdx, 8
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call assert_u64
+    add  rsp, 40
+    lea  rdi, [rel main_str56]
+    mov  rsi, 30
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, 0
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-288], rax
+    lea  rax, [rbp-288]
+    mov  [rbp-296], rax
+    sfence
+    mov  rax, [rbp-296]
+    push rax
+    mov  rax, 0xA5A5A5A5
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    mov  dword [rcx], eax
+    mfence
+    mov  rax, [rbp-296]
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-304], rax
+    lfence
+    sub  rsp, 8
+    mov  rax, 0xA5A5A5A5
+    push rax
+    mov  rax, [rbp-304]
+    and  eax, 0xFFFFFFFF
+    push rax
+    lea  rax, [rel main_str57]
+    mov  rdx, 13
     sub  rsp, 8
     mov  [rsp], rdx
     sub  rsp, 8

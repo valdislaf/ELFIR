@@ -201,6 +201,16 @@ i64 i= 0;
       assert_i64("ptr_null_eq", pn == null, 1);
       ptr<u64> pc = ptr<u64>(0x1000);
       assert_u64("ptr_cast", u64(pc), 0x1000);
+
+      print("\n-- volatile/barrier tests --\n");
+      u32 mm = 0;
+      ptr<u32> pm = &mm;
+      barrier_store();
+      volatile_store(pm, u32(0xA5A5A5A5));
+      barrier_full();
+      u32 mv = volatile_load(pm);
+      barrier_load();
+      assert_u64("volatile_load", u64(mv), 0xA5A5A5A5);
 	 
       ret 0;
   }

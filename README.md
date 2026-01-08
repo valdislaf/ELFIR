@@ -154,6 +154,8 @@ fn main_d64() {
 - Byte offset: `byte_add(p, n)` adds raw bytes.
 - Null: `null` can be assigned to any `ptr<T>` and compared with `==`/`!=`.
 - Pointer casts: `ptr<T>(u64_expr)` and `u64(p)`.
+- Volatile MMIO: `volatile_load(p)` and `volatile_store(p, v)` for integer pointers.
+- Barriers: `barrier_full()`, `barrier_load()`, `barrier_store()` emit `mfence/lfence/sfence`.
 - Floating literals (d64 mode): digits with optional `.` and optional exponent `e|E[+|-]digits`.
 - d64 output format: fixed within [1e-17, 1e18), otherwise scientific; trailing zeros trimmed (at least one digit after the dot).
 - String literals support escapes: `\\`, `\"`, `\n`, `\t`.
