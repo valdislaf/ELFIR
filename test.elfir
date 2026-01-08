@@ -26,5 +26,25 @@ i64 i= 0;
  print("s1=", s1, "\n"); 		
 	     i+=1;
 	  }
+	  
+	      i = 0;
+      while (i < 5) {
+          if (i == 3) {
+              break;
+          }
+          print("i=", i, "\n");
+          i += 1;
+      }
+	  
+	       i = 0;
+      while (i < 5) {
+          i += 1;
+          if (i == 3) {
+              continue;
+          }
+          print("i=", i, "\n");
+      }
+	  
+	  
       ret 0;
   }

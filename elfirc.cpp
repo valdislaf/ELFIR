@@ -32,6 +32,8 @@ enum class TokKind {
     KwElseIf,
     KwWhile,
     KwFor,
+    KwBreak,
+    KwContinue,
 
     LParen, RParen,
     LBrace, RBrace,
@@ -98,6 +100,8 @@ public:
             else if (t.text == "elseif") t.kind = TokKind::KwElseIf;
             else if (t.text == "while") t.kind = TokKind::KwWhile;
             else if (t.text == "for") t.kind = TokKind::KwFor;
+            else if (t.text == "break") t.kind = TokKind::KwBreak;
+            else if (t.text == "continue") t.kind = TokKind::KwContinue;
             else t.kind = TokKind::Ident;
             return t;
         }
@@ -300,7 +304,7 @@ struct Stmt {
         std::vector<Stmt> body;
     };
     enum class AssignOp { Eq, AddEq, SubEq, MulEq, DivEq };
-    enum class Kind { AutoAssign, TypedAssign, Assign, Ret, PrintI64, PrintD64, PrintStr, PrintList, If, While, For } kind;
+    enum class Kind { AutoAssign, TypedAssign, Assign, Ret, PrintI64, PrintD64, PrintStr, PrintList, If, While, For, Break, Continue } kind;
     Type declType = Type::I64;    // for TypedAssign
     std::string name;             // for AutoAssign
     std::unique_ptr<Expr> expr;   // for both
@@ -360,6 +364,20 @@ private:
         }
         if (cur_.kind == TokKind::KwFor) {
             return parseForStmt();
+        }
+        if (cur_.kind == TokKind::KwBreak) {
+            advance();
+            expect(TokKind::Semicolon, "Expected ';' after break");
+            Stmt st;
+            st.kind = Stmt::Kind::Break;
+            return st;
+        }
+        if (cur_.kind == TokKind::KwContinue) {
+            advance();
+            expect(TokKind::Semicolon, "Expected ';' after continue");
+            Stmt st;
+            st.kind = Stmt::Kind::Continue;
+            return st;
         }
         if (cur_.kind == TokKind::KwAuto) {
             advance();
@@ -1530,7 +1548,13 @@ static void emitCleanupStrs(std::ostringstream& out, const CodegenCtx& cg, int& 
     }
 }
 
-static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, int& labelId, Mode mode, Type retType) {
+struct LoopContext {
+    std::string breakLabel;
+    std::string continueLabel;
+};
+
+static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, int& labelId, Mode mode, Type retType,
+                     std::vector<LoopContext>& loops) {
     bool hasRet = false;
     if (st.kind == Stmt::Kind::AutoAssign) {
         if (mode == Mode::Mixed) {
@@ -1726,7 +1750,7 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
                 emitCondJumpFalse(out, cg, *br.cond, labelId, mode, ".if_next_" + std::to_string(nextId));
             }
             for (const auto& inner : br.body) {
-                if (emitStmt(out, cg, inner, labelId, mode, retType)) {
+                if (emitStmt(out, cg, inner, labelId, mode, retType, loops)) {
                     hasRet = true;
                 }
             }
@@ -1736,42 +1760,64 @@ static bool emitStmt(std::ostringstream& out, CodegenCtx& cg, const Stmt& st, in
         out << ".if_end_" << endId << ":\n";
         return hasRet;
     }
+    if (st.kind == Stmt::Kind::Break) {
+        if (loops.empty()) {
+            throw Error("break is only allowed inside loops");
+        }
+        out << "    jmp  " << loops.back().breakLabel << "\n";
+        return false;
+    }
+    if (st.kind == Stmt::Kind::Continue) {
+        if (loops.empty()) {
+            throw Error("continue is only allowed inside loops");
+        }
+        out << "    jmp  " << loops.back().continueLabel << "\n";
+        return false;
+    }
     if (st.kind == Stmt::Kind::While) {
         int startId = labelId++;
         int endId = labelId++;
+        LoopContext loopCtx{".while_end_" + std::to_string(endId), ".while_start_" + std::to_string(startId)};
+        loops.push_back(loopCtx);
         out << ".while_start_" << startId << ":\n";
         emitCondJumpFalse(out, cg, *st.cond, labelId, mode, ".while_end_" + std::to_string(endId));
         for (const auto& inner : st.body) {
-            if (emitStmt(out, cg, inner, labelId, mode, retType)) {
+            if (emitStmt(out, cg, inner, labelId, mode, retType, loops)) {
                 hasRet = true;
             }
         }
         out << "    jmp  .while_start_" << startId << "\n";
         out << ".while_end_" << endId << ":\n";
+        loops.pop_back();
         return hasRet;
     }
     if (st.kind == Stmt::Kind::For) {
         if (st.init) {
-            if (emitStmt(out, cg, *st.init, labelId, mode, retType)) {
+            if (emitStmt(out, cg, *st.init, labelId, mode, retType, loops)) {
                 hasRet = true;
             }
         }
         int startId = labelId++;
+        int stepId = labelId++;
         int endId = labelId++;
+        LoopContext loopCtx{".for_end_" + std::to_string(endId), ".for_step_" + std::to_string(stepId)};
+        loops.push_back(loopCtx);
         out << ".for_start_" << startId << ":\n";
         emitCondJumpFalse(out, cg, *st.cond, labelId, mode, ".for_end_" + std::to_string(endId));
         for (const auto& inner : st.body) {
-            if (emitStmt(out, cg, inner, labelId, mode, retType)) {
+            if (emitStmt(out, cg, inner, labelId, mode, retType, loops)) {
                 hasRet = true;
             }
         }
+        out << ".for_step_" << stepId << ":\n";
         if (st.step) {
-            if (emitStmt(out, cg, *st.step, labelId, mode, retType)) {
+            if (emitStmt(out, cg, *st.step, labelId, mode, retType, loops)) {
                 hasRet = true;
             }
         }
         out << "    jmp  .for_start_" << startId << "\n";
         out << ".for_end_" << endId << ":\n";
+        loops.pop_back();
         return hasRet;
     }
 
@@ -1802,8 +1848,9 @@ static GenResult genFunctionAsm(const Func& f, Mode mode, Type retType) {
     std::ostringstream body;
 
     int labelId = 0;
+    std::vector<LoopContext> loops;
     for (const auto& st : f.body) {
-        if (emitStmt(body, cg, st, labelId, mode, retType)) {
+        if (emitStmt(body, cg, st, labelId, mode, retType, loops)) {
             hasRet = true;
         }
     }

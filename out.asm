@@ -23,6 +23,7 @@ str6: db 115, 61
 str7: db 0
 str8: db 35
 str9: db 115, 49, 61
+str10: db 105, 61
 
 section .text
 
@@ -312,9 +313,101 @@ main:
     jmp  .while_start_3
 .while_end_4:
     mov  rax, 0
+    mov  [rbp-40], rax
+.while_start_7:
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, 5
+    pop  rcx
+    cmp  rcx, rax
+    setl al
+    movzx eax, al
+    cmp  rax, 0
+    je   .while_end_8
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, 3
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_10
+    jmp  .while_end_8
+    jmp  .if_end_9
+.if_next_10:
+.if_end_9:
+    lea  rdi, [rel str10]
+    mov  rsi, 2
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-40]
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_i64_raw
+    add  rsp, 8
+    lea  rdi, [rel str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, 1
+    mov  rcx, [rbp-40]
+    add  rax, rcx
+    mov  [rbp-40], rax
+    jmp  .while_start_7
+.while_end_8:
+    mov  rax, 0
+    mov  [rbp-40], rax
+.while_start_11:
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, 5
+    pop  rcx
+    cmp  rcx, rax
+    setl al
+    movzx eax, al
+    cmp  rax, 0
+    je   .while_end_12
+    mov  rax, 1
+    mov  rcx, [rbp-40]
+    add  rax, rcx
+    mov  [rbp-40], rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, 3
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_14
+    jmp  .while_start_11
+    jmp  .if_end_13
+.if_next_14:
+.if_end_13:
+    lea  rdi, [rel str10]
+    mov  rsi, 2
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rax, [rbp-40]
+    mov  rdi, rax
+    sub  rsp, 8
+    call rt_print_i64_raw
+    add  rsp, 8
+    lea  rdi, [rel str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    jmp  .while_start_11
+.while_end_12:
+    mov  rax, 0
     mov  rax, [rbp-32]
     test rax, rax
-    jns  .str_free_done_7
+    jns  .str_free_done_15
     mov  rsi, rax
     neg  rsi
     dec  rsi
@@ -322,10 +415,10 @@ main:
     sub  rsp, 8
     call rt_str_free
     add  rsp, 8
-.str_free_done_7:
+.str_free_done_15:
     mov  rax, [rbp-56]
     test rax, rax
-    jns  .str_free_done_8
+    jns  .str_free_done_16
     mov  rsi, rax
     neg  rsi
     dec  rsi
@@ -333,7 +426,7 @@ main:
     sub  rsp, 8
     call rt_str_free
     add  rsp, 8
-.str_free_done_8:
+.str_free_done_16:
     leave
     ret
 

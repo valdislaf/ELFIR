@@ -131,6 +131,7 @@ fn main_d64() {
 - `if (<expr>) { ... } [elseif (<expr>) { ... }]* [else { ... }]` with numeric conditions (nonzero is true).
 - `while (<expr>) { ... }` repeats while condition is nonzero.
 - `for (<init>, <cond>, <step>) { ... }` or `for (<init>; <cond>; <step>) { ... }` with commas or semicolons; `<init>` is `auto` or `i64/d64` declaration.
+- `break;` exits the nearest loop, `continue;` jumps to the next iteration.
 - `<name> = <expr>;` assigns to an existing variable (str assignment is allowed for literals/str vars).
 - `<name> += <expr>;`, `<name> -= <expr>;`, `<name> *= <expr>;`, `<name> /= <expr>;` for numeric types; `str` supports `=` and `+=` only.
 - Operators: `+`, `-`, `*`, `/`, `%` with standard precedence and left associativity.
