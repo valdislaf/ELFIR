@@ -64,8 +64,11 @@ enum class TokKind {
     Ge,
     Amp,
     Pipe,
+    AndAnd,
+    OrOr,
     Caret,
     Tilde,
+    Bang,
     Shl,
     Shr,
 };
@@ -225,7 +228,7 @@ public:
                 t.kind = TokKind::Minus; return t;
             case '!':
                 if (i_ < s_.size() && s_[i_] == '=') { i_++; t.kind = TokKind::NotEq; return t; }
-                throw Error(std::string("Unexpected character '") + c + "' at position " + std::to_string(t.pos));
+                t.kind = TokKind::Bang; return t;
             case '<':
                 if (i_ < s_.size() && s_[i_] == '=') { i_++; t.kind = TokKind::Le; return t; }
                 if (i_ < s_.size() && s_[i_] == '<') { i_++; t.kind = TokKind::Shl; return t; }
@@ -234,8 +237,12 @@ public:
                 if (i_ < s_.size() && s_[i_] == '=') { i_++; t.kind = TokKind::Ge; return t; }
                 if (i_ < s_.size() && s_[i_] == '>') { i_++; t.kind = TokKind::Shr; return t; }
                 t.kind = TokKind::Gt; return t;
-            case '&': t.kind = TokKind::Amp; return t;
-            case '|': t.kind = TokKind::Pipe; return t;
+            case '&':
+                if (i_ < s_.size() && s_[i_] == '&') { i_++; t.kind = TokKind::AndAnd; return t; }
+                t.kind = TokKind::Amp; return t;
+            case '|':
+                if (i_ < s_.size() && s_[i_] == '|') { i_++; t.kind = TokKind::OrOr; return t; }
+                t.kind = TokKind::Pipe; return t;
             case '^': t.kind = TokKind::Caret; return t;
             case '~': t.kind = TokKind::Tilde; return t;
             default:
@@ -313,6 +320,9 @@ struct Expr {
         BitNot,
         Cmp,
         And,
+        LogAnd,
+        LogOr,
+        Not,
         Sqrt,
         Pow,
         Min,
@@ -434,6 +444,18 @@ struct Expr {
     static std::unique_ptr<Expr> makeAnd(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
         auto e = std::make_unique<Expr>();
         e->kind = Kind::And; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeLogAnd(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::LogAnd; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeLogOr(std::unique_ptr<Expr> a, std::unique_ptr<Expr> b) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::LogOr; e->lhs = std::move(a); e->rhs = std::move(b); return e;
+    }
+    static std::unique_ptr<Expr> makeNot(std::unique_ptr<Expr> a) {
+        auto e = std::make_unique<Expr>();
+        e->kind = Kind::Not; e->lhs = std::move(a); return e;
     }
     static std::unique_ptr<Expr> makeSqrt(std::unique_ptr<Expr> a) {
         auto e = std::make_unique<Expr>();
@@ -1116,6 +1138,11 @@ private:
             auto rhs = parseUnary();
             return Expr::makeBitNot(std::move(rhs));
         }
+        if (cur_.kind == TokKind::Bang) {
+            advance();
+            auto rhs = parseUnary();
+            return Expr::makeNot(std::move(rhs));
+        }
         if (cur_.kind == TokKind::Star) {
             advance();
             auto rhs = parseUnary();
@@ -1240,7 +1267,7 @@ private:
     }
 
     // comparison := bitor ( (==|!=|<|<=|>|>=) bitor )*
-    std::unique_ptr<Expr> parseComparison() {
+    std::unique_ptr<Expr> parseCmp() {
         auto left = parseBitOr();
         if (!isCmpTok(cur_.kind)) return left;
 
@@ -1260,6 +1287,33 @@ private:
         }
 
         return result;
+    }
+
+    // logical_and := comparison { '&&' comparison }
+    std::unique_ptr<Expr> parseLogicalAnd() {
+        auto left = parseCmp();
+        while (cur_.kind == TokKind::AndAnd) {
+            advance();
+            auto right = parseCmp();
+            left = Expr::makeLogAnd(std::move(left), std::move(right));
+        }
+        return left;
+    }
+
+    // logical_or := logical_and { '||' logical_and }
+    std::unique_ptr<Expr> parseLogicalOr() {
+        auto left = parseLogicalAnd();
+        while (cur_.kind == TokKind::OrOr) {
+            advance();
+            auto right = parseLogicalAnd();
+            left = Expr::makeLogOr(std::move(left), std::move(right));
+        }
+        return left;
+    }
+
+    // expr := logical_or
+    std::unique_ptr<Expr> parseComparison() {
+        return parseLogicalOr();
     }
 
     void advance() {
@@ -1740,6 +1794,27 @@ static void emitExprInt(std::ostringstream& out, CodegenCtx& cg, const Expr& e, 
             emitExprInt(out, cg, *e.rhs, labelId);
             out << "    pop  rcx\n";
             out << "    and  rax, rcx\n";
+            return;
+        case K::LogAnd:
+        case K::LogOr:
+            emitExprInt(out, cg, *e.lhs, labelId);
+            out << "    cmp  rax, 0\n";
+            out << "    setne al\n";
+            out << "    movzx eax, al\n";
+            out << "    push rax\n";
+            emitExprInt(out, cg, *e.rhs, labelId);
+            out << "    cmp  rax, 0\n";
+            out << "    setne al\n";
+            out << "    movzx eax, al\n";
+            out << "    pop  rcx\n";
+            if (e.kind == K::LogAnd) out << "    and  rax, rcx\n";
+            else out << "    or   rax, rcx\n";
+            return;
+        case K::Not:
+            emitExprInt(out, cg, *e.lhs, labelId);
+            out << "    cmp  rax, 0\n";
+            out << "    sete al\n";
+            out << "    movzx eax, al\n";
             return;
         case K::Cast: {
             if (isPtrType(e.castType)) {
@@ -2597,6 +2672,22 @@ static ExprTypeTag inferExprTypeTag(const Expr& e, const CodegenCtx& cg, Mode mo
             }
             if (mode == Mode::D64Only && lt == ExprTypeTag::IntLiteral && rt == ExprTypeTag::IntLiteral) {
                 return ExprTypeTag::D64;
+            }
+            return ExprTypeTag::I64;
+        }
+        case K::LogAnd:
+        case K::LogOr: {
+            auto lt = inferExprTypeTag(*e.lhs, cg, mode);
+            auto rt = inferExprTypeTag(*e.rhs, cg, mode);
+            if (lt == ExprTypeTag::D64 || rt == ExprTypeTag::D64) {
+                throw Error("Type error: logical ops are only allowed for integer types");
+            }
+            return ExprTypeTag::I64;
+        }
+        case K::Not: {
+            auto lt = inferExprTypeTag(*e.lhs, cg, mode);
+            if (lt == ExprTypeTag::D64) {
+                throw Error("Type error: logical ops are only allowed for integer types");
             }
             return ExprTypeTag::I64;
         }

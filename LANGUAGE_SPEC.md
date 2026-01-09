@@ -86,7 +86,7 @@ step  := ident assign_op expr
 assign_op := "=" | "+=" | "-=" | "*=" | "/="
 
 expr precedence (highest to lowest):
-  unary:   "-" "~" "*" "&"
+  unary:   "!" "-" "~" "*" "&"
   mul:     "*" "/" "%"
   add:     "+" "-"
   shift:   "<<" ">>"
@@ -94,6 +94,8 @@ expr precedence (highest to lowest):
   bitxor:  "^"
   bitor:   "|"
   cmp:     "==" "!=" "<" "<=" ">" ">="
+  land:    "&&"
+  lor:     "||"
 
 Primary:
 - number | string | ident | "(" expr ")" | cast | call | null
@@ -156,10 +158,11 @@ Functions:
 - Non-void functions must contain at least one `ret <expr>;` (compile-time error otherwise).
 - `for` init is limited to `auto` or an explicit type declaration (no assignments).
 
-Comparisons:
+Comparisons / logic:
 - Integer comparisons return 0/1 (i64).
 - d64 comparisons return 0.0/1.0 (d64).
 - Pointer comparisons only allow == and !=, and require same element type (or null).
+- Logical operators `&&`, `||`, `!` are integer-only and return 0/1 (no short-circuit).
 
 5) ABI / Code Generation
 
