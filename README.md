@@ -55,6 +55,18 @@ sudo apt update
 sudo apt install -y build-essential nasm binutils
 ```
 
+Extra for ISO builds (GRUB + xorriso):
+
+```bash
+sudo apt install -y grub-pc-bin xorriso
+```
+
+Extra for running ISO in QEMU:
+
+```bash
+sudo apt install -y qemu-system-x86
+```
+
 ## Quick Start
 
 1) Build the compiler

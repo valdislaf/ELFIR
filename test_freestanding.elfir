@@ -1,4 +1,22 @@
 fn _start() {
+    ptr<u16> vga = ptr<u16>(0xB8000);
+    u16 attr = u16(0x0F00);
+    i64 i = 0;
+    while (i < 2000) {
+        volatile_store(vga + i, u16(0x20) | attr);
+        i += 1;
+    }
+
+    i64 base = 996;
+    volatile_store(vga + base + 0, u16(0x45) | attr);
+    volatile_store(vga + base + 1, u16(0x4C) | attr);
+    volatile_store(vga + base + 2, u16(0x46) | attr);
+    volatile_store(vga + base + 3, u16(0x49) | attr);
+    volatile_store(vga + base + 4, u16(0x52) | attr);
+    volatile_store(vga + base + 5, u16(0x20) | attr);
+    volatile_store(vga + base + 6, u16(0x4F) | attr);
+    volatile_store(vga + base + 7, u16(0x4B) | attr);
+
     i64 one = 1;
     while (one) {
         asm0("hlt");

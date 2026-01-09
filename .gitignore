@@ -5,3 +5,6 @@
 
 # windows binaries
 *.exe
+
+iso/
+*.iso

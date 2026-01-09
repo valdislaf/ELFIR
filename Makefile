@@ -3,7 +3,7 @@ CFLAGS := -std=c++20 -O2 -Wall -Wextra -pedantic
 NASM := nasm
 LD := ld
 
-.PHONY: all clean freestanding
+.PHONY: all clean freestanding iso run-iso
 
 all: prog
 
@@ -34,5 +34,22 @@ prog_freestanding: out_freestanding.o
 
 freestanding: prog_freestanding
 
+boot.o: boot.asm
+	$(NASM) -felf64 $< -o $@
+
+kernel.elf: boot.o out_freestanding.o linker.ld
+	$(LD) -T linker.ld -o $@ boot.o out_freestanding.o
+
+elfir.iso: kernel.elf grub.cfg
+	mkdir -p iso/boot/grub
+	cp kernel.elf iso/boot/
+	cp grub.cfg iso/boot/grub/
+	grub-mkrescue -o $@ iso
+
+iso: elfir.iso
+
+run-iso: elfir.iso
+	qemu-system-x86_64 -cdrom $<
+
 clean:
-	rm -f elfirc out.asm out.o runtime.o prog out_freestanding.asm out_freestanding.o prog_freestanding
+	rm -f elfirc out.asm out.o runtime.o prog out_freestanding.asm out_freestanding.o prog_freestanding boot.o kernel.elf elfir.iso

@@ -1,0 +1,237 @@
+ELFIR: быстрый старт в режиме freestanding (Multiboot2 + GRUB)
+
+Ниже — минимальный, но рабочий путь, как загрузить 64-битное ядро ELFIR через GRUB (Multiboot2).
+Я выбираю Multiboot2 как самый быстрый путь увидеть «привет» и отладить цепочку.
+
+Важно
+- ELFIR генерирует x86-64 код. GRUB по Multiboot2 входит в 32-битном режиме.
+- Нужен небольшой 32-битный ASM-стаб, который включит long mode и передаст управление в 64-битный _start.
+- В freestanding-режиме _start не должен возвращать.
+ - В этом репозитории уже есть готовые `boot.asm`, `linker.ld`, `grub.cfg` и цели `make iso`/`make run-iso`.
+
+0) Зависимости
+
+Ubuntu/WSL:
+  sudo apt update
+  sudo apt install -y build-essential nasm binutils grub-pc-bin xorriso qemu-system-x86
+
+1) Соберите ELFIR и freestanding asm
+
+  make clean && make freestanding
+
+Это создаст:
+  out_freestanding.asm
+  out_freestanding.o
+  prog_freestanding (не используется для загрузки в GRUB)
+
+2) Multiboot2 + long mode stub (boot.asm)
+
+Файл `boot.asm` уже есть в проекте. Ниже — его текущий вариант (для справки):
+
+--- boot.asm ---
+BITS 32
+
+; Multiboot2 header (минимальный)
+section .multiboot2
+align 8
+mb2_header_start:
+    dd 0xE85250D6          ; magic
+    dd 0                   ; architecture (0 = i386)
+    dd mb2_header_end - mb2_header_start
+    dd -(0xE85250D6 + 0 + (mb2_header_end - mb2_header_start))
+
+    ; End tag
+    dw 0
+    dw 0
+    dd 8
+mb2_header_end:
+
+section .text
+extern _start
+
+global mb2_entry
+mb2_entry:
+    cli
+    mov esp, stack_top
+
+    ; --- ВКЛЮЧЕНИЕ LONG MODE (минимальный скелет) ---
+    ; 1) Настроить GDT
+    lgdt [gdt64_desc]
+
+    ; 2) Включить PAE
+    mov eax, cr4
+    or eax, 1 << 5
+    mov cr4, eax
+
+    ; 3) Включить LME (Long Mode Enable)
+    mov ecx, 0xC0000080     ; IA32_EFER
+    rdmsr
+    or eax, 1 << 8
+    wrmsr
+
+    ; 4) Включить paging (CR3 должен указывать на PML4)
+    mov eax, pml4_table
+    mov cr3, eax
+    mov eax, cr0
+    or eax, 1 << 31
+    mov cr0, eax
+
+    ; 5) Дальний прыжок в 64-битный сегмент
+    jmp 0x08:long_mode_start
+
+; --- 64-bit ---
+BITS 64
+long_mode_start:
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov ss, ax
+
+    ; В 64-битном _start можно использовать asm0("hlt") и т.п.
+    call _start
+
+.hang:
+    hlt
+    jmp .hang
+
+section .data
+align 16
+; GDT: null, code, data
+GDT64:
+    dq 0
+    dq 0x00AF9A000000FFFF  ; code
+    dq 0x00AF92000000FFFF  ; data
+
+gdt64_desc:
+    dw gdt64_desc - GDT64 - 1
+    dq GDT64
+
+align 4096
+pml4_table:
+    dq pdpt_table + 0x3
+align 4096
+pdpt_table:
+    dq pd_table + 0x3
+align 4096
+pd_table:
+%assign i 0
+%rep 512
+    dq (i * 0x200000) | 0x83
+%assign i i+1
+%endrep
+
+section .bss
+align 16
+stack_bottom:
+    resb 16384
+stack_top:
+
+--- конец boot.asm ---
+
+Примечание: этот stub минимальный. При желании можно расширить page tables, добавить higher-half и т.д.
+
+3) Linker script (linker.ld)
+
+--- linker.ld ---
+ENTRY(mb2_entry)
+SECTIONS
+{
+    .multiboot2 0 : {
+        *(.multiboot2)
+    }
+
+    . = 1M;
+
+    .text : {
+        *(.text*)
+    }
+
+    .rodata : {
+        *(.rodata*)
+    }
+
+    .data : {
+        *(.data*)
+    }
+
+    .bss : {
+        *(.bss*)
+        *(COMMON)
+    }
+}
+--- конец linker.ld ---
+
+4) Соберите ядро
+
+  make iso
+
+5) GRUB ISO
+
+Создайте grub.cfg:
+
+--- grub.cfg ---
+set timeout=0
+set default=0
+
+menuentry "ELFIR kernel" {
+    multiboot2 /boot/kernel.elf
+    boot
+}
+--- конец grub.cfg ---
+
+Соберите ISO:
+
+  mkdir -p iso/boot/grub
+  cp kernel.elf iso/boot/
+  cp grub.cfg iso/boot/grub/
+  grub-mkrescue -o elfir.iso iso
+
+6) Запуск в QEMU
+
+  make run-iso
+
+7) Пример freestanding программы ELFIR
+
+В _start нужен бесконечный цикл:
+
+fn _start() {
+    i64 one = 1;
+    while (one) {
+        asm0("hlt");
+    }
+}
+
+8) Минимальный вывод на экран (VGA text mode)
+
+Вариант для теста “жив ли ядро”: пишем в VGA 0xB8000.
+Пример уже есть в `test_freestanding.elfir` (показывает `ELFIR OK` по центру экрана).
+
+Код (с очисткой экрана):
+
+fn _start() {
+    ptr<u16> vga = ptr<u16>(0xB8000);
+    u16 attr = u16(0x0F00);
+    i64 i = 0;
+    while (i < 2000) {
+        volatile_store(vga + i, u16(0x20) | attr);
+        i += 1;
+    }
+
+    i64 base = 996;
+    volatile_store(vga + base + 0, u16(0x45) | attr);
+    volatile_store(vga + base + 1, u16(0x4C) | attr);
+    volatile_store(vga + base + 2, u16(0x46) | attr);
+    volatile_store(vga + base + 3, u16(0x49) | attr);
+    volatile_store(vga + base + 4, u16(0x52) | attr);
+    volatile_store(vga + base + 5, u16(0x20) | attr);
+    volatile_store(vga + base + 6, u16(0x4F) | attr);
+    volatile_store(vga + base + 7, u16(0x4B) | attr);
+
+    i64 one = 1;
+    while (one) {
+        asm0("hlt");
+    }
+}
+
+Примечание по user-space:
+- hlt в user-space вызывает #GP (SIGSEGV). В ядре это нормально.
