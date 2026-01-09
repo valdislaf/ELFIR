@@ -171,6 +171,69 @@ static void print_status(CHAR16 *label, EFI_STATUS status) {
     Print(L"%s: %r\n", label, status);
 }
 
+static UINT64 find_xhci_base(void) {
+    EFI_STATUS status;
+    EFI_HANDLE *handles = NULL;
+    UINTN count = 0;
+    UINTN i;
+
+    status = uefi_call_wrapper(gBS->LocateHandleBuffer, 5,
+                               ByProtocol, &gEfiPciIoProtocolGuid,
+                               NULL, &count, &handles);
+    if (EFI_ERROR(status)) {
+        print_status(L"UEFI: LocateHandleBuffer(PciIo) failed", status);
+        return 0;
+    }
+
+    for (i = 0; i < count; ++i) {
+        EFI_PCI_IO_PROTOCOL *pci = NULL;
+        UINT8 class_code[3];
+        UINT32 bar[2];
+        UINT64 base;
+
+        status = uefi_call_wrapper(gBS->OpenProtocol, 6,
+                                   handles[i],
+                                   &gEfiPciIoProtocolGuid,
+                                   (void **)&pci,
+                                   g_image_handle,
+                                   NULL,
+                                   EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+        if (EFI_ERROR(status) || !pci) {
+            continue;
+        }
+
+        status = uefi_call_wrapper(pci->Pci.Read, 5, pci,
+                                   EfiPciIoWidthUint8, 0x09,
+                                   3, class_code);
+        if (EFI_ERROR(status)) {
+            continue;
+        }
+
+        if (class_code[2] != 0x0C || class_code[1] != 0x03 || class_code[0] != 0x30) {
+            continue;
+        }
+
+        status = uefi_call_wrapper(pci->Pci.Read, 5, pci,
+                                   EfiPciIoWidthUint32, 0x10,
+                                   2, bar);
+        if (EFI_ERROR(status)) {
+            continue;
+        }
+
+        base = ((UINT64)bar[1] << 32) | (UINT64)bar[0];
+        base &= ~((UINT64)0xF);
+        if (base != 0) {
+            Print(L"UEFI: xHCI MMIO base=%lx\n", base);
+            uefi_call_wrapper(gBS->FreePool, 1, handles);
+            return base;
+        }
+    }
+
+    uefi_call_wrapper(gBS->FreePool, 1, handles);
+    Print(L"UEFI: xHCI controller not found\n");
+    return 0;
+}
+
 static EFI_STATUS exit_boot_services(EFI_HANDLE image) {
     EFI_STATUS status;
     UINTN map_size = 0;
@@ -258,7 +321,7 @@ static EFI_FILE_HANDLE find_root_for_path(CHAR16 *path) {
 }
 
 __attribute__((noreturn))
-static void jump_to_kernel(EFI_PHYSICAL_ADDRESS entry, EFI_SYSTEM_TABLE *st) {
+static void jump_to_kernel(EFI_PHYSICAL_ADDRESS entry, EFI_SYSTEM_TABLE *st, UINT64 xhci_base) {
     UINTN stack_pages = 16; /* 64 KiB */
     EFI_PHYSICAL_ADDRESS stack_base = 0;
     UINTN stack_top;
@@ -275,9 +338,10 @@ static void jump_to_kernel(EFI_PHYSICAL_ADDRESS entry, EFI_SYSTEM_TABLE *st) {
     __asm__ __volatile__(
         "mov %0, %%rsp\n"
         "mov %1, %%rdi\n"
-        "jmp *%2\n"
+        "mov %2, %%rsi\n"
+        "jmp *%3\n"
         :
-        : "r"(stack_top), "r"(st), "r"((void *)(UINTN)entry)
+        : "r"(stack_top), "r"(st), "r"(xhci_base), "r"((void *)(UINTN)entry)
         : "memory"
     );
 
@@ -293,6 +357,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
     EFI_LOADED_IMAGE *loaded = NULL;
     EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *sfs = NULL;
     EFI_FILE_HANDLE file_root = NULL;
+    UINT64 xhci_base = 0;
 
     InitializeLib(ImageHandle, SystemTable);
     g_image_handle = ImageHandle;
@@ -353,6 +418,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
         return status;
     }
 
+    xhci_base = find_xhci_base();
     Print(L"UEFI: calling ExitBootServices() before jumping to kernel...\n");
     status = exit_boot_services(ImageHandle);
     if (EFI_ERROR(status)) {
@@ -360,6 +426,6 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
         return status;
     }
 
-    jump_to_kernel(entry, SystemTable);
+    jump_to_kernel(entry, SystemTable, xhci_base);
     return EFI_SUCCESS;
 }

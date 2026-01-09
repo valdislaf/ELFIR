@@ -20,6 +20,7 @@ global uefi_set_cursor_pos
 global uefi_read_key
 global uefi_read_key_wait
 global uefi_print_marker
+global uefi_get_xhci_base
 
 extern _start
 
@@ -51,16 +52,17 @@ extern _start
 section .bss
 align 8
 uefi_st:       resq 1
+uefi_xhci_base: resq 1
 
 section .text
 
 ; ---------------------------------------------------------------------------
-; Вход в UEFI-приложение: efi_main(ImageHandle=RCX, SystemTable=RDX)
-; Сохраняем SystemTable и передаём управление в _start (ядро)
+; Вход из загрузчика: SystemTable=RDI, xHCI MMIO base=RSI
+; Сохраняем SystemTable и MMIO адрес, передаём управление в _start (ядро)
 ; ---------------------------------------------------------------------------
 uefi_entry:
-    ; RCX = ImageHandle, RDX = SystemTable (Microsoft x64 ABI)
-    mov     [rel uefi_st], rdx
+    mov     [rel uefi_st], rdi
+    mov     [rel uefi_xhci_base], rsi
 
     ; Печать "ENTRY" через UEFI, если ConOut есть
     push    rbx
@@ -99,6 +101,10 @@ uefi_present:
     test    rax, rax
     setne   al
     movzx   eax, al
+    ret
+
+uefi_get_xhci_base:
+    mov     rax, [rel uefi_xhci_base]
     ret
 
 ; ---------------------------------------------------------------------------
