@@ -1,4 +1,7 @@
 fn serial_init(u16 port) {
+    if (uefi_present()) {
+        ret;
+    }
     out8(port + u16(1), u8(0x00));
     out8(port + u16(3), u8(0x80));
     out8(port + u16(0), u8(0x01));
@@ -8,7 +11,27 @@ fn serial_init(u16 port) {
     out8(port + u16(4), u8(0x0B));
 }
 
+extern fn u64 uefi_read_key();
+extern fn i64 uefi_present();
+extern fn i64 uefi_print(ptr<u16> s);
+extern fn i64 uefi_clear();
+extern fn i64 uefi_set_cursor_pos(i64 col, i64 row);
+extern fn ptr<u16> rt_uefi_tmp();
+extern fn i64 uefi_print_marker();
+extern fn ptr<u8> rt_uefi_line();
+extern fn ptr<u8> rt_uefi_last_line();
+extern fn ptr<u8> rt_uefi_hist_base();
+extern fn ptr<u8> rt_uefi_hist_len_base();
+extern fn ptr<u8> rt_uefi_edit_buf();
+extern fn ptr<u64> rt_ticks_ptr();
+extern fn ptr<u8> rt_kbd_head_ptr();
+extern fn ptr<u8> rt_kbd_tail_ptr();
+extern fn ptr<u8> rt_kbd_buf_ptr();
+
 fn serial_write_byte(u16 port, u8 b) {
+    if (uefi_present()) {
+        ret;
+    }
     while ((in8(port + u16(5)) & u8(0x20)) == u8(0)) {
     }
     out8(port, b);
@@ -24,6 +47,35 @@ fn serial_write_backspace(u16 port) {
     serial_write_byte(port, u8(0x20));
     serial_write_byte(port, u8(0x08));
 }
+
+fn uefi_putc(u8 c) {
+    if (!uefi_present()) {
+        ret;
+    }
+    ptr<u16> tmp = rt_uefi_tmp();
+    if (c == u8(0x0A)) {
+        *(tmp + 0) = u16(0x0D);
+        *(tmp + 1) = u16(0x0A);
+        *(tmp + 2) = u16(0);
+        i64 st = uefi_print(tmp);
+        st = st;
+        ret;
+    }
+    if (c == u8(0x08)) {
+        *(tmp + 0) = u16(0x08);
+        *(tmp + 1) = u16(0x20);
+        *(tmp + 2) = u16(0x08);
+        *(tmp + 3) = u16(0);
+        i64 st2 = uefi_print(tmp);
+        st2 = st2;
+        ret;
+    }
+    *(tmp + 0) = u16(c);
+    *(tmp + 1) = u16(0);
+    i64 st3 = uefi_print(tmp);
+    st3 = st3;
+}
+
 
 fn serial_write_kernel_start(u16 port) {
     serial_write_byte(port, u8(0x6B));
@@ -77,6 +129,28 @@ fn serial_write_kernel_halt(u16 port) {
     serial_write_newline(port);
 }
 
+fn irq_timer_tick() {
+    ptr<u64> ticks = rt_ticks_ptr();
+    u64 t = volatile_load(ticks);
+    t += u64(1);
+    volatile_store(ticks, t);
+}
+
+fn irq_kbd_push(u64 sc) {
+    ptr<u8> buf = rt_kbd_buf_ptr();
+    ptr<u8> headp = rt_kbd_head_ptr();
+    ptr<u8> tailp = rt_kbd_tail_ptr();
+    u8 head = volatile_load(headp);
+    u8 tail = volatile_load(tailp);
+    u8 next = u8((u64(head) + u64(1)) & u64(63));
+    if (next == tail) {
+        ret;
+    }
+    *(buf + u64(head)) = u8(sc);
+    volatile_store(headp, next);
+    ret;
+}
+
 fn panic(str msg) {
     print("PANIC: ", msg, "\n");
     asm0("cli");
@@ -99,6 +173,30 @@ fn u8 kbd_read_scancode() {
         ret u8(0);
     }
     ret in8(u16(0x60));
+}
+
+fn kbd_flush() {
+    u8 st = in8(u16(0x64));
+    while ((st & u8(0x01)) != u8(0)) {
+        u8 drop = in8(u16(0x60));
+        drop = drop;
+        st = in8(u16(0x64));
+    }
+}
+
+fn u8 kbd_read_scancode_irq() {
+    ptr<u8> buf = ptr<u8>(0x01002000);
+    ptr<u8> headp = ptr<u8>(0x01001008);
+    ptr<u8> tailp = ptr<u8>(0x01001009);
+    u8 head = volatile_load(headp);
+    u8 tail = volatile_load(tailp);
+    if (head == tail) {
+        ret u8(0);
+    }
+    u8 sc = *(buf + u64(tail));
+    tail = u8((u64(tail) + u64(1)) & u64(63));
+    volatile_store(tailp, tail);
+    ret sc;
 }
 
 fn u8 kbd_scancode_to_ascii(u8 sc, i64 shift) {
@@ -159,6 +257,9 @@ fn u8 kbd_scancode_to_ascii(u8 sc, i64 shift) {
 }
 
 fn tty_scroll(ptr<u16> vga, u16 attr) {
+    if (uefi_present()) {
+        ret;
+    }
     i64 i = 0;
     while (i < 1920) {
         u16 v = volatile_load(vga + i + 80);
@@ -173,6 +274,13 @@ fn tty_scroll(ptr<u16> vga, u16 attr) {
 }
 
 fn tty_clear(ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr) {
+    if (uefi_present()) {
+        i64 st = uefi_clear();
+        st = st;
+        *rowp = 0;
+        *colp = 0;
+        ret;
+    }
     i64 i = 0;
     while (i < 2000) {
         volatile_store(vga + i, u16(0x20) | attr);
@@ -183,18 +291,28 @@ fn tty_clear(ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr) {
 }
 
 fn tty_putc(ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr, u8 c) {
+    i64 is_uefi = uefi_present();
     i64 row = *rowp;
     i64 col = *colp;
     i64 idx = 0;
 
     if (c == u8(0x0A)) {
+        if (is_uefi) {
+            uefi_putc(c);
+        }
         col = 0;
         row += 1;
     } else {
         if (c == u8(0x0D)) {
+            if (is_uefi) {
+                uefi_putc(c);
+            }
             col = 0;
         } else {
             if (c == u8(0x08)) {
+                if (is_uefi) {
+                    uefi_putc(c);
+                }
                 if (col > 0) {
                     col -= 1;
                 } else {
@@ -205,11 +323,17 @@ fn tty_putc(ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr, u8 c) {
                         col = 0;
                     }
                 }
-                idx = row * 80 + col;
-                volatile_store(vga + idx, u16(0x20) | attr);
+                if (!is_uefi) {
+                    idx = row * 80 + col;
+                    volatile_store(vga + idx, u16(0x20) | attr);
+                }
             } else {
-                idx = row * 80 + col;
-                volatile_store(vga + idx, u16(c) | attr);
+                if (is_uefi) {
+                    uefi_putc(c);
+                } else {
+                    idx = row * 80 + col;
+                    volatile_store(vga + idx, u16(c) | attr);
+                }
                 col += 1;
             }
         }
@@ -252,6 +376,10 @@ fn line_copy(ptr<u8> dst, ptr<u8> src, i64 len) {
 fn line_redraw(ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr, i64 line_row, i64 line_col, ptr<u8> buf, i64 len, i64 prev_len, i64 cur) {
     *rowp = line_row;
     *colp = line_col;
+    if (uefi_present()) {
+        i64 st = uefi_set_cursor_pos(line_col, line_row);
+        st = st;
+    }
 
     i64 i = 0;
     while (i < len) {
@@ -276,6 +404,10 @@ fn line_redraw(ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr, i64 line_ro
     }
     *rowp = row;
     *colp = col;
+    if (uefi_present()) {
+        i64 st2 = uefi_set_cursor_pos(col, row);
+        st2 = st2;
+    }
 }
 
 fn line_clear_display(ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr, u16 com1, i64 len) {
@@ -563,34 +695,58 @@ fn run_command(ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr, u16 com1, p
     serial_log_cmd_unknown(com1);
     tty_putc(vga, rowp, colp, attr, u8(0x3F));
     tty_putc(vga, rowp, colp, attr, u8(0x0A));
+    ret;
 }
 
 fn _start() {
    // i64 x=1;
   //  x/=0;
+    if (uefi_present()) {
+        uefi_putc(u8(0x4B)); // 'K'
+    }
     u16 com1 = u16(0x3F8);
     serial_init(com1);
     serial_write_kernel_start(com1);
+    i64 uefi = uefi_present();
+    if (uefi) {
+        uefi_putc(u8(0x31)); // '1'
+    }
 
     ptr<u16> vga = ptr<u16>(0xB8000);
     u16 attr = u16(0x0F00);
-    i64 i = 0;
-    while (i < 2000) {
-        volatile_store(vga + i, u16(0x20) | attr);
-        i += 1;
+    if (!uefi) {
+        i64 i = 0;
+        while (i < 2000) {
+            volatile_store(vga + i, u16(0x20) | attr);
+            i += 1;
+        }
+
+        i64 base = 996;
+        volatile_store(vga + base + 0, u16(0x45) | attr);
+        volatile_store(vga + base + 1, u16(0x4C) | attr);
+        volatile_store(vga + base + 2, u16(0x46) | attr);
+        volatile_store(vga + base + 3, u16(0x49) | attr);
+        volatile_store(vga + base + 4, u16(0x52) | attr);
+        volatile_store(vga + base + 5, u16(0x20) | attr);
+        volatile_store(vga + base + 6, u16(0x4F) | attr);
+        volatile_store(vga + base + 7, u16(0x4B) | attr);
     }
 
-    i64 base = 996;
-    volatile_store(vga + base + 0, u16(0x45) | attr);
-    volatile_store(vga + base + 1, u16(0x4C) | attr);
-    volatile_store(vga + base + 2, u16(0x46) | attr);
-    volatile_store(vga + base + 3, u16(0x49) | attr);
-    volatile_store(vga + base + 4, u16(0x52) | attr);
-    volatile_store(vga + base + 5, u16(0x20) | attr);
-    volatile_store(vga + base + 6, u16(0x4F) | attr);
-    volatile_store(vga + base + 7, u16(0x4B) | attr);
-
     serial_write_kernel_init_ok(com1);
+
+    volatile_store(rt_ticks_ptr(), u64(0));
+    volatile_store(rt_kbd_head_ptr(), u8(0));
+    volatile_store(rt_kbd_tail_ptr(), u8(0));
+    kbd_flush();
+    i64 enable_irq = 1;
+    i64 use_irq_kbd = enable_irq;
+    if (uefi) {
+        enable_irq = 0;
+        use_irq_kbd = 0;
+    }
+    if (enable_irq) {
+        asm0("sti");
+    }
 
     // Exception test scaffolding (enable one at a time)
     // #DE divide-by-zero (enabled)
@@ -637,11 +793,11 @@ fn _start() {
     ptr<i64> colp = &col;
     i64 shift = 0;
 
-    ptr<u8> line = ptr<u8>(0x90000);
-    ptr<u8> last_line = ptr<u8>(0x90100);
-    ptr<u8> hist_base = ptr<u8>(0x90200);
-    ptr<u8> hist_len_base = ptr<u8>(0x90A00);
-    ptr<u8> edit_buf = ptr<u8>(0x90A20);
+    ptr<u8> line = rt_uefi_line();
+    ptr<u8> last_line = rt_uefi_last_line();
+    ptr<u8> hist_base = rt_uefi_hist_base();
+    ptr<u8> hist_len_base = rt_uefi_hist_len_base();
+    ptr<u8> edit_buf = rt_uefi_edit_buf();
     i64 len = 0;
     i64 last_len = 0;
     i64 prev_len = 0;
@@ -664,7 +820,151 @@ fn _start() {
 
     i64 one = 1;
     while (one) {
-        u8 sc = kbd_read_scancode();
+        u64 key = u64(0);
+        u16 uefi_uc = u16(0);
+        u16 uefi_sc = u16(0);
+        if (uefi) {
+            key = uefi_read_key();
+            if (key != u64(0)) {
+                uefi_uc = u16(key & u64(0xFFFF));
+                uefi_sc = u16((key >> u64(16)) & u64(0xFFFF));
+            }
+        }
+        if (uefi && ((uefi_uc != u16(0)) || (uefi_sc != u16(0)))) {
+            if (uefi_sc != u16(0)) {
+                if (uefi_sc == u16(1)) {
+                    if (hist_count > 0) {
+                        serial_log_key_up(com1);
+                        if (hist_nav < 0) {
+                            line_copy(edit_buf, line, len);
+                            edit_len = len;
+                            hist_nav = hist_head - 1;
+                            if (hist_nav < 0) { hist_nav += 8; }
+                        } else {
+                        i64 uefi_oldest = hist_head - hist_count;
+                        while (uefi_oldest < 0) { uefi_oldest += 8; }
+                        if (hist_nav != uefi_oldest) {
+                            hist_nav = hist_nav - 1;
+                            if (hist_nav < 0) { hist_nav += 8; }
+                        }
+                    }
+                    ptr<u8> uefi_src = hist_entry_ptr(hist_base, hist_nav);
+                    len = hist_get_len(hist_len_base, hist_nav);
+                    line_copy(line, uefi_src, len);
+                    cur = len;
+                    line_redraw(vga, rowp, colp, attr, line_row, line_col, line, len, prev_len, cur);
+                    prev_len = len;
+                    }
+                } else {
+                    if (uefi_sc == u16(2)) {
+                        if (hist_nav >= 0) {
+                            serial_log_key_down(com1);
+                            i64 newest = hist_head - 1;
+                            if (newest < 0) { newest += 8; }
+                            if (hist_nav == newest) {
+                                hist_nav = -1;
+                                line_copy(line, edit_buf, edit_len);
+                                len = edit_len;
+                            } else {
+                                hist_nav = hist_nav + 1;
+                                if (hist_nav >= 8) { hist_nav -= 8; }
+                                ptr<u8> src2 = hist_entry_ptr(hist_base, hist_nav);
+                                len = hist_get_len(hist_len_base, hist_nav);
+                                line_copy(line, src2, len);
+                            }
+                            cur = len;
+                            line_redraw(vga, rowp, colp, attr, line_row, line_col, line, len, prev_len, cur);
+                            prev_len = len;
+                        }
+                    } else {
+                        if (uefi_sc == u16(4)) {
+                            if (cur > 0) {
+                                serial_log_key_left(com1);
+                                cur -= 1;
+                                line_redraw(vga, rowp, colp, attr, line_row, line_col, line, len, prev_len, cur);
+                            }
+                        } else {
+                            if (uefi_sc == u16(3)) {
+                                if (cur < len) {
+                                    serial_log_key_right(com1);
+                                    cur += 1;
+                                    line_redraw(vga, rowp, colp, attr, line_row, line_col, line, len, prev_len, cur);
+                                }
+                            }
+                        }
+                    }
+                }
+                continue;
+            }
+            if (uefi_uc != u16(0)) {
+                u8 uefi_ch = u8(uefi_uc);
+                if (uefi_ch == u8(0x0D)) { uefi_ch = u8(0x0A); }
+                if (uefi_ch == u8(0x08)) {
+                    if (cur > 0) {
+                        i64 uefi_k = cur - 1;
+                        while (uefi_k < len - 1) {
+                            *(line + uefi_k) = *(line + uefi_k + 1);
+                            uefi_k += 1;
+                        }
+                        len -= 1;
+                        cur -= 1;
+                        line_redraw(vga, rowp, colp, attr, line_row, line_col, line, len, prev_len, cur);
+                        prev_len = len;
+                    }
+                    continue;
+                }
+                if (uefi_ch == u8(0x0A)) {
+                    serial_write_newline(com1);
+                    tty_putc(vga, rowp, colp, attr, uefi_ch);
+                    if (len > 0) {
+                        line_copy(last_line, line, len);
+                        last_len = len;
+                        ptr<u8> uefi_dst = hist_entry_ptr(hist_base, hist_head);
+                        line_copy(uefi_dst, line, len);
+                        hist_set_len(hist_len_base, hist_head, len);
+                        hist_head += 1;
+                        if (hist_head >= 8) { hist_head = 0; }
+                        if (hist_count < 8) { hist_count += 1; }
+                    }
+                    run_command(vga, rowp, colp, attr, com1, line, len);
+                    len = 0;
+                    cur = 0;
+                    prev_len = 0;
+                    hist_nav = -1;
+                    tty_write_prompt(vga, rowp, colp, attr);
+                    line_row = *rowp;
+                    line_col = *colp;
+                    serial_write_byte(com1, u8(0x3E));
+                    serial_write_byte(com1, u8(0x20));
+                    continue;
+                }
+                if (uefi_ch < u8(0x20)) {
+                    continue;
+                }
+                if (len >= cap - 1) {
+                    continue;
+                }
+                i = len;
+                while (i > cur) {
+                    *(line + i) = *(line + i - 1);
+                    i -= 1;
+                }
+                *(line + cur) = uefi_ch;
+                len += 1;
+                cur += 1;
+                serial_write_byte(com1, uefi_ch);
+                line_redraw(vga, rowp, colp, attr, line_row, line_col, line, len, prev_len, cur);
+                prev_len = len;
+                continue;
+            }
+        }
+
+        u8 sc = u8(0);
+        if (use_irq_kbd) {
+            sc = kbd_read_scancode_irq();
+        } else {
+            sc = kbd_read_scancode();
+        }
         if (sc == u8(0)) {
             continue;
         }
@@ -685,9 +985,9 @@ fn _start() {
                         hist_nav = hist_head - 1;
                         if (hist_nav < 0) { hist_nav += 8; }
                     } else {
-                        i64 oldest = hist_head - hist_count;
-                        while (oldest < 0) { oldest += 8; }
-                        if (hist_nav != oldest) {
+                        i64 oldest2 = hist_head - hist_count;
+                        while (oldest2 < 0) { oldest2 += 8; }
+                        if (hist_nav != oldest2) {
                             hist_nav = hist_nav - 1;
                             if (hist_nav < 0) { hist_nav += 8; }
                         }
@@ -703,18 +1003,18 @@ fn _start() {
                 if (sc == u8(0x50)) {
                     if (hist_nav >= 0) {
                         serial_log_key_down(com1);
-                        i64 newest = hist_head - 1;
-                        if (newest < 0) { newest += 8; }
-                        if (hist_nav == newest) {
+                        i64 uefi_newest = hist_head - 1;
+                        if (uefi_newest < 0) { uefi_newest += 8; }
+                        if (hist_nav == uefi_newest) {
                             hist_nav = -1;
                             line_copy(line, edit_buf, edit_len);
                             len = edit_len;
                         } else {
                             hist_nav = hist_nav + 1;
                             if (hist_nav >= 8) { hist_nav -= 8; }
-                            ptr<u8> src2 = hist_entry_ptr(hist_base, hist_nav);
+                            ptr<u8> uefi_src2 = hist_entry_ptr(hist_base, hist_nav);
                             len = hist_get_len(hist_len_base, hist_nav);
-                            line_copy(line, src2, len);
+                            line_copy(line, uefi_src2, len);
                         }
                         cur = len;
                         line_redraw(vga, rowp, colp, attr, line_row, line_col, line, len, prev_len, cur);

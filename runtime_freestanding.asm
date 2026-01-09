@@ -8,6 +8,24 @@ global rt_str_copy
 global rt_str_concat
 global rt_str_free
 global idt_init
+global pic_init
+global rt_uefi_tmp
+global rt_uefi_line
+global rt_uefi_last_line
+global rt_uefi_hist_base
+global rt_uefi_hist_len_base
+global rt_uefi_edit_buf
+global rt_ticks_ptr
+global rt_kbd_head_ptr
+global rt_kbd_tail_ptr
+global rt_kbd_buf_ptr
+global uefi_present:weak
+global uefi_read_key:weak
+global uefi_print:weak
+global uefi_clear:weak
+global uefi_set_cursor_pos:weak
+extern irq_timer_tick
+extern irq_kbd_push
 
 %define COM1 0x3F8
 %define VGA_BASE 0xB8000
@@ -20,6 +38,21 @@ alignb 4
 rt_vga_row: resd 1
 rt_vga_col: resd 1
 rt_serial_ready: resb 1
+alignb 2
+rt_uefi_tmp_buf: resw 4
+alignb 8
+rt_uefi_line_buf: resb 256
+rt_uefi_last_line_buf: resb 256
+rt_uefi_hist_buf: resb 256 * 8
+rt_uefi_hist_len_buf: resb 8
+rt_uefi_edit_buf_mem: resb 256
+alignb 8
+rt_ticks: resq 1
+alignb 1
+rt_kbd_head: resb 1
+rt_kbd_tail: resb 1
+alignb 1
+rt_kbd_buf: resb 64
 alignb 8
 rt_str_heap_pos: resq 1
 alignb 16
@@ -139,6 +172,46 @@ idt_desc:
 
 section .text
 
+rt_uefi_tmp:
+    lea     rax, [rel rt_uefi_tmp_buf]
+    ret
+
+rt_uefi_line:
+    lea     rax, [rel rt_uefi_line_buf]
+    ret
+
+rt_uefi_last_line:
+    lea     rax, [rel rt_uefi_last_line_buf]
+    ret
+
+rt_uefi_hist_base:
+    lea     rax, [rel rt_uefi_hist_buf]
+    ret
+
+rt_uefi_hist_len_base:
+    lea     rax, [rel rt_uefi_hist_len_buf]
+    ret
+
+rt_uefi_edit_buf:
+    lea     rax, [rel rt_uefi_edit_buf_mem]
+    ret
+
+rt_ticks_ptr:
+    lea     rax, [rel rt_ticks]
+    ret
+
+rt_kbd_head_ptr:
+    lea     rax, [rel rt_kbd_head]
+    ret
+
+rt_kbd_tail_ptr:
+    lea     rax, [rel rt_kbd_tail]
+    ret
+
+rt_kbd_buf_ptr:
+    lea     rax, [rel rt_kbd_buf]
+    ret
+
 rt_serial_init_if_needed:
     mov     al, [rt_serial_ready]
     cmp     al, 1
@@ -230,8 +303,13 @@ rt_print_bytes:
     push    rbx
     push    r12
     push    r13
+    push    r15
 
     call    rt_serial_init_if_needed
+    xor     r15d, r15d
+    call    uefi_present
+    test    eax, eax
+    setne   r15b
     mov     rbx, rdi
     mov     r12, rsi
 
@@ -251,14 +329,18 @@ rt_print_bytes:
     mov     al, r13b
     out     dx, al
 
+    test    r15b, r15b
+    jnz     .skip_vga
     mov     al, r13b
     call    rt_vga_putc_al
+.skip_vga:
 
     inc     rbx
     dec     r12
     jmp     .loop
 
 .done:
+    pop     r15
     pop     r13
     pop     r12
     pop     rbx
@@ -322,9 +404,36 @@ idt_init:
     mov     rdi, 14
     lea     rsi, [rel isr_pf]
     call    idt_set_entry
+    mov     rdi, 32
+    lea     rsi, [rel irq0_stub]
+    call    idt_set_entry
+    mov     rdi, 33
+    lea     rsi, [rel irq1_stub]
+    call    idt_set_entry
 
     lidt    [rel idt_desc]
     pop     rbx
+    ret
+
+pic_init:
+    mov     al, 0x11
+    out     0x20, al
+    out     0xA0, al
+    mov     al, 0x20
+    out     0x21, al
+    mov     al, 0x28
+    out     0xA1, al
+    mov     al, 0x04
+    out     0x21, al
+    mov     al, 0x02
+    out     0xA1, al
+    mov     al, 0x01
+    out     0x21, al
+    out     0xA1, al
+    mov     al, 0xFC
+    out     0x21, al
+    mov     al, 0xFF
+    out     0xA1, al
     ret
 
 isr_de:
@@ -446,6 +555,86 @@ isr_common:
     hlt
     jmp     .halt
 
+irq0_stub:
+    push    rax
+    push    rcx
+    push    rdx
+    push    rbx
+    push    rbp
+    push    rsi
+    push    rdi
+    push    r8
+    push    r9
+    push    r10
+    push    r11
+    push    r12
+    push    r13
+    push    r14
+    push    r15
+    call    irq_timer_tick
+    mov     al, 0x20
+    out     0x20, al
+    pop     r15
+    pop     r14
+    pop     r13
+    pop     r12
+    pop     r11
+    pop     r10
+    pop     r9
+    pop     r8
+    pop     rdi
+    pop     rsi
+    pop     rbp
+    pop     rbx
+    pop     rdx
+    pop     rcx
+    pop     rax
+    iretq
+
+irq1_stub:
+    push    rax
+    push    rcx
+    push    rdx
+    push    rbx
+    push    rbp
+    push    rsi
+    push    rdi
+    push    r8
+    push    r9
+    push    r10
+    push    r11
+    push    r12
+    push    r13
+    push    r14
+    push    r15
+    in      al, 0x64
+    test    al, 0x01
+    jz      .irq1_done
+    in      al, 0x60
+    movzx   rax, al
+    push    rax
+    call    irq_kbd_push
+    add     rsp, 8
+.irq1_done:
+    mov     al, 0x20
+    out     0x20, al
+    pop     r15
+    pop     r14
+    pop     r13
+    pop     r12
+    pop     r11
+    pop     r10
+    pop     r9
+    pop     r8
+    pop     rdi
+    pop     rsi
+    pop     rbp
+    pop     rbx
+    pop     rdx
+    pop     rcx
+    pop     rax
+    iretq
+
 rt_print_hex_u64_raw:
     push    rbx
     sub     rsp, 16
@@ -555,4 +744,26 @@ rt_str_concat:
 ; rt_str_free: no-op in freestanding
 ; in: rdi=ptr, rsi=len
 rt_str_free:
+    ret
+
+; Weak stub: real UEFI build overrides this in uefi_entry.asm.
+uefi_present:
+    xor     eax, eax
+    ret
+
+; Weak stubs for non-UEFI builds.
+uefi_read_key:
+    xor     eax, eax
+    ret
+
+uefi_print:
+    mov     eax, 1
+    ret
+
+uefi_clear:
+    mov     eax, 1
+    ret
+
+uefi_set_cursor_pos:
+    mov     eax, 1
     ret

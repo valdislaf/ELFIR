@@ -67,6 +67,12 @@ Extra for running ISO in QEMU:
 sudo apt install -y qemu-system-x86
 ```
 
+Extra for UEFI loader builds:
+
+```bash
+sudo apt install -y gnu-efi
+```
+
 ## Quick Start
 
 1) Build the compiler
@@ -117,6 +123,28 @@ Freestanding build (kernel-style):
 ```bash
 make freestanding
 ```
+
+UEFI build (USB keyboard via firmware):
+
+```bash
+make uefi
+```
+
+Create a USB-ready folder structure:
+
+```bash
+make uefi-usb
+```
+
+Copy `uefi_usb/` contents to the root of a FAT32 USB stick. The loader is placed at `EFI/BOOT/BOOTX64.EFI` and the kernel at `kernel_uefi.elf`.
+
+Create a UEFI-bootable ISO (for Rufus or similar):
+
+```bash
+make uefi-iso
+```
+
+This produces `elfir_uefi.iso` from the `uefi_usb/` layout. Requires `xorriso`, `dosfstools` (mkfs.fat), and `mtools` (mcopy/mmd).
 
 Expected output:
 

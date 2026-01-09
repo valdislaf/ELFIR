@@ -10,7 +10,7 @@ There is no bytecode format; the compiler emits x86-64 NASM assembly.
 - Identifiers: `[A-Za-z_][A-Za-z0-9_]*`.
 - Keywords:
   fn, auto, ret, i64, d64, str, void, u8, u16, u32, u64, ptr, if, else, elseif,
-  while, for, break, continue, null
+  while, for, break, continue, null, extern
 - Builtin function names (not keywords):
   print, print_i64, print_d64, print_str, print_hex,
   sqrt, pow, min, max, abs, sin, cos, tan, pi,
@@ -47,8 +47,9 @@ Sizes:
 
 3) Grammar (informal)
 
-program    := function*
+program    := (function | extern_fn)*
 function   := ("void" "fn" | "fn") [ret_type] ident "(" params? ")" "{" stmt* "}"
+extern_fn  := "extern" ("void" "fn" | "fn") [ret_type] ident "(" params? ")" ";"
 ret_type   := type
 params     := param ("," param)*
 param      := type ident
@@ -157,6 +158,7 @@ Printing:
 Functions:
 - Non-void functions must contain at least one `ret <expr>;` (compile-time error otherwise).
 - `for` init is limited to `auto` or an explicit type declaration (no assignments).
+- `extern fn` declares a function signature without a body; it must be provided by linked objects.
 
 Comparisons / logic:
 - Integer comparisons return 0/1 (i64).
