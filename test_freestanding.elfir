@@ -71,6 +71,15 @@ fn serial_write_kernel_halt(u16 port) {
     serial_write_newline(port);
 }
 
+fn panic(str msg) {
+    print("PANIC: ", msg, "\n");
+    asm0("cli");
+    i64 one = 1;
+    while (one) {
+        asm0("hlt");
+    }
+}
+
 fn _start() {
     u16 com1 = u16(0x3F8);
     serial_init(com1);

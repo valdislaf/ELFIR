@@ -19,6 +19,9 @@ out.o: out.asm
 runtime.o: runtime.asm
 	$(NASM) -felf64 $< -o $@
 
+runtime_freestanding.o: runtime_freestanding.asm
+	$(NASM) -felf64 $< -o $@
+
 prog: out.o runtime.o
 	$(LD) $^ -o $@
 	./prog
@@ -29,16 +32,16 @@ out_freestanding.asm: test_freestanding.elfir elfirc
 out_freestanding.o: out_freestanding.asm
 	$(NASM) -felf64 $< -o $@
 
-prog_freestanding: out_freestanding.o
-	$(LD) -e _start $< -o $@
+prog_freestanding: out_freestanding.o runtime_freestanding.o
+	$(LD) -e _start $^ -o $@
 
 freestanding: prog_freestanding
 
 boot.o: boot.asm
 	$(NASM) -felf64 $< -o $@
 
-kernel.elf: boot.o out_freestanding.o linker.ld
-	$(LD) -T linker.ld -o $@ boot.o out_freestanding.o
+kernel.elf: boot.o out_freestanding.o runtime_freestanding.o linker.ld
+	$(LD) -T linker.ld -o $@ boot.o out_freestanding.o runtime_freestanding.o
 
 elfir.iso: kernel.elf grub.cfg
 	mkdir -p iso/boot/grub
@@ -52,4 +55,4 @@ run-iso: elfir.iso
 	qemu-system-x86_64 -cdrom $<
 
 clean:
-	rm -f elfirc out.asm out.o runtime.o prog out_freestanding.asm out_freestanding.o prog_freestanding boot.o kernel.elf elfir.iso
+	rm -f elfirc out.asm out.o runtime.o runtime_freestanding.o prog out_freestanding.asm out_freestanding.o prog_freestanding boot.o kernel.elf elfir.iso

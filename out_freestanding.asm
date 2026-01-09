@@ -14,6 +14,11 @@ extern rt_str_concat
 extern rt_str_copy
 extern rt_str_free
 
+section .rodata
+
+panic_str0: db 80, 65, 78, 73, 67, 58, 32
+panic_str1: db 10
+
 section .text
 
 serial_init:
@@ -588,6 +593,63 @@ serial_write_kernel_halt:
     push rax
     call serial_write_newline
     add  rsp, 8
+    leave
+    ret
+
+panic:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  rdx, [rbp+24]
+    test rdx, rdx
+    jns  .param_str_ok_0
+    neg  rdx
+    dec  rdx
+.param_str_ok_0:
+    mov  [rbp-8], rax
+    mov  [rbp-16], rdx
+    lea  rdi, [rel panic_str0]
+    mov  rsi, 7
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    mov  rdi, [rbp-8]
+    mov  rsi, [rbp-16]
+    test rsi, rsi
+    jns  .str_len_ok_1
+    neg  rsi
+    dec  rsi
+.str_len_ok_1:
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    lea  rdi, [rel panic_str1]
+    mov  rsi, 1
+    sub  rsp, 8
+    call rt_print_bytes
+    add  rsp, 8
+    cli
+    mov  rax, 1
+    mov  [rbp-24], rax
+.while_start_2:
+    mov  rax, [rbp-24]
+    cmp  rax, 0
+    je   .while_end_3
+    hlt
+    jmp  .while_start_2
+.while_end_3:
+    mov  rax, [rbp-16]
+    test rax, rax
+    jns  .str_free_done_4
+    mov  rsi, rax
+    neg  rsi
+    dec  rsi
+    mov  rdi, [rbp-8]
+    sub  rsp, 8
+    call rt_str_free
+    add  rsp, 8
+.str_free_done_4:
     leave
     ret
 
