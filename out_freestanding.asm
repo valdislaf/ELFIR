@@ -656,7 +656,7 @@ panic:
 _start:
     push rbp
     mov  rbp, rsp
-    sub  rsp, 48
+    sub  rsp, 64
     mov  rax, 0x3F8
     and  rax, 0xFFFF
     and  rax, 0xFFFF
@@ -921,20 +921,38 @@ _start:
     push rax
     call serial_write_kernel_init_ok
     add  rsp, 8
+    mov  rax, 0x40000000
+    mov  [rbp-48], rax
+    mov  rax, [rbp-48]
+    mov  rax, qword [rax]
+    mov  [rbp-56], rax
+    mov  rax, [rbp-56]
+    push rax
+    mov  rax, 0
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_3
+    nop
+    jmp  .if_end_2
+.if_next_3:
+.if_end_2:
     mov  rax, [rbp-8]
     and  rax, 0xFFFF
     push rax
     call serial_write_kernel_halt
     add  rsp, 8
     mov  rax, 1
-    mov  [rbp-48], rax
-.while_start_2:
-    mov  rax, [rbp-48]
+    mov  [rbp-64], rax
+.while_start_4:
+    mov  rax, [rbp-64]
     cmp  rax, 0
-    je   .while_end_3
+    je   .while_end_5
     hlt
-    jmp  .while_start_2
-.while_end_3:
+    jmp  .while_start_4
+.while_end_5:
     leave
     ret
 

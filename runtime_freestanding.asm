@@ -32,11 +32,7 @@ idt_table: resb 256 * 16
 section .rodata
 msg_exc: db "EXCEPTION: "
 msg_exc_len: equ $ - msg_exc
-msg_de: db "#DE", 10
-msg_de_len: equ $ - msg_de
-msg_pf: db "#PF", 10
-msg_pf_len: equ $ - msg_pf
-msg_unk: db "#??", 10
+msg_unk: db "#??"
 msg_unk_len: equ $ - msg_unk
 msg_rip: db "RIP=0x"
 msg_rip_len: equ $ - msg_rip
@@ -44,9 +40,98 @@ msg_cr2: db " CR2=0x"
 msg_cr2_len: equ $ - msg_cr2
 msg_ec: db " EC=0x"
 msg_ec_len: equ $ - msg_ec
+msg_pfec: db "PFEC:"
+msg_pfec_len: equ $ - msg_pfec
+msg_p: db " P="
+msg_p_len: equ $ - msg_p
+msg_w: db " W="
+msg_w_len: equ $ - msg_w
+msg_u: db " U="
+msg_u_len: equ $ - msg_u
+msg_r: db " R="
+msg_r_len: equ $ - msg_r
+msg_i: db " I="
+msg_i_len: equ $ - msg_i
 msg_nl: db 10
 msg_nl_len: equ $ - msg_nl
 hex_table: db "0123456789ABCDEF"
+
+exc_name_ptrs:
+    dq exc_00, exc_01, exc_02, exc_03, exc_04, exc_05, exc_06, exc_07
+    dq exc_08, exc_09, exc_10, exc_11, exc_12, exc_13, exc_14, exc_15
+    dq exc_16, exc_17, exc_18, exc_19, exc_20, exc_21, exc_22, exc_23
+    dq exc_24, exc_25, exc_26, exc_27, exc_28, exc_29, exc_30, exc_31
+exc_name_lens:
+    dq exc_00_len, exc_01_len, exc_02_len, exc_03_len, exc_04_len, exc_05_len, exc_06_len, exc_07_len
+    dq exc_08_len, exc_09_len, exc_10_len, exc_11_len, exc_12_len, exc_13_len, exc_14_len, exc_15_len
+    dq exc_16_len, exc_17_len, exc_18_len, exc_19_len, exc_20_len, exc_21_len, exc_22_len, exc_23_len
+    dq exc_24_len, exc_25_len, exc_26_len, exc_27_len, exc_28_len, exc_29_len, exc_30_len, exc_31_len
+
+exc_00: db "#DE"
+exc_00_len: equ $ - exc_00
+exc_01: db "#DB"
+exc_01_len: equ $ - exc_01
+exc_02: db "#NMI"
+exc_02_len: equ $ - exc_02
+exc_03: db "#BP"
+exc_03_len: equ $ - exc_03
+exc_04: db "#OF"
+exc_04_len: equ $ - exc_04
+exc_05: db "#BR"
+exc_05_len: equ $ - exc_05
+exc_06: db "#UD"
+exc_06_len: equ $ - exc_06
+exc_07: db "#NM"
+exc_07_len: equ $ - exc_07
+exc_08: db "#DF"
+exc_08_len: equ $ - exc_08
+exc_09: db "#CSO"
+exc_09_len: equ $ - exc_09
+exc_10: db "#TS"
+exc_10_len: equ $ - exc_10
+exc_11: db "#NP"
+exc_11_len: equ $ - exc_11
+exc_12: db "#SS"
+exc_12_len: equ $ - exc_12
+exc_13: db "#GP"
+exc_13_len: equ $ - exc_13
+exc_14: db "#PF"
+exc_14_len: equ $ - exc_14
+exc_15: db "#RES"
+exc_15_len: equ $ - exc_15
+exc_16: db "#MF"
+exc_16_len: equ $ - exc_16
+exc_17: db "#AC"
+exc_17_len: equ $ - exc_17
+exc_18: db "#MC"
+exc_18_len: equ $ - exc_18
+exc_19: db "#XM"
+exc_19_len: equ $ - exc_19
+exc_20: db "#VE"
+exc_20_len: equ $ - exc_20
+exc_21: db "#CP"
+exc_21_len: equ $ - exc_21
+exc_22: db "#RES"
+exc_22_len: equ $ - exc_22
+exc_23: db "#RES"
+exc_23_len: equ $ - exc_23
+exc_24: db "#RES"
+exc_24_len: equ $ - exc_24
+exc_25: db "#RES"
+exc_25_len: equ $ - exc_25
+exc_26: db "#RES"
+exc_26_len: equ $ - exc_26
+exc_27: db "#RES"
+exc_27_len: equ $ - exc_27
+exc_28: db "#RES"
+exc_28_len: equ $ - exc_28
+exc_29: db "#RES"
+exc_29_len: equ $ - exc_29
+exc_30: db "#RES"
+exc_30_len: equ $ - exc_30
+exc_31: db "#RES"
+exc_31_len: equ $ - exc_31
+
 align 16
 idt_desc:
     dw (256 * 16) - 1
@@ -179,6 +264,29 @@ rt_print_bytes:
     pop     rbx
     ret
 
+rt_print_char_al:
+    sub     rsp, 16
+    mov     [rsp], al
+    mov     rdi, rsp
+    mov     rsi, 1
+    call    rt_print_bytes
+    add     rsp, 16
+    ret
+
+rt_print_bit_label:
+    ; rdi=label ptr, rsi=len, rdx=bit (0/1)
+    push    rbx
+    mov     rbx, rdx
+    call    rt_print_bytes
+    mov     al, '0'
+    test    rbx, rbx
+    jz      .emit
+    mov     al, '1'
+.emit:
+    call    rt_print_char_al
+    pop     rbx
+    ret
+
 idt_set_entry:
     ; rdi=vector, rsi=handler
     lea     rdx, [rel idt_table]
@@ -243,25 +351,23 @@ isr_common:
     mov     rsi, msg_exc_len
     call    rt_print_bytes
 
-    cmp     rbx, 0
-    je      .print_de
-    cmp     rbx, 14
-    je      .print_pf
+    cmp     rbx, 31
+    ja      .print_name_unk
+    lea     rdx, [rel exc_name_ptrs]
+    mov     rdi, [rdx + rbx*8]
+    lea     rdx, [rel exc_name_lens]
+    mov     rsi, [rdx + rbx*8]
+    call    rt_print_bytes
+    jmp     .print_name_done
+.print_name_unk:
     lea     rdi, [rel msg_unk]
     mov     rsi, msg_unk_len
     call    rt_print_bytes
-    jmp     .print_rip
-.print_de:
-    lea     rdi, [rel msg_de]
-    mov     rsi, msg_de_len
-    call    rt_print_bytes
-    jmp     .print_rip
-.print_pf:
-    lea     rdi, [rel msg_pf]
-    mov     rsi, msg_pf_len
+.print_name_done:
+    lea     rdi, [rel msg_nl]
+    mov     rsi, msg_nl_len
     call    rt_print_bytes
 
-.print_rip:
     lea     rdi, [rel msg_rip]
     mov     rsi, msg_rip_len
     call    rt_print_bytes
@@ -287,6 +393,51 @@ isr_common:
     call    rt_print_hex_u64_raw
 
 .print_nl:
+    lea     rdi, [rel msg_nl]
+    mov     rsi, msg_nl_len
+    call    rt_print_bytes
+
+    cmp     rbx, 14
+    jne     .halt
+
+    lea     rdi, [rel msg_pfec]
+    mov     rsi, msg_pfec_len
+    call    rt_print_bytes
+
+    mov     rdx, r13
+    and     rdx, 1
+    lea     rdi, [rel msg_p]
+    mov     rsi, msg_p_len
+    call    rt_print_bit_label
+
+    mov     rdx, r13
+    shr     rdx, 1
+    and     rdx, 1
+    lea     rdi, [rel msg_w]
+    mov     rsi, msg_w_len
+    call    rt_print_bit_label
+
+    mov     rdx, r13
+    shr     rdx, 2
+    and     rdx, 1
+    lea     rdi, [rel msg_u]
+    mov     rsi, msg_u_len
+    call    rt_print_bit_label
+
+    mov     rdx, r13
+    shr     rdx, 3
+    and     rdx, 1
+    lea     rdi, [rel msg_r]
+    mov     rsi, msg_r_len
+    call    rt_print_bit_label
+
+    mov     rdx, r13
+    shr     rdx, 4
+    and     rdx, 1
+    lea     rdi, [rel msg_i]
+    mov     rsi, msg_i_len
+    call    rt_print_bit_label
+
     lea     rdi, [rel msg_nl]
     mov     rsi, msg_nl_len
     call    rt_print_bytes

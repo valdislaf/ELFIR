@@ -107,14 +107,43 @@ fn _start() {
 
     serial_write_kernel_init_ok(com1);
 
-   /* i64 do_pf = 1;
-    if (do_pf) {
-        ptr<u64> p = ptr<u64>(0x40000000);
-        u64 v = volatile_load(p);
-        if (v == u64(0)) {
-            asm0("nop");
-        }
-    }*/
+    // Exception test scaffolding (enable one at a time)
+    // #DE divide-by-zero (enabled)
+    /*  
+		i64 a = 1;
+		i64 b = 0;
+		i64 c = a / b;
+		if (c == 0) { asm0("nop"); } 
+	*/
+    // #DB debug (needs hardware debug regs / single-step)
+    // #NMI non-maskable interrupt (external)
+    // #BP breakpoint (needs int3 / asm)
+    // #OF overflow (needs INTO / asm, or crafted flags)
+    // #BR bound range (needs BOUND / asm)
+    // #UD invalid opcode (needs ud2 / asm)
+    // #NM device-not-available (disable TS then use FPU)
+    // #DF double fault (needs faulty handler / stack)
+    // #CSO coprocessor segment overrun (reserved)
+    // #TS invalid TSS (needs task switch / asm)
+    // #NP segment not present (needs segment setup / asm)
+    // #SS stack-segment fault (needs bad SS / asm)
+    // #GP general protection (bad segment or privilege / asm)
+    //
+    // #PF page fault  
+    /*	
+           ptr<u64> p = ptr<u64>(0x40000000);
+           u64 v = volatile_load(p);
+           if (v == u64(0)) { asm0("nop"); }    
+    */		   
+    //
+    // #RES reserved
+    // #MF x87 FPU error (use FPU + unmasked exception)
+    // #AC alignment check (needs CR0.AM + EFLAGS.AC)
+    // #MC machine check (hardware)
+    // #XM SIMD FP exception (use SSE + unmasked exception)
+    // #VE virtualization exception (VMX)
+    // #CP control protection (CET)
+    // #RES reserved (22-31)
 
     serial_write_kernel_halt(com1);
     i64 one = 1;
