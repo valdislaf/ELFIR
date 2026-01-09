@@ -1,4 +1,81 @@
+fn serial_init(u16 port) {
+    out8(port + u16(1), u8(0x00));
+    out8(port + u16(3), u8(0x80));
+    out8(port + u16(0), u8(0x01));
+    out8(port + u16(1), u8(0x00));
+    out8(port + u16(3), u8(0x03));
+    out8(port + u16(2), u8(0xC7));
+    out8(port + u16(4), u8(0x0B));
+}
+
+fn serial_write_byte(u16 port, u8 b) {
+    while ((in8(port + u16(5)) & u8(0x20)) == u8(0)) {
+    }
+    out8(port, b);
+}
+
+fn serial_write_newline(u16 port) {
+    serial_write_byte(port, u8(0x0D));
+    serial_write_byte(port, u8(0x0A));
+}
+
+fn serial_write_kernel_start(u16 port) {
+    serial_write_byte(port, u8(0x6B));
+    serial_write_byte(port, u8(0x65));
+    serial_write_byte(port, u8(0x72));
+    serial_write_byte(port, u8(0x6E));
+    serial_write_byte(port, u8(0x65));
+    serial_write_byte(port, u8(0x6C));
+    serial_write_byte(port, u8(0x3A));
+    serial_write_byte(port, u8(0x20));
+    serial_write_byte(port, u8(0x73));
+    serial_write_byte(port, u8(0x74));
+    serial_write_byte(port, u8(0x61));
+    serial_write_byte(port, u8(0x72));
+    serial_write_byte(port, u8(0x74));
+    serial_write_newline(port);
+}
+
+fn serial_write_kernel_init_ok(u16 port) {
+    serial_write_byte(port, u8(0x6B));
+    serial_write_byte(port, u8(0x65));
+    serial_write_byte(port, u8(0x72));
+    serial_write_byte(port, u8(0x6E));
+    serial_write_byte(port, u8(0x65));
+    serial_write_byte(port, u8(0x6C));
+    serial_write_byte(port, u8(0x3A));
+    serial_write_byte(port, u8(0x20));
+    serial_write_byte(port, u8(0x69));
+    serial_write_byte(port, u8(0x6E));
+    serial_write_byte(port, u8(0x69));
+    serial_write_byte(port, u8(0x74));
+    serial_write_byte(port, u8(0x20));
+    serial_write_byte(port, u8(0x6F));
+    serial_write_byte(port, u8(0x6B));
+    serial_write_newline(port);
+}
+
+fn serial_write_kernel_halt(u16 port) {
+    serial_write_byte(port, u8(0x6B));
+    serial_write_byte(port, u8(0x65));
+    serial_write_byte(port, u8(0x72));
+    serial_write_byte(port, u8(0x6E));
+    serial_write_byte(port, u8(0x65));
+    serial_write_byte(port, u8(0x6C));
+    serial_write_byte(port, u8(0x3A));
+    serial_write_byte(port, u8(0x20));
+    serial_write_byte(port, u8(0x68));
+    serial_write_byte(port, u8(0x61));
+    serial_write_byte(port, u8(0x6C));
+    serial_write_byte(port, u8(0x74));
+    serial_write_newline(port);
+}
+
 fn _start() {
+    u16 com1 = u16(0x3F8);
+    serial_init(com1);
+    serial_write_kernel_start(com1);
+
     ptr<u16> vga = ptr<u16>(0xB8000);
     u16 attr = u16(0x0F00);
     i64 i = 0;
@@ -17,6 +94,9 @@ fn _start() {
     volatile_store(vga + base + 6, u16(0x4F) | attr);
     volatile_store(vga + base + 7, u16(0x4B) | attr);
 
+    serial_write_kernel_init_ok(com1);
+
+    serial_write_kernel_halt(com1);
     i64 one = 1;
     while (one) {
         asm0("hlt");
