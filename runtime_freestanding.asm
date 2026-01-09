@@ -7,6 +7,7 @@ global rt_print_bytes
 global rt_str_copy
 global rt_str_concat
 global rt_str_free
+global idt_init
 
 %define COM1 0x3F8
 %define VGA_BASE 0xB8000
@@ -15,15 +16,41 @@ global rt_str_free
 %define VGA_ATTR 0x0F
 
 section .bss
-align 4
+alignb 4
 rt_vga_row: resd 1
 rt_vga_col: resd 1
 rt_serial_ready: resb 1
-align 8
+alignb 8
 rt_str_heap_pos: resq 1
-align 16
+alignb 16
 rt_str_heap: resb 65536
 rt_str_heap_end:
+
+alignb 16
+idt_table: resb 256 * 16
+
+section .rodata
+msg_exc: db "EXCEPTION: "
+msg_exc_len: equ $ - msg_exc
+msg_de: db "#DE", 10
+msg_de_len: equ $ - msg_de
+msg_pf: db "#PF", 10
+msg_pf_len: equ $ - msg_pf
+msg_unk: db "#??", 10
+msg_unk_len: equ $ - msg_unk
+msg_rip: db "RIP=0x"
+msg_rip_len: equ $ - msg_rip
+msg_cr2: db " CR2=0x"
+msg_cr2_len: equ $ - msg_cr2
+msg_ec: db " EC=0x"
+msg_ec_len: equ $ - msg_ec
+msg_nl: db 10
+msg_nl_len: equ $ - msg_nl
+hex_table: db "0123456789ABCDEF"
+align 16
+idt_desc:
+    dw (256 * 16) - 1
+    dq idt_table
 
 section .text
 
@@ -149,6 +176,142 @@ rt_print_bytes:
 .done:
     pop     r13
     pop     r12
+    pop     rbx
+    ret
+
+idt_set_entry:
+    ; rdi=vector, rsi=handler
+    lea     rdx, [rel idt_table]
+    mov     rax, rdi
+    shl     rax, 4
+    add     rdx, rax
+    mov     rax, rsi
+    mov     word [rdx + 0], ax
+    mov     word [rdx + 2], 0x08
+    mov     byte [rdx + 4], 0
+    mov     byte [rdx + 5], 0x8E
+    shr     rax, 16
+    mov     word [rdx + 6], ax
+    shr     rax, 16
+    mov     dword [rdx + 8], eax
+    mov     dword [rdx + 12], 0
+    ret
+
+idt_init:
+    push    rbx
+    xor     ebx, ebx
+.loop:
+    mov     rdi, rbx
+    lea     rsi, [rel isr_default]
+    call    idt_set_entry
+    inc     rbx
+    cmp     rbx, 256
+    jne     .loop
+
+    mov     rdi, 0
+    lea     rsi, [rel isr_de]
+    call    idt_set_entry
+    mov     rdi, 14
+    lea     rsi, [rel isr_pf]
+    call    idt_set_entry
+
+    lidt    [rel idt_desc]
+    pop     rbx
+    ret
+
+isr_de:
+    push    qword 0
+    push    qword 0
+    jmp     isr_common
+
+isr_pf:
+    push    qword 14
+    jmp     isr_common
+
+isr_default:
+    push    qword 0
+    push    qword 0xFF
+    jmp     isr_common
+
+isr_common:
+    cli
+    mov     rbx, [rsp]
+    mov     r13, [rsp + 8]
+    mov     r12, [rsp + 16]
+
+    lea     rdi, [rel msg_exc]
+    mov     rsi, msg_exc_len
+    call    rt_print_bytes
+
+    cmp     rbx, 0
+    je      .print_de
+    cmp     rbx, 14
+    je      .print_pf
+    lea     rdi, [rel msg_unk]
+    mov     rsi, msg_unk_len
+    call    rt_print_bytes
+    jmp     .print_rip
+.print_de:
+    lea     rdi, [rel msg_de]
+    mov     rsi, msg_de_len
+    call    rt_print_bytes
+    jmp     .print_rip
+.print_pf:
+    lea     rdi, [rel msg_pf]
+    mov     rsi, msg_pf_len
+    call    rt_print_bytes
+
+.print_rip:
+    lea     rdi, [rel msg_rip]
+    mov     rsi, msg_rip_len
+    call    rt_print_bytes
+
+    mov     rdi, r12
+    call    rt_print_hex_u64_raw
+
+    cmp     rbx, 14
+    jne     .print_nl
+
+    mov     rax, cr2
+    mov     r14, rax
+    lea     rdi, [rel msg_cr2]
+    mov     rsi, msg_cr2_len
+    call    rt_print_bytes
+    mov     rdi, r14
+    call    rt_print_hex_u64_raw
+
+    lea     rdi, [rel msg_ec]
+    mov     rsi, msg_ec_len
+    call    rt_print_bytes
+    mov     rdi, r13
+    call    rt_print_hex_u64_raw
+
+.print_nl:
+    lea     rdi, [rel msg_nl]
+    mov     rsi, msg_nl_len
+    call    rt_print_bytes
+
+.halt:
+    hlt
+    jmp     .halt
+
+rt_print_hex_u64_raw:
+    push    rbx
+    sub     rsp, 16
+    mov     rbx, rdi
+    mov     rcx, 16
+.hex_loop:
+    mov     rax, rbx
+    and     rax, 0xF
+    mov     al, [rel hex_table + rax]
+    mov     [rsp + rcx - 1], al
+    shr     rbx, 4
+    dec     rcx
+    jne     .hex_loop
+    mov     rdi, rsp
+    mov     rsi, 16
+    call    rt_print_bytes
+    add     rsp, 16
     pop     rbx
     ret
 

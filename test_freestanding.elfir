@@ -81,6 +81,8 @@ fn panic(str msg) {
 }
 
 fn _start() {
+   // i64 x=1;
+  //  x/=0;
     u16 com1 = u16(0x3F8);
     serial_init(com1);
     serial_write_kernel_start(com1);
@@ -104,6 +106,15 @@ fn _start() {
     volatile_store(vga + base + 7, u16(0x4B) | attr);
 
     serial_write_kernel_init_ok(com1);
+
+   /* i64 do_pf = 1;
+    if (do_pf) {
+        ptr<u64> p = ptr<u64>(0x40000000);
+        u64 v = volatile_load(p);
+        if (v == u64(0)) {
+            asm0("nop");
+        }
+    }*/
 
     serial_write_kernel_halt(com1);
     i64 one = 1;

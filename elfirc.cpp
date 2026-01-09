@@ -248,7 +248,29 @@ private:
         while (i_ < s_.size()) {
             char c = s_[i_];
             if (std::isspace((unsigned char)c)) { i_++; continue; }
-            // v0: no comments. (Можно добавить позже.)
+            if (c == '/' && i_ + 1 < s_.size()) {
+                char n = s_[i_ + 1];
+                if (n == '/') {
+                    i_ += 2;
+                    while (i_ < s_.size() && s_[i_] != '\n') i_++;
+                    continue;
+                }
+                if (n == '*') {
+                    size_t start = i_;
+                    i_ += 2;
+                    while (i_ + 1 < s_.size()) {
+                        if (s_[i_] == '*' && s_[i_ + 1] == '/') {
+                            i_ += 2;
+                            break;
+                        }
+                        i_++;
+                    }
+                    if (i_ >= s_.size()) {
+                        throw Error("Unterminated block comment at position " + std::to_string(start));
+                    }
+                    continue;
+                }
+            }
             break;
         }
     }
