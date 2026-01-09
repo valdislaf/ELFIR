@@ -241,6 +241,33 @@ fn tty_write_buf(ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr, ptr<u8> b
     }
 }
 
+fn line_copy(ptr<u8> dst, ptr<u8> src, i64 len) {
+    i64 i = 0;
+    while (i < len) {
+        *(dst + i) = *(src + i);
+        i += 1;
+    }
+}
+
+fn line_clear_display(ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr, u16 com1, i64 len) {
+    i64 i = 0;
+    while (i < len) {
+        serial_write_backspace(com1);
+        tty_putc(vga, rowp, colp, attr, u8(0x08));
+        i += 1;
+    }
+}
+
+fn line_echo_buf(ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr, u16 com1, ptr<u8> buf, i64 len) {
+    i64 i = 0;
+    while (i < len) {
+        u8 ch = *(buf + i);
+        serial_write_byte(com1, ch);
+        tty_putc(vga, rowp, colp, attr, ch);
+        i += 1;
+    }
+}
+
 fn tty_write_help(ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr) {
     tty_putc(vga, rowp, colp, attr, u8(0x68));
     tty_putc(vga, rowp, colp, attr, u8(0x65));
@@ -270,6 +297,13 @@ fn tty_write_help(ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr) {
     tty_putc(vga, rowp, colp, attr, u8(0x61));
     tty_putc(vga, rowp, colp, attr, u8(0x6C));
     tty_putc(vga, rowp, colp, attr, u8(0x74));
+    tty_putc(vga, rowp, colp, attr, u8(0x0A));
+
+    tty_putc(vga, rowp, colp, attr, u8(0x70));
+    tty_putc(vga, rowp, colp, attr, u8(0x61));
+    tty_putc(vga, rowp, colp, attr, u8(0x6E));
+    tty_putc(vga, rowp, colp, attr, u8(0x69));
+    tty_putc(vga, rowp, colp, attr, u8(0x63));
     tty_putc(vga, rowp, colp, attr, u8(0x0A));
 }
 
@@ -305,6 +339,16 @@ fn i64 cmd_is_echo(ptr<u8> buf, i64 len) {
     if (*(buf + 1) != u8(0x63)) { ret 0; }
     if (*(buf + 2) != u8(0x68)) { ret 0; }
     if (*(buf + 3) != u8(0x6F)) { ret 0; }
+    ret 1;
+}
+
+fn i64 cmd_is_panic(ptr<u8> buf, i64 len) {
+    if (len != 5) { ret 0; }
+    if (*(buf + 0) != u8(0x70)) { ret 0; }
+    if (*(buf + 1) != u8(0x61)) { ret 0; }
+    if (*(buf + 2) != u8(0x6E)) { ret 0; }
+    if (*(buf + 3) != u8(0x69)) { ret 0; }
+    if (*(buf + 4) != u8(0x63)) { ret 0; }
     ret 1;
 }
 
@@ -359,6 +403,20 @@ fn serial_log_cmd_halt(u16 port) {
     serial_write_newline(port);
 }
 
+fn serial_log_cmd_panic(u16 port) {
+    serial_write_byte(port, u8(0x63));
+    serial_write_byte(port, u8(0x6D));
+    serial_write_byte(port, u8(0x64));
+    serial_write_byte(port, u8(0x3A));
+    serial_write_byte(port, u8(0x20));
+    serial_write_byte(port, u8(0x70));
+    serial_write_byte(port, u8(0x61));
+    serial_write_byte(port, u8(0x6E));
+    serial_write_byte(port, u8(0x69));
+    serial_write_byte(port, u8(0x63));
+    serial_write_newline(port);
+}
+
 fn serial_log_cmd_unknown(u16 port) {
     serial_write_byte(port, u8(0x63));
     serial_write_byte(port, u8(0x6D));
@@ -366,6 +424,17 @@ fn serial_log_cmd_unknown(u16 port) {
     serial_write_byte(port, u8(0x3A));
     serial_write_byte(port, u8(0x20));
     serial_write_byte(port, u8(0x3F));
+    serial_write_newline(port);
+}
+
+fn serial_log_key_up(u16 port) {
+    serial_write_byte(port, u8(0x6B));
+    serial_write_byte(port, u8(0x65));
+    serial_write_byte(port, u8(0x79));
+    serial_write_byte(port, u8(0x3A));
+    serial_write_byte(port, u8(0x20));
+    serial_write_byte(port, u8(0x75));
+    serial_write_byte(port, u8(0x70));
     serial_write_newline(port);
 }
 
@@ -390,6 +459,10 @@ fn run_command(ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr, u16 com1, p
         while (one) {
             asm0("hlt");
         }
+    }
+    if (cmd_is_panic(buf, len)) {
+        serial_log_cmd_panic(com1);
+        panic("manual panic");
     }
     if (cmd_is_echo(buf, len)) {
         serial_log_cmd_echo(com1);
@@ -483,8 +556,11 @@ fn _start() {
     i64 shift = 0;
 
     ptr<u8> line = ptr<u8>(0x90000);
+    ptr<u8> last_line = ptr<u8>(0x90100);
     i64 len = 0;
+    i64 last_len = 0;
     i64 cap = 256;
+    i64 e0 = 0;
 
     tty_clear(vga, rowp, colp, attr);
     tty_write_prompt(vga, rowp, colp, attr);
@@ -497,7 +573,24 @@ fn _start() {
         if (sc == u8(0)) {
             continue;
         }
-        if ((sc == u8(0xE0)) || (sc == u8(0xE1))) {
+        if (sc == u8(0xE0)) {
+            e0 = 1;
+            continue;
+        }
+        if (sc == u8(0xE1)) {
+            continue;
+        }
+        if (e0) {
+            if (sc == u8(0x48)) {
+                if (last_len > 0) {
+                    serial_log_key_up(com1);
+                    line_clear_display(vga, rowp, colp, attr, com1, len);
+                    line_copy(line, last_line, last_len);
+                    len = last_len;
+                    line_echo_buf(vga, rowp, colp, attr, com1, line, len);
+                }
+            }
+            e0 = 0;
             continue;
         }
         if ((sc & u8(0x80)) != u8(0)) {
@@ -526,6 +619,10 @@ fn _start() {
         if (ch == u8(0x0A)) {
             serial_write_newline(com1);
             tty_putc(vga, rowp, colp, attr, ch);
+            if (len > 0) {
+                line_copy(last_line, line, len);
+                last_len = len;
+            }
             run_command(vga, rowp, colp, attr, com1, line, len);
             len = 0;
             tty_write_prompt(vga, rowp, colp, attr);

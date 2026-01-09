@@ -18,6 +18,7 @@ section .rodata
 
 panic_str0: db 80, 65, 78, 73, 67, 58, 32
 panic_str1: db 10
+run_command_str0: db 109, 97, 110, 117, 97, 108, 32, 112, 97, 110, 105, 99
 
 section .text
 
@@ -2656,6 +2657,187 @@ tty_write_buf:
     leave
     ret
 
+line_copy:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, 0
+    mov  [rbp-32], rax
+.while_start_0:
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    pop  rcx
+    cmp  rcx, rax
+    setl al
+    movzx eax, al
+    cmp  rax, 0
+    je   .while_end_1
+    mov  rax, [rbp-8]
+    push rax
+    mov  rax, [rbp-32]
+    mov  rcx, rax
+    pop  rax
+    add  rax, rcx
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-32]
+    mov  rcx, rax
+    pop  rax
+    add  rax, rcx
+    movzx eax, byte [rax]
+    and  rax, 0xFF
+    and  rax, 0xFF
+    pop  rcx
+    mov  byte [rcx], al
+    mov  rax, 1
+    mov  rcx, [rbp-32]
+    add  rax, rcx
+    mov  [rbp-32], rax
+    jmp  .while_start_0
+.while_end_1:
+    leave
+    ret
+
+line_clear_display:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 64
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    and  rax, 0xFFFF
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    and  rax, 0xFFFF
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, 0
+    mov  [rbp-56], rax
+.while_start_0:
+    mov  rax, [rbp-56]
+    push rax
+    mov  rax, [rbp-48]
+    pop  rcx
+    cmp  rcx, rax
+    setl al
+    movzx eax, al
+    cmp  rax, 0
+    je   .while_end_1
+    mov  rax, [rbp-40]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_backspace
+    add  rsp, 8
+    mov  rax, 0x08
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-32]
+    and  rax, 0xFFFF
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call tty_putc
+    add  rsp, 40
+    mov  rax, 1
+    mov  rcx, [rbp-56]
+    add  rax, rcx
+    mov  [rbp-56], rax
+    jmp  .while_start_0
+.while_end_1:
+    leave
+    ret
+
+line_echo_buf:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 80
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    and  rax, 0xFFFF
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    and  rax, 0xFFFF
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, [rbp+64]
+    mov  [rbp-56], rax
+    mov  rax, 0
+    mov  [rbp-64], rax
+.while_start_0:
+    mov  rax, [rbp-64]
+    push rax
+    mov  rax, [rbp-56]
+    pop  rcx
+    cmp  rcx, rax
+    setl al
+    movzx eax, al
+    cmp  rax, 0
+    je   .while_end_1
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-64]
+    mov  rcx, rax
+    pop  rax
+    add  rax, rcx
+    movzx eax, byte [rax]
+    and  rax, 0xFF
+    and  rax, 0xFF
+    mov  [rbp-72], rax
+    sub  rsp, 8
+    mov  rax, [rbp-72]
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-40]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_byte
+    add  rsp, 24
+    mov  rax, [rbp-72]
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-32]
+    and  rax, 0xFFFF
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call tty_putc
+    add  rsp, 40
+    mov  rax, 1
+    mov  rcx, [rbp-64]
+    add  rax, rcx
+    mov  [rbp-64], rax
+    jmp  .while_start_0
+.while_end_1:
+    leave
+    ret
+
 tty_write_help:
     push rbp
     mov  rbp, rsp
@@ -3006,6 +3188,90 @@ tty_write_help:
     call tty_putc
     add  rsp, 40
     mov  rax, 0x74
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-32]
+    and  rax, 0xFFFF
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call tty_putc
+    add  rsp, 40
+    mov  rax, 0x0A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-32]
+    and  rax, 0xFFFF
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call tty_putc
+    add  rsp, 40
+    mov  rax, 0x70
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-32]
+    and  rax, 0xFFFF
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call tty_putc
+    add  rsp, 40
+    mov  rax, 0x61
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-32]
+    and  rax, 0xFFFF
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call tty_putc
+    add  rsp, 40
+    mov  rax, 0x6E
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-32]
+    and  rax, 0xFFFF
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call tty_putc
+    add  rsp, 40
+    mov  rax, 0x69
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-32]
+    and  rax, 0xFFFF
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call tty_putc
+    add  rsp, 40
+    mov  rax, 0x63
     and  rax, 0xFF
     push rax
     mov  rax, [rbp-32]
@@ -3489,6 +3755,148 @@ cmd_is_echo:
     leave
     ret
 
+cmd_is_panic:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 16
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, 5
+    pop  rcx
+    cmp  rcx, rax
+    setne al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_1
+    mov  rax, 0
+    leave
+    ret
+    jmp  .if_end_0
+.if_next_1:
+.if_end_0:
+    mov  rax, [rbp-8]
+    push rax
+    mov  rax, 0
+    mov  rcx, rax
+    pop  rax
+    add  rax, rcx
+    movzx eax, byte [rax]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 0x70
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    setne al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_3
+    mov  rax, 0
+    leave
+    ret
+    jmp  .if_end_2
+.if_next_3:
+.if_end_2:
+    mov  rax, [rbp-8]
+    push rax
+    mov  rax, 1
+    mov  rcx, rax
+    pop  rax
+    add  rax, rcx
+    movzx eax, byte [rax]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 0x61
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    setne al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_5
+    mov  rax, 0
+    leave
+    ret
+    jmp  .if_end_4
+.if_next_5:
+.if_end_4:
+    mov  rax, [rbp-8]
+    push rax
+    mov  rax, 2
+    mov  rcx, rax
+    pop  rax
+    add  rax, rcx
+    movzx eax, byte [rax]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 0x6E
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    setne al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_7
+    mov  rax, 0
+    leave
+    ret
+    jmp  .if_end_6
+.if_next_7:
+.if_end_6:
+    mov  rax, [rbp-8]
+    push rax
+    mov  rax, 3
+    mov  rcx, rax
+    pop  rax
+    add  rax, rcx
+    movzx eax, byte [rax]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 0x69
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    setne al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_9
+    mov  rax, 0
+    leave
+    ret
+    jmp  .if_end_8
+.if_next_9:
+.if_end_8:
+    mov  rax, [rbp-8]
+    push rax
+    mov  rax, 4
+    mov  rcx, rax
+    pop  rax
+    add  rax, rcx
+    movzx eax, byte [rax]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 0x63
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    setne al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_11
+    mov  rax, 0
+    leave
+    ret
+    jmp  .if_end_10
+.if_next_11:
+.if_end_10:
+    mov  rax, 1
+    leave
+    ret
+
 serial_log_cmd_help:
     push rbp
     mov  rbp, rsp
@@ -3864,6 +4272,111 @@ serial_log_cmd_halt:
     leave
     ret
 
+serial_log_cmd_panic:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 16
+    mov  rax, [rbp+16]
+    and  rax, 0xFFFF
+    mov  [rbp-8], rax
+    sub  rsp, 8
+    mov  rax, 0x63
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_byte
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 0x6D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_byte
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 0x64
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_byte
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 0x3A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_byte
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 0x20
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_byte
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 0x70
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_byte
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 0x61
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_byte
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 0x6E
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_byte
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 0x69
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_byte
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 0x63
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_byte
+    add  rsp, 24
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_newline
+    add  rsp, 8
+    leave
+    ret
+
 serial_log_cmd_unknown:
     push rbp
     mov  rbp, rsp
@@ -3918,6 +4431,84 @@ serial_log_cmd_unknown:
     add  rsp, 24
     sub  rsp, 8
     mov  rax, 0x3F
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_byte
+    add  rsp, 24
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_newline
+    add  rsp, 8
+    leave
+    ret
+
+serial_log_key_up:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 16
+    mov  rax, [rbp+16]
+    and  rax, 0xFFFF
+    mov  [rbp-8], rax
+    sub  rsp, 8
+    mov  rax, 0x6B
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_byte
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 0x65
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_byte
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 0x79
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_byte
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 0x3A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_byte
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 0x20
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_byte
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 0x75
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_write_byte
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 0x70
     and  rax, 0xFF
     push rax
     mov  rax, [rbp-8]
@@ -4061,10 +4652,36 @@ run_command:
     push rax
     mov  rax, [rbp-48]
     push rax
-    call cmd_is_echo
+    call cmd_is_panic
     add  rsp, 24
     cmp  rax, 0
     je   .if_next_11
+    mov  rax, [rbp-40]
+    and  rax, 0xFFFF
+    push rax
+    call serial_log_cmd_panic
+    add  rsp, 8
+    sub  rsp, 8
+    lea  rax, [rel run_command_str0]
+    mov  rdx, 12
+    sub  rsp, 8
+    mov  [rsp], rdx
+    sub  rsp, 8
+    mov  [rsp], rax
+    call panic
+    add  rsp, 24
+    jmp  .if_end_10
+.if_next_11:
+.if_end_10:
+    sub  rsp, 8
+    mov  rax, [rbp-56]
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    call cmd_is_echo
+    add  rsp, 24
+    cmp  rax, 0
+    je   .if_next_13
     mov  rax, [rbp-40]
     and  rax, 0xFFFF
     push rax
@@ -4080,7 +4697,7 @@ run_command:
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_13
+    je   .if_next_15
     mov  rax, [rbp-48]
     push rax
     mov  rax, 4
@@ -4097,15 +4714,15 @@ run_command:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_15
+    je   .if_next_17
     mov  rax, 5
     mov  [rbp-72], rax
+    jmp  .if_end_16
+.if_next_17:
+.if_end_16:
     jmp  .if_end_14
 .if_next_15:
 .if_end_14:
-    jmp  .if_end_12
-.if_next_13:
-.if_end_12:
     mov  rax, [rbp-56]
     push rax
     mov  rax, [rbp-72]
@@ -4114,7 +4731,7 @@ run_command:
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_17
+    je   .if_next_19
     sub  rsp, 8
     mov  rax, [rbp-56]
     push rax
@@ -4141,9 +4758,9 @@ run_command:
     push rax
     call tty_write_buf
     add  rsp, 56
-    jmp  .if_end_16
-.if_next_17:
-.if_end_16:
+    jmp  .if_end_18
+.if_next_19:
+.if_end_18:
     mov  rax, 0x0A
     and  rax, 0xFF
     push rax
@@ -4160,9 +4777,9 @@ run_command:
     add  rsp, 40
     leave
     ret
-    jmp  .if_end_10
-.if_next_11:
-.if_end_10:
+    jmp  .if_end_12
+.if_next_13:
+.if_end_12:
     mov  rax, [rbp-40]
     and  rax, 0xFFFF
     push rax
@@ -4200,7 +4817,7 @@ run_command:
 _start:
     push rbp
     mov  rbp, rsp
-    sub  rsp, 144
+    sub  rsp, 160
     mov  rax, 0x3F8
     and  rax, 0xFFFF
     and  rax, 0xFFFF
@@ -4482,10 +5099,16 @@ _start:
     mov  [rbp-80], rax
     mov  rax, 0x90000
     mov  [rbp-88], rax
-    mov  rax, 0
+    mov  rax, 0x90100
     mov  [rbp-96], rax
-    mov  rax, 256
+    mov  rax, 0
     mov  [rbp-104], rax
+    mov  rax, 0
+    mov  [rbp-112], rax
+    mov  rax, 256
+    mov  [rbp-120], rax
+    mov  rax, 0
+    mov  [rbp-128], rax
     sub  rsp, 8
     mov  rax, [rbp-24]
     and  rax, 0xFFFF
@@ -4529,9 +5152,9 @@ _start:
     call serial_write_byte
     add  rsp, 24
     mov  rax, 1
-    mov  [rbp-112], rax
+    mov  [rbp-136], rax
 .while_start_2:
-    mov  rax, [rbp-112]
+    mov  rax, [rbp-136]
     cmp  rax, 0
     je   .while_end_3
     sub  rsp, 8
@@ -4539,8 +5162,8 @@ _start:
     add  rsp, 8
     and  rax, 0xFF
     and  rax, 0xFF
-    mov  [rbp-120], rax
-    mov  rax, [rbp-120]
+    mov  [rbp-144], rax
+    mov  rax, [rbp-144]
     and  rax, 0xFF
     push rax
     mov  rax, 0
@@ -4555,7 +5178,7 @@ _start:
     jmp  .if_end_4
 .if_next_5:
 .if_end_4:
-    mov  rax, [rbp-120]
+    mov  rax, [rbp-144]
     and  rax, 0xFF
     push rax
     mov  rax, 0xE0
@@ -4565,10 +5188,14 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    setne al
-    movzx eax, al
-    push rax
-    mov  rax, [rbp-120]
+    je   .if_next_7
+    mov  rax, 1
+    mov  [rbp-128], rax
+    jmp  .while_start_2
+    jmp  .if_end_6
+.if_next_7:
+.if_end_6:
+    mov  rax, [rbp-144]
     and  rax, 0xFF
     push rax
     mov  rax, 0xE1
@@ -4578,17 +5205,97 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    setne al
-    movzx eax, al
-    pop  rcx
-    or   rax, rcx
-    cmp  rax, 0
-    je   .if_next_7
+    je   .if_next_9
     jmp  .while_start_2
-    jmp  .if_end_6
-.if_next_7:
-.if_end_6:
-    mov  rax, [rbp-120]
+    jmp  .if_end_8
+.if_next_9:
+.if_end_8:
+    mov  rax, [rbp-128]
+    cmp  rax, 0
+    je   .if_next_11
+    mov  rax, [rbp-144]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 0x48
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_13
+    mov  rax, [rbp-112]
+    push rax
+    mov  rax, 0
+    pop  rcx
+    cmp  rcx, rax
+    setg al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_15
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    call serial_log_key_up
+    add  rsp, 8
+    sub  rsp, 8
+    mov  rax, [rbp-104]
+    push rax
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    mov  rax, [rbp-24]
+    and  rax, 0xFFFF
+    push rax
+    mov  rax, [rbp-72]
+    push rax
+    mov  rax, [rbp-64]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    call line_clear_display
+    add  rsp, 56
+    mov  rax, [rbp-112]
+    push rax
+    mov  rax, [rbp-96]
+    push rax
+    mov  rax, [rbp-88]
+    push rax
+    call line_copy
+    add  rsp, 24
+    mov  rax, [rbp-112]
+    mov  [rbp-104], rax
+    mov  rax, [rbp-104]
+    push rax
+    mov  rax, [rbp-88]
+    push rax
+    mov  rax, [rbp-8]
+    and  rax, 0xFFFF
+    push rax
+    mov  rax, [rbp-24]
+    and  rax, 0xFFFF
+    push rax
+    mov  rax, [rbp-72]
+    push rax
+    mov  rax, [rbp-64]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    call line_echo_buf
+    add  rsp, 56
+    jmp  .if_end_14
+.if_next_15:
+.if_end_14:
+    jmp  .if_end_12
+.if_next_13:
+.if_end_12:
+    mov  rax, 0
+    mov  [rbp-128], rax
+    jmp  .while_start_2
+    jmp  .if_end_10
+.if_next_11:
+.if_end_10:
+    mov  rax, [rbp-144]
     and  rax, 0xFF
     push rax
     mov  rax, 0x80
@@ -4604,8 +5311,8 @@ _start:
     setne al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_9
-    mov  rax, [rbp-120]
+    je   .if_next_17
+    mov  rax, [rbp-144]
     and  rax, 0xFF
     push rax
     mov  rax, 0x7F
@@ -4614,8 +5321,8 @@ _start:
     and  rax, rcx
     and  rax, 0xFF
     and  rax, 0xFF
-    mov  [rbp-128], rax
-    mov  rax, [rbp-128]
+    mov  [rbp-152], rax
+    mov  rax, [rbp-152]
     and  rax, 0xFF
     push rax
     mov  rax, 0x2A
@@ -4628,7 +5335,7 @@ _start:
     setne al
     movzx eax, al
     push rax
-    mov  rax, [rbp-128]
+    mov  rax, [rbp-152]
     and  rax, 0xFF
     push rax
     mov  rax, 0x36
@@ -4643,17 +5350,17 @@ _start:
     pop  rcx
     or   rax, rcx
     cmp  rax, 0
-    je   .if_next_11
+    je   .if_next_19
     mov  rax, 0
     mov  [rbp-80], rax
-    jmp  .if_end_10
-.if_next_11:
-.if_end_10:
+    jmp  .if_end_18
+.if_next_19:
+.if_end_18:
     jmp  .while_start_2
-    jmp  .if_end_8
-.if_next_9:
-.if_end_8:
-    mov  rax, [rbp-120]
+    jmp  .if_end_16
+.if_next_17:
+.if_end_16:
+    mov  rax, [rbp-144]
     and  rax, 0xFF
     push rax
     mov  rax, 0x2A
@@ -4666,7 +5373,7 @@ _start:
     setne al
     movzx eax, al
     push rax
-    mov  rax, [rbp-120]
+    mov  rax, [rbp-144]
     and  rax, 0xFF
     push rax
     mov  rax, 0x36
@@ -4681,25 +5388,25 @@ _start:
     pop  rcx
     or   rax, rcx
     cmp  rax, 0
-    je   .if_next_13
+    je   .if_next_21
     mov  rax, 1
     mov  [rbp-80], rax
     jmp  .while_start_2
-    jmp  .if_end_12
-.if_next_13:
-.if_end_12:
+    jmp  .if_end_20
+.if_next_21:
+.if_end_20:
     sub  rsp, 8
     mov  rax, [rbp-80]
     push rax
-    mov  rax, [rbp-120]
+    mov  rax, [rbp-144]
     and  rax, 0xFF
     push rax
     call kbd_scancode_to_ascii
     add  rsp, 24
     and  rax, 0xFF
     and  rax, 0xFF
-    mov  [rbp-136], rax
-    mov  rax, [rbp-136]
+    mov  [rbp-160], rax
+    mov  rax, [rbp-160]
     and  rax, 0xFF
     push rax
     mov  rax, 0
@@ -4709,12 +5416,12 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_15
+    je   .if_next_23
     jmp  .while_start_2
-    jmp  .if_end_14
-.if_next_15:
-.if_end_14:
-    mov  rax, [rbp-136]
+    jmp  .if_end_22
+.if_next_23:
+.if_end_22:
+    mov  rax, [rbp-160]
     and  rax, 0xFF
     push rax
     mov  rax, 0x08
@@ -4724,8 +5431,8 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_17
-    mov  rax, [rbp-96]
+    je   .if_next_25
+    mov  rax, [rbp-104]
     push rax
     mov  rax, 0
     pop  rcx
@@ -4733,18 +5440,18 @@ _start:
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_19
+    je   .if_next_27
     mov  rax, 1
-    mov  rcx, [rbp-96]
+    mov  rcx, [rbp-104]
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-96], rax
+    mov  [rbp-104], rax
     mov  rax, [rbp-8]
     and  rax, 0xFFFF
     push rax
     call serial_write_backspace
     add  rsp, 8
-    mov  rax, [rbp-136]
+    mov  rax, [rbp-160]
     and  rax, 0xFF
     push rax
     mov  rax, [rbp-24]
@@ -4758,14 +5465,14 @@ _start:
     push rax
     call tty_putc
     add  rsp, 40
-    jmp  .if_end_18
-.if_next_19:
-.if_end_18:
+    jmp  .if_end_26
+.if_next_27:
+.if_end_26:
     jmp  .while_start_2
-    jmp  .if_end_16
-.if_next_17:
-.if_end_16:
-    mov  rax, [rbp-136]
+    jmp  .if_end_24
+.if_next_25:
+.if_end_24:
+    mov  rax, [rbp-160]
     and  rax, 0xFF
     push rax
     mov  rax, 0x0A
@@ -4775,13 +5482,13 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_21
+    je   .if_next_29
     mov  rax, [rbp-8]
     and  rax, 0xFFFF
     push rax
     call serial_write_newline
     add  rsp, 8
-    mov  rax, [rbp-136]
+    mov  rax, [rbp-160]
     and  rax, 0xFF
     push rax
     mov  rax, [rbp-24]
@@ -4795,7 +5502,29 @@ _start:
     push rax
     call tty_putc
     add  rsp, 40
+    mov  rax, [rbp-104]
+    push rax
+    mov  rax, 0
+    pop  rcx
+    cmp  rcx, rax
+    setg al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_31
+    mov  rax, [rbp-104]
+    push rax
+    mov  rax, [rbp-88]
+    push rax
     mov  rax, [rbp-96]
+    push rax
+    call line_copy
+    add  rsp, 24
+    mov  rax, [rbp-104]
+    mov  [rbp-112], rax
+    jmp  .if_end_30
+.if_next_31:
+.if_end_30:
+    mov  rax, [rbp-104]
     push rax
     mov  rax, [rbp-88]
     push rax
@@ -4814,7 +5543,7 @@ _start:
     call run_command
     add  rsp, 56
     mov  rax, 0
-    mov  [rbp-96], rax
+    mov  [rbp-104], rax
     sub  rsp, 8
     mov  rax, [rbp-24]
     and  rax, 0xFFFF
@@ -4846,10 +5575,10 @@ _start:
     call serial_write_byte
     add  rsp, 24
     jmp  .while_start_2
-    jmp  .if_end_20
-.if_next_21:
-.if_end_20:
-    mov  rax, [rbp-136]
+    jmp  .if_end_28
+.if_next_29:
+.if_end_28:
+    mov  rax, [rbp-160]
     and  rax, 0xFF
     push rax
     mov  rax, 0x20
@@ -4859,14 +5588,14 @@ _start:
     setb al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_23
+    je   .if_next_33
     jmp  .while_start_2
-    jmp  .if_end_22
-.if_next_23:
-.if_end_22:
-    mov  rax, [rbp-96]
-    push rax
+    jmp  .if_end_32
+.if_next_33:
+.if_end_32:
     mov  rax, [rbp-104]
+    push rax
+    mov  rax, [rbp-120]
     push rax
     mov  rax, 1
     pop  rcx
@@ -4877,29 +5606,29 @@ _start:
     setge al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_25
+    je   .if_next_35
     jmp  .while_start_2
-    jmp  .if_end_24
-.if_next_25:
-.if_end_24:
+    jmp  .if_end_34
+.if_next_35:
+.if_end_34:
     mov  rax, [rbp-88]
     push rax
-    mov  rax, [rbp-96]
+    mov  rax, [rbp-104]
     mov  rcx, rax
     pop  rax
     add  rax, rcx
     push rax
-    mov  rax, [rbp-136]
+    mov  rax, [rbp-160]
     and  rax, 0xFF
     and  rax, 0xFF
     pop  rcx
     mov  byte [rcx], al
     mov  rax, 1
-    mov  rcx, [rbp-96]
+    mov  rcx, [rbp-104]
     add  rax, rcx
-    mov  [rbp-96], rax
+    mov  [rbp-104], rax
     sub  rsp, 8
-    mov  rax, [rbp-136]
+    mov  rax, [rbp-160]
     and  rax, 0xFF
     push rax
     mov  rax, [rbp-8]
@@ -4907,7 +5636,7 @@ _start:
     push rax
     call serial_write_byte
     add  rsp, 24
-    mov  rax, [rbp-136]
+    mov  rax, [rbp-160]
     and  rax, 0xFF
     push rax
     mov  rax, [rbp-24]
