@@ -20,7 +20,25 @@ global fb_write_hcs3_label
 global fb_write_dboff_label
 global fb_write_rtsoff_label
 global fb_write_ports_label
+global fb_write_portsc_label
+global fb_write_portr_label
+global fb_write_portu_label
 global fb_write_slots_label
+global fb_write_hcc1_label
+global fb_write_ecp_label
+global fb_write_leg_label
+global fb_write_bios_label
+global fb_write_os_label
+global fb_write_spd1_label
+global fb_write_spd2_label
+global fb_write_poff_label
+global fb_write_pcnt_label
+global fb_write_slot_label
+global fb_write_ccode_label
+global fb_write_ccs_label
+global fb_write_ped_label
+global fb_write_pls_label
+global fb_write_spd_label
 global fb_write_cfg_label
 global fb_write_dcbaap_label
 global fb_write_crcr_label
@@ -28,6 +46,10 @@ global fb_write_erstba_label
 global fb_write_erdp_label
 global fb_write_iman_label
 global xhci_zero
+global xhci_write_trb
+global xhci_cmd_ring_init
+global xhci_cmd_enqueue
+global xhci_evt_poll
 global fb_write_usbcmd_label
 global fb_write_usbsts_label
 global fb_fill_rect
@@ -1639,7 +1661,7 @@ fb_putc:
     mov  rax, [rbp+64]
     and  rax, 0xFF
     mov  [rbp-56], rax
-    mov  rax, 1
+    mov  rax, 2
     mov  [rbp-64], rax
     mov  rax, 10
     mov  [rbp-72], rax
@@ -3508,6 +3530,439 @@ fb_write_ports_label:
     leave
     ret
 
+fb_write_portsc_label:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 64
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, [rbp+64]
+    mov  [rbp-56], rax
+    mov  rax, 0x50
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x4F
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x52
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x54
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x30
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-56]
+    and  rax, 0xFF
+    pop  rcx
+    add  rax, rcx
+    and  rax, 0xFF
+    and  rax, 0xFF
+    mov  [rbp-64], rax
+    mov  rax, [rbp-64]
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x3D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    leave
+    ret
+
+fb_write_portr_label:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 64
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, [rbp+64]
+    mov  [rbp-56], rax
+    mov  rax, 0x50
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x4F
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x52
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x54
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x30
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-56]
+    and  rax, 0xFF
+    pop  rcx
+    add  rax, rcx
+    and  rax, 0xFF
+    and  rax, 0xFF
+    mov  [rbp-64], rax
+    mov  rax, [rbp-64]
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x52
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x3D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    leave
+    ret
+
+fb_write_portu_label:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 64
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, [rbp+64]
+    mov  [rbp-56], rax
+    mov  rax, 0x50
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x4F
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x52
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x54
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x30
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-56]
+    and  rax, 0xFF
+    pop  rcx
+    add  rax, rcx
+    and  rax, 0xFF
+    and  rax, 0xFF
+    mov  [rbp-64], rax
+    mov  rax, [rbp-64]
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x55
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x3D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    leave
+    ret
+
 fb_write_slots_label:
     push rbp
     mov  rbp, rsp
@@ -3610,6 +4065,1821 @@ fb_write_slots_label:
     call fb_putc
     add  rsp, 56
     mov  rax, 0x3D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    leave
+    ret
+
+fb_write_hcc1_label:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 48
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, 0x48
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x43
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x43
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x31
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x3D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x30
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x58
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    leave
+    ret
+
+fb_write_ecp_label:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 48
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, 0x45
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x43
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x50
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x3D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x30
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x58
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    leave
+    ret
+
+fb_write_leg_label:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 48
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, 0x4C
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x45
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x47
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x3D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x30
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x58
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    leave
+    ret
+
+fb_write_bios_label:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 48
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, 0x42
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x49
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x4F
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x53
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x3D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x30
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x58
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    leave
+    ret
+
+fb_write_os_label:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 48
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, 0x4F
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x53
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x3D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x30
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x58
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    leave
+    ret
+
+fb_write_spd1_label:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 48
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, 0x53
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x50
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x44
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x31
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x3D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x30
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x58
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    leave
+    ret
+
+fb_write_spd2_label:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 48
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, 0x53
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x50
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x44
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x32
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x3D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x30
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x58
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    leave
+    ret
+
+fb_write_poff_label:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 48
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, 0x50
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x4F
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x46
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x46
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x3D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    leave
+    ret
+
+fb_write_pcnt_label:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 48
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, 0x50
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x43
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x4E
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x54
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x3D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    leave
+    ret
+
+fb_write_slot_label:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 48
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, 0x53
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x4C
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x4F
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x54
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x3D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    leave
+    ret
+
+fb_write_ccode_label:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 48
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, 0x43
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x43
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x4F
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x44
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x45
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x3D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    leave
+    ret
+
+fb_write_ccs_label:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 48
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, 0x43
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x43
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x53
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x3D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x30
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x58
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    leave
+    ret
+
+fb_write_ped_label:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 48
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, 0x50
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x45
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x44
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x3D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x30
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x58
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    leave
+    ret
+
+fb_write_pls_label:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 48
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, 0x50
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x4C
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x53
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x3D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x30
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x58
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    leave
+    ret
+
+fb_write_spd_label:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 48
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, 0x53
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x50
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x44
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x3D
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x30
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-8]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 0x58
     and  rax, 0xFF
     push rax
     mov  rax, [rbp-48]
@@ -4549,6 +6819,516 @@ xhci_zero:
     leave
     ret
 
+xhci_write_trb:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 64
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-48], rax
+    mov  rax, [rbp-8]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, 4
+    pop  rcx
+    imul rax, rcx
+    mov  rcx, rax
+    pop  rax
+    imul rcx, 4
+    add  rax, rcx
+    mov  [rbp-56], rax
+    mov  rax, [rbp-56]
+    push rax
+    mov  rax, 0
+    mov  rcx, rax
+    pop  rax
+    imul rcx, 4
+    add  rax, rcx
+    push rax
+    mov  rax, [rbp-24]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    mov  dword [rcx], eax
+    mov  rax, [rbp-56]
+    push rax
+    mov  rax, 1
+    mov  rcx, rax
+    pop  rax
+    imul rcx, 4
+    add  rax, rcx
+    push rax
+    mov  rax, [rbp-32]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    mov  dword [rcx], eax
+    mov  rax, [rbp-56]
+    push rax
+    mov  rax, 2
+    mov  rcx, rax
+    pop  rax
+    imul rcx, 4
+    add  rax, rcx
+    push rax
+    mov  rax, [rbp-40]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    mov  dword [rcx], eax
+    mov  rax, [rbp-56]
+    push rax
+    mov  rax, 3
+    mov  rcx, rax
+    pop  rax
+    imul rcx, 4
+    add  rax, rcx
+    push rax
+    mov  rax, [rbp-48]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    mov  dword [rcx], eax
+    leave
+    ret
+
+xhci_cmd_ring_init:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 80
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-16], rax
+    mov  rax, [rbp-8]
+    mov  [rbp-24], rax
+    mov  rax, 255
+    mov  [rbp-32], rax
+    mov  rax, [rbp-8]
+    mov  [rbp-40], rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-48], rax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, 32
+    mov  rcx, rax
+    pop  rax
+    shr  rax, cl
+    push rax
+    mov  rax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-56], rax
+    mov  rax, 0
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-64], rax
+    mov  rax, 0
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-72], rax
+    mov  rax, [rbp-72]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-16]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 1
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    or   rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-72], rax
+    mov  rax, [rbp-72]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 1
+    push rax
+    mov  rax, 1
+    mov  rcx, rax
+    pop  rax
+    shl  rax, cl
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    or   rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-72], rax
+    mov  rax, [rbp-72]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 6
+    push rax
+    mov  rax, 10
+    mov  rcx, rax
+    pop  rax
+    shl  rax, cl
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    or   rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-72], rax
+    sub  rsp, 8
+    mov  rax, [rbp-72]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-64]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-56]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-48]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    call xhci_write_trb
+    add  rsp, 56
+    leave
+    ret
+
+xhci_cmd_enqueue:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 80
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-48], rax
+    mov  rax, [rbp+64]
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-56], rax
+    mov  rax, [rbp-8]
+    mov  [rbp-64], rax
+    mov  rax, [rbp-16]
+    mov  rax, qword [rax]
+    mov  [rbp-72], rax
+    mov  rax, [rbp-24]
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-80], rax
+    mov  rax, [rbp-56]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-80]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 1
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    or   rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-56], rax
+    sub  rsp, 8
+    mov  rax, [rbp-56]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-48]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-40]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-32]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-72]
+    push rax
+    mov  rax, [rbp-64]
+    push rax
+    call xhci_write_trb
+    add  rsp, 56
+    mov  rax, 1
+    mov  rcx, [rbp-72]
+    add  rax, rcx
+    mov  [rbp-72], rax
+    mov  rax, [rbp-72]
+    push rax
+    mov  rax, 255
+    pop  rcx
+    cmp  rcx, rax
+    setge al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_1
+    mov  rax, 0
+    mov  [rbp-72], rax
+    mov  rax, [rbp-80]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 1
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    xor  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-80], rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-80]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    mov  dword [rcx], eax
+    jmp  .if_end_0
+.if_next_1:
+.if_end_0:
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-72]
+    pop  rcx
+    mov  qword [rcx], rax
+    leave
+    ret
+
+xhci_evt_poll:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 96
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    mov  rax, [rbp+48]
+    mov  [rbp-40], rax
+    mov  rax, [rbp+56]
+    mov  [rbp-48], rax
+    mov  rax, [rbp+64]
+    mov  [rbp-56], rax
+    mov  rax, [rbp-8]
+    mov  [rbp-64], rax
+    mov  rax, [rbp-16]
+    mov  rax, qword [rax]
+    mov  [rbp-72], rax
+    mov  rax, [rbp-64]
+    push rax
+    mov  rax, [rbp-72]
+    push rax
+    mov  rax, 4
+    pop  rcx
+    imul rax, rcx
+    mov  rcx, rax
+    pop  rax
+    imul rcx, 4
+    add  rax, rcx
+    push rax
+    mov  rax, 3
+    mov  rcx, rax
+    pop  rax
+    imul rcx, 4
+    add  rax, rcx
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-80], rax
+    mov  rax, [rbp-24]
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-88], rax
+    mov  rax, [rbp-80]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 1
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-88]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 1
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    cmp  rcx, rax
+    setne al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_1
+    mov  rax, 0
+    leave
+    ret
+    jmp  .if_end_0
+.if_next_1:
+.if_end_0:
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-64]
+    push rax
+    mov  rax, [rbp-72]
+    push rax
+    mov  rax, 4
+    pop  rcx
+    imul rax, rcx
+    mov  rcx, rax
+    pop  rax
+    imul rcx, 4
+    add  rax, rcx
+    push rax
+    mov  rax, 0
+    mov  rcx, rax
+    pop  rax
+    imul rcx, 4
+    add  rax, rcx
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    mov  dword [rcx], eax
+    mov  rax, [rbp-40]
+    push rax
+    mov  rax, [rbp-64]
+    push rax
+    mov  rax, [rbp-72]
+    push rax
+    mov  rax, 4
+    pop  rcx
+    imul rax, rcx
+    mov  rcx, rax
+    pop  rax
+    imul rcx, 4
+    add  rax, rcx
+    push rax
+    mov  rax, 1
+    mov  rcx, rax
+    pop  rax
+    imul rcx, 4
+    add  rax, rcx
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    mov  dword [rcx], eax
+    mov  rax, [rbp-48]
+    push rax
+    mov  rax, [rbp-64]
+    push rax
+    mov  rax, [rbp-72]
+    push rax
+    mov  rax, 4
+    pop  rcx
+    imul rax, rcx
+    mov  rcx, rax
+    pop  rax
+    imul rcx, 4
+    add  rax, rcx
+    push rax
+    mov  rax, 2
+    mov  rcx, rax
+    pop  rax
+    imul rcx, 4
+    add  rax, rcx
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    mov  dword [rcx], eax
+    mov  rax, [rbp-56]
+    push rax
+    mov  rax, [rbp-80]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    mov  dword [rcx], eax
+    mov  rax, 1
+    mov  rcx, [rbp-72]
+    add  rax, rcx
+    mov  [rbp-72], rax
+    mov  rax, [rbp-72]
+    push rax
+    mov  rax, 256
+    pop  rcx
+    cmp  rcx, rax
+    setge al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_3
+    mov  rax, 0
+    mov  [rbp-72], rax
+    mov  rax, [rbp-88]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 1
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    xor  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-88], rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-88]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    mov  dword [rcx], eax
+    jmp  .if_end_2
+.if_next_3:
+.if_end_2:
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-72]
+    pop  rcx
+    mov  qword [rcx], rax
+    mov  rax, 1
+    leave
+    ret
+
 fb_write_usbcmd_label:
     push rbp
     mov  rbp, rsp
@@ -5034,7 +7814,7 @@ fb_mark_line:
     mov  rax, [rbp+56]
     and  eax, 0xFFFFFFFF
     mov  [rbp-48], rax
-    mov  rax, 1
+    mov  rax, 2
     mov  [rbp-56], rax
     mov  rax, 10
     mov  [rbp-64], rax
@@ -10700,7 +13480,7 @@ run_command:
 _start:
     push rbp
     mov  rbp, rsp
-    sub  rsp, 1072
+    sub  rsp, 1584
     sub  rsp, 8
     call uefi_get_fb_base
     add  rsp, 8
@@ -11859,152 +14639,151 @@ _start:
     add  rsp, 56
     mov  rax, [rbp-232]
     push rax
-    mov  rax, [rbp-256]
-    and  rax, 0xFF
+    mov  rax, 0x10
     pop  rcx
     add  rax, rcx
     mov  [rbp-368], rax
     mov  rax, [rbp-368]
-    push rax
-    mov  rax, 0x00
-    pop  rcx
-    add  rax, rcx
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
     mov  [rbp-376], rax
-    mov  rax, [rbp-368]
+    mov  rax, [rbp-376]
+    and  eax, 0xFFFFFFFF
     push rax
-    mov  rax, 0x04
+    mov  rax, 16
+    and  eax, 0xFFFFFFFF
+    mov  rcx, rax
+    pop  rax
+    shr  rax, cl
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0xFFFF
+    and  eax, 0xFFFFFFFF
     pop  rcx
-    add  rax, rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
     mov  [rbp-384], rax
-    mov  rax, [rbp-376]
-    mov  eax, dword [rax]
-    and  eax, 0xFFFFFFFF
-    and  eax, 0xFFFFFFFF
-    mov  [rbp-392], rax
     mov  rax, [rbp-384]
-    mov  eax, dword [rax]
-    and  eax, 0xFFFFFFFF
-    and  eax, 0xFFFFFFFF
-    mov  [rbp-400], rax
-    sub  rsp, 8
-    mov  rax, [rbp-208]
-    push rax
-    mov  rax, [rbp-200]
-    push rax
-    mov  rax, [rbp-32]
-    push rax
-    mov  rax, [rbp-24]
-    push rax
-    mov  rax, [rbp-16]
-    push rax
-    mov  rax, [rbp-216]
-    push rax
-    call fb_write_usbcmd_label
-    add  rsp, 56
-    mov  rax, [rbp-392]
     and  eax, 0xFFFFFFFF
     push rax
-    mov  rax, [rbp-208]
-    push rax
-    mov  rax, [rbp-200]
-    push rax
-    mov  rax, [rbp-32]
-    push rax
-    mov  rax, [rbp-24]
-    push rax
-    mov  rax, [rbp-16]
-    push rax
-    mov  rax, [rbp-216]
-    push rax
-    call fb_write_hex_u64
-    add  rsp, 56
-    mov  rax, 0x0A
-    and  rax, 0xFF
-    push rax
-    mov  rax, [rbp-208]
-    push rax
-    mov  rax, [rbp-200]
-    push rax
-    mov  rax, [rbp-32]
-    push rax
-    mov  rax, [rbp-24]
-    push rax
-    mov  rax, [rbp-16]
-    push rax
-    mov  rax, [rbp-216]
-    push rax
-    call fb_putc
-    add  rsp, 56
-    sub  rsp, 8
-    mov  rax, [rbp-208]
-    push rax
-    mov  rax, [rbp-200]
-    push rax
-    mov  rax, [rbp-32]
-    push rax
-    mov  rax, [rbp-24]
-    push rax
-    mov  rax, [rbp-16]
-    push rax
-    mov  rax, [rbp-216]
-    push rax
-    call fb_write_usbsts_label
-    add  rsp, 56
-    mov  rax, [rbp-400]
-    and  eax, 0xFFFFFFFF
-    push rax
-    mov  rax, [rbp-208]
-    push rax
-    mov  rax, [rbp-200]
-    push rax
-    mov  rax, [rbp-32]
-    push rax
-    mov  rax, [rbp-24]
-    push rax
-    mov  rax, [rbp-16]
-    push rax
-    mov  rax, [rbp-216]
-    push rax
-    call fb_write_hex_u64
-    add  rsp, 56
-    mov  rax, 0x0A
-    and  rax, 0xFF
-    push rax
-    mov  rax, [rbp-208]
-    push rax
-    mov  rax, [rbp-200]
-    push rax
-    mov  rax, [rbp-32]
-    push rax
-    mov  rax, [rbp-24]
-    push rax
-    mov  rax, [rbp-16]
-    push rax
-    mov  rax, [rbp-216]
-    push rax
-    call fb_putc
-    add  rsp, 56
-    mov  rax, [rbp-392]
-    and  eax, 0xFFFFFFFF
-    push rax
-    mov  rax, 0x00000002
-    and  eax, 0xFFFFFFFF
+    mov  rax, 4
     pop  rcx
-    or   rax, rcx
-    and  eax, 0xFFFFFFFF
-    and  eax, 0xFFFFFFFF
-    mov  [rbp-408], rax
+    imul rax, rcx
+    mov  [rbp-392], rax
+    sub  rsp, 8
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hcc1_label
+    add  rsp, 56
     mov  rax, [rbp-376]
+    and  eax, 0xFFFFFFFF
     push rax
-    mov  rax, [rbp-408]
-    and  eax, 0xFFFFFFFF
-    and  eax, 0xFFFFFFFF
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x0A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    sub  rsp, 8
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_ecp_label
+    add  rsp, 56
+    mov  rax, [rbp-392]
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x0A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, [rbp-392]
+    push rax
+    mov  rax, 0
     pop  rcx
-    mov  dword [rcx], eax
-    mov  rax, 1000000
-    mov  [rbp-416], rax
-.while_start_22:
-    mov  rax, [rbp-416]
+    cmp  rcx, rax
+    setne al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_23
+    mov  rax, [rbp-392]
+    mov  [rbp-400], rax
+    mov  rax, 32
+    mov  [rbp-408], rax
+.while_start_24:
+    mov  rax, [rbp-408]
     push rax
     mov  rax, 0
     pop  rcx
@@ -12012,261 +14791,133 @@ _start:
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .while_end_23
-    mov  rax, [rbp-376]
-    mov  eax, dword [rax]
-    and  eax, 0xFFFFFFFF
+    setne al
+    movzx eax, al
     push rax
-    mov  rax, 0x00000002
-    and  eax, 0xFFFFFFFF
-    pop  rcx
-    and  rax, rcx
-    and  eax, 0xFFFFFFFF
+    mov  rax, [rbp-400]
     push rax
     mov  rax, 0
-    and  eax, 0xFFFFFFFF
     pop  rcx
     cmp  rcx, rax
-    sete al
+    setne al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_25
-    jmp  .while_end_23
-    jmp  .if_end_24
-.if_next_25:
-.if_end_24:
-    mov  rax, 1
-    mov  rcx, [rbp-416]
-    sub  rcx, rax
-    mov  rax, rcx
+    setne al
+    movzx eax, al
+    pop  rcx
+    and  rax, rcx
+    cmp  rax, 0
+    je   .while_end_25
+    mov  rax, [rbp-232]
+    push rax
+    mov  rax, [rbp-400]
+    pop  rcx
+    add  rax, rcx
     mov  [rbp-416], rax
-    jmp  .while_start_22
-.while_end_23:
-    mov  rax, [rbp-376]
+    mov  rax, [rbp-416]
     mov  eax, dword [rax]
     and  eax, 0xFFFFFFFF
     and  eax, 0xFFFFFFFF
     mov  [rbp-424], rax
-    mov  rax, [rbp-384]
-    mov  eax, dword [rax]
-    and  eax, 0xFFFFFFFF
-    and  eax, 0xFFFFFFFF
-    mov  [rbp-432], rax
-    sub  rsp, 8
-    mov  rax, [rbp-208]
-    push rax
-    mov  rax, [rbp-200]
-    push rax
-    mov  rax, [rbp-32]
-    push rax
-    mov  rax, [rbp-24]
-    push rax
-    mov  rax, [rbp-16]
-    push rax
-    mov  rax, [rbp-216]
-    push rax
-    call fb_write_usbcmd_label
-    add  rsp, 56
     mov  rax, [rbp-424]
     and  eax, 0xFFFFFFFF
     push rax
-    mov  rax, [rbp-208]
-    push rax
-    mov  rax, [rbp-200]
-    push rax
-    mov  rax, [rbp-32]
-    push rax
-    mov  rax, [rbp-24]
-    push rax
-    mov  rax, [rbp-16]
-    push rax
-    mov  rax, [rbp-216]
-    push rax
-    call fb_write_hex_u64
-    add  rsp, 56
-    mov  rax, 0x0A
-    and  rax, 0xFF
-    push rax
-    mov  rax, [rbp-208]
-    push rax
-    mov  rax, [rbp-200]
-    push rax
-    mov  rax, [rbp-32]
-    push rax
-    mov  rax, [rbp-24]
-    push rax
-    mov  rax, [rbp-16]
-    push rax
-    mov  rax, [rbp-216]
-    push rax
-    call fb_putc
-    add  rsp, 56
-    sub  rsp, 8
-    mov  rax, [rbp-208]
-    push rax
-    mov  rax, [rbp-200]
-    push rax
-    mov  rax, [rbp-32]
-    push rax
-    mov  rax, [rbp-24]
-    push rax
-    mov  rax, [rbp-16]
-    push rax
-    mov  rax, [rbp-216]
-    push rax
-    call fb_write_usbsts_label
-    add  rsp, 56
-    mov  rax, [rbp-432]
-    and  eax, 0xFFFFFFFF
-    push rax
-    mov  rax, [rbp-208]
-    push rax
-    mov  rax, [rbp-200]
-    push rax
-    mov  rax, [rbp-32]
-    push rax
-    mov  rax, [rbp-24]
-    push rax
-    mov  rax, [rbp-16]
-    push rax
-    mov  rax, [rbp-216]
-    push rax
-    call fb_write_hex_u64
-    add  rsp, 56
-    mov  rax, 0x0A
-    and  rax, 0xFF
-    push rax
-    mov  rax, [rbp-208]
-    push rax
-    mov  rax, [rbp-200]
-    push rax
-    mov  rax, [rbp-32]
-    push rax
-    mov  rax, [rbp-24]
-    push rax
-    mov  rax, [rbp-16]
-    push rax
-    mov  rax, [rbp-216]
-    push rax
-    call fb_putc
-    add  rsp, 56
-    mov  rax, [rbp-424]
-    and  eax, 0xFFFFFFFF
-    push rax
-    mov  rax, 0x00000001
-    and  eax, 0xFFFFFFFF
-    pop  rcx
-    or   rax, rcx
-    and  eax, 0xFFFFFFFF
-    and  eax, 0xFFFFFFFF
-    mov  [rbp-440], rax
-    mov  rax, [rbp-376]
-    push rax
-    mov  rax, [rbp-440]
-    and  eax, 0xFFFFFFFF
-    and  eax, 0xFFFFFFFF
-    pop  rcx
-    mov  dword [rcx], eax
-    mov  rax, 1000000
-    mov  [rbp-448], rax
-.while_start_26:
-    mov  rax, [rbp-448]
-    push rax
-    mov  rax, 0
-    pop  rcx
-    cmp  rcx, rax
-    setg al
-    movzx eax, al
-    cmp  rax, 0
-    je   .while_end_27
-    mov  rax, [rbp-384]
-    mov  eax, dword [rax]
-    and  eax, 0xFFFFFFFF
-    push rax
-    mov  rax, 0x00000001
+    mov  rax, 0xFF
     and  eax, 0xFFFFFFFF
     pop  rcx
     and  rax, rcx
     and  eax, 0xFFFFFFFF
-    push rax
-    mov  rax, 0
+    and  rax, 0xFF
+    and  rax, 0xFF
+    mov  [rbp-432], rax
+    mov  rax, [rbp-424]
     and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 8
+    and  eax, 0xFFFFFFFF
+    mov  rcx, rax
+    pop  rax
+    shr  rax, cl
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0xFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  rax, 0xFF
+    and  rax, 0xFF
+    mov  [rbp-440], rax
+    mov  rax, [rbp-432]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 2
+    and  rax, 0xFF
     pop  rcx
     cmp  rcx, rax
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_29
-    jmp  .while_end_27
-    jmp  .if_end_28
-.if_next_29:
-.if_end_28:
-    mov  rax, 1
-    mov  rcx, [rbp-448]
-    sub  rcx, rax
-    mov  rax, rcx
+    je   .if_next_27
+    mov  rax, [rbp-232]
+    push rax
+    mov  rax, [rbp-400]
+    pop  rcx
+    add  rax, rcx
+    push rax
+    mov  rax, 0x04
+    pop  rcx
+    add  rax, rcx
     mov  [rbp-448], rax
-    jmp  .while_start_26
-.while_end_27:
-    mov  rax, [rbp-376]
-    mov  eax, dword [rax]
-    and  eax, 0xFFFFFFFF
-    and  eax, 0xFFFFFFFF
+    mov  rax, [rbp-232]
+    push rax
+    mov  rax, [rbp-400]
+    pop  rcx
+    add  rax, rcx
+    push rax
+    mov  rax, 0x08
+    pop  rcx
+    add  rax, rcx
     mov  [rbp-456], rax
-    mov  rax, [rbp-384]
+    mov  rax, [rbp-448]
     mov  eax, dword [rax]
     and  eax, 0xFFFFFFFF
     and  eax, 0xFFFFFFFF
     mov  [rbp-464], rax
-    sub  rsp, 8
-    mov  rax, [rbp-208]
-    push rax
-    mov  rax, [rbp-200]
-    push rax
-    mov  rax, [rbp-32]
-    push rax
-    mov  rax, [rbp-24]
-    push rax
-    mov  rax, [rbp-16]
-    push rax
-    mov  rax, [rbp-216]
-    push rax
-    call fb_write_usbcmd_label
-    add  rsp, 56
     mov  rax, [rbp-456]
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-472], rax
+    mov  rax, [rbp-472]
     and  eax, 0xFFFFFFFF
     push rax
-    mov  rax, [rbp-208]
-    push rax
-    mov  rax, [rbp-200]
-    push rax
-    mov  rax, [rbp-32]
-    push rax
-    mov  rax, [rbp-24]
-    push rax
-    mov  rax, [rbp-16]
-    push rax
-    mov  rax, [rbp-216]
-    push rax
-    call fb_write_hex_u64
-    add  rsp, 56
-    mov  rax, 0x0A
+    mov  rax, 0xFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
     and  rax, 0xFF
+    and  rax, 0xFF
+    mov  [rbp-480], rax
+    mov  rax, [rbp-472]
+    and  eax, 0xFFFFFFFF
     push rax
-    mov  rax, [rbp-208]
+    mov  rax, 8
+    and  eax, 0xFFFFFFFF
+    mov  rcx, rax
+    pop  rax
+    shr  rax, cl
+    and  eax, 0xFFFFFFFF
     push rax
-    mov  rax, [rbp-200]
-    push rax
-    mov  rax, [rbp-32]
-    push rax
-    mov  rax, [rbp-24]
-    push rax
-    mov  rax, [rbp-16]
-    push rax
-    mov  rax, [rbp-216]
-    push rax
-    call fb_putc
-    add  rsp, 56
+    mov  rax, 0xFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  rax, 0xFF
+    and  rax, 0xFF
+    mov  [rbp-488], rax
     sub  rsp, 8
     mov  rax, [rbp-208]
     push rax
@@ -12280,7 +14931,7 @@ _start:
     push rax
     mov  rax, [rbp-216]
     push rax
-    call fb_write_usbsts_label
+    call fb_write_spd1_label
     add  rsp, 56
     mov  rax, [rbp-464]
     and  eax, 0xFFFFFFFF
@@ -12316,262 +14967,675 @@ _start:
     push rax
     call fb_putc
     add  rsp, 56
-    mov  rax, [rbp-320]
+    sub  rsp, 8
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_spd2_label
+    add  rsp, 56
+    mov  rax, [rbp-472]
     and  eax, 0xFFFFFFFF
     push rax
-    mov  rax, 0x1F
-    and  eax, 0xFFFFFFFF
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x0A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    sub  rsp, 8
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_poff_label
+    add  rsp, 56
+    mov  rax, [rbp-480]
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x20
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    sub  rsp, 8
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_pcnt_label
+    add  rsp, 56
+    mov  rax, [rbp-488]
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x0A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    jmp  .if_end_26
+.if_next_27:
+.if_end_26:
+    mov  rax, [rbp-432]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 1
+    and  rax, 0xFF
     pop  rcx
-    and  rax, rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_29
+    mov  rax, [rbp-232]
+    push rax
+    mov  rax, [rbp-400]
+    pop  rcx
+    add  rax, rcx
+    mov  [rbp-496], rax
+    mov  rax, [rbp-496]
+    mov  eax, dword [rax]
     and  eax, 0xFFFFFFFF
     and  eax, 0xFFFFFFFF
-    mov  [rbp-472], rax
-    mov  rax, [rbp-320]
+    mov  [rbp-504], rax
+    mov  rax, [rbp-504]
     and  eax, 0xFFFFFFFF
     push rax
-    mov  rax, 27
+    mov  rax, 16
     and  eax, 0xFFFFFFFF
     mov  rcx, rax
     pop  rax
     shr  rax, cl
     and  eax, 0xFFFFFFFF
     push rax
-    mov  rax, 0x1F
+    mov  rax, 1
     and  eax, 0xFFFFFFFF
     pop  rcx
     and  rax, rcx
     and  eax, 0xFFFFFFFF
     and  eax, 0xFFFFFFFF
-    mov  [rbp-480], rax
-    mov  rax, [rbp-480]
+    mov  [rbp-512], rax
+    mov  rax, [rbp-504]
     and  eax, 0xFFFFFFFF
     push rax
-    mov  rax, 5
+    mov  rax, 24
     and  eax, 0xFFFFFFFF
     mov  rcx, rax
     pop  rax
-    shl  rax, cl
+    shr  rax, cl
     and  eax, 0xFFFFFFFF
     push rax
-    mov  rax, [rbp-472]
+    mov  rax, 1
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-520], rax
+    sub  rsp, 8
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_leg_label
+    add  rsp, 56
+    mov  rax, [rbp-504]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x0A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    sub  rsp, 8
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_bios_label
+    add  rsp, 56
+    mov  rax, [rbp-512]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x0A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    sub  rsp, 8
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_os_label
+    add  rsp, 56
+    mov  rax, [rbp-520]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x0A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, [rbp-504]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 1
+    push rax
+    mov  rax, 24
+    mov  rcx, rax
+    pop  rax
+    shl  rax, cl
     and  eax, 0xFFFFFFFF
     pop  rcx
     or   rax, rcx
     and  eax, 0xFFFFFFFF
     and  eax, 0xFFFFFFFF
-    mov  [rbp-488], rax
-    mov  rax, [rbp-488]
-    and  eax, 0xFFFFFFFF
-    push rax
-    mov  rax, 32
-    and  eax, 0xFFFFFFFF
-    pop  rcx
-    cmp  rcx, rax
-    seta al
-    movzx eax, al
-    cmp  rax, 0
-    je   .if_next_31
-    mov  rax, 32
-    and  eax, 0xFFFFFFFF
-    and  eax, 0xFFFFFFFF
-    mov  [rbp-488], rax
-    jmp  .if_end_30
-.if_next_31:
-.if_end_30:
-    sub  rsp, 8
-    call rt_xhci_dcbaa
-    add  rsp, 8
-    mov  [rbp-496], rax
-    sub  rsp, 8
-    call rt_xhci_cmd_ring
-    add  rsp, 8
-    mov  [rbp-504], rax
-    sub  rsp, 8
-    call rt_xhci_evt_ring
-    add  rsp, 8
-    mov  [rbp-512], rax
-    sub  rsp, 8
-    call rt_xhci_erst
-    add  rsp, 8
-    mov  [rbp-520], rax
-    sub  rsp, 8
-    call rt_xhci_scratch_array
-    add  rsp, 8
     mov  [rbp-528], rax
-    sub  rsp, 8
-    call rt_xhci_scratch_bufs
-    add  rsp, 8
-    mov  [rbp-536], rax
-    sub  rsp, 8
-    mov  rax, 2048
-    push rax
     mov  rax, [rbp-496]
     push rax
-    call xhci_zero
-    add  rsp, 24
-    sub  rsp, 8
-    mov  rax, 4096
-    push rax
-    mov  rax, [rbp-504]
-    push rax
-    call xhci_zero
-    add  rsp, 24
-    sub  rsp, 8
-    mov  rax, 4096
-    push rax
-    mov  rax, [rbp-512]
-    push rax
-    call xhci_zero
-    add  rsp, 24
-    sub  rsp, 8
-    mov  rax, 16
-    push rax
-    mov  rax, [rbp-520]
-    push rax
-    call xhci_zero
-    add  rsp, 24
-    sub  rsp, 8
-    mov  rax, 256
-    push rax
     mov  rax, [rbp-528]
-    push rax
-    call xhci_zero
-    add  rsp, 24
-    sub  rsp, 8
-    mov  rax, 4096
-    push rax
-    mov  rax, 32
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
     pop  rcx
-    imul rax, rcx
-    push rax
+    mov  dword [rcx], eax
+    mov  rax, 2000000
+    mov  [rbp-536], rax
+.while_start_30:
     mov  rax, [rbp-536]
     push rax
-    call xhci_zero
-    add  rsp, 24
-    mov  rax, [rbp-488]
+    mov  rax, 0
+    pop  rcx
+    cmp  rcx, rax
+    setg al
+    movzx eax, al
+    cmp  rax, 0
+    je   .while_end_31
+    mov  rax, [rbp-496]
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-544], rax
+    mov  rax, [rbp-544]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 16
+    and  eax, 0xFFFFFFFF
+    mov  rcx, rax
+    pop  rax
+    shr  rax, cl
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 1
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
     and  eax, 0xFFFFFFFF
     push rax
     mov  rax, 0
     and  eax, 0xFFFFFFFF
     pop  rcx
     cmp  rcx, rax
-    seta al
+    sete al
     movzx eax, al
     cmp  rax, 0
     je   .if_next_33
-    mov  rax, [rbp-528]
-    mov  [rbp-544], rax
-    mov  rax, [rbp-496]
-    mov  [rbp-552], rax
-    mov  rax, [rbp-552]
-    push rax
-    mov  rax, [rbp-528]
-    pop  rcx
-    mov  qword [rcx], rax
-    mov  rax, 0
-    mov  [rbp-560], rax
-.while_start_34:
-    mov  rax, [rbp-560]
-    and  eax, 0xFFFFFFFF
-    push rax
-    mov  rax, [rbp-488]
-    and  eax, 0xFFFFFFFF
-    pop  rcx
-    cmp  rcx, rax
-    setb al
-    movzx eax, al
-    cmp  rax, 0
-    je   .while_end_35
-    mov  rax, [rbp-536]
-    push rax
-    mov  rax, [rbp-560]
-    push rax
-    mov  rax, 4096
-    pop  rcx
-    imul rax, rcx
-    mov  rcx, rax
-    pop  rax
-    add  rax, rcx
-    mov  [rbp-568], rax
-    mov  rax, [rbp-544]
-    push rax
-    mov  rax, [rbp-560]
-    mov  rcx, rax
-    pop  rax
-    imul rcx, 8
-    add  rax, rcx
-    push rax
-    mov  rax, [rbp-568]
-    pop  rcx
-    mov  qword [rcx], rax
-    mov  rax, 1
-    mov  rcx, [rbp-560]
-    add  rax, rcx
-    mov  [rbp-560], rax
-    jmp  .while_start_34
-.while_end_35:
+    jmp  .while_end_31
     jmp  .if_end_32
 .if_next_33:
 .if_end_32:
+    mov  rax, 1
+    mov  rcx, [rbp-536]
+    sub  rcx, rax
+    mov  rax, rcx
+    mov  [rbp-536], rax
+    jmp  .while_start_30
+.while_end_31:
+    mov  rax, [rbp-496]
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-552], rax
+    sub  rsp, 8
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_leg_label
+    add  rsp, 56
+    mov  rax, [rbp-552]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x0A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    jmp  .while_end_25
+    jmp  .if_end_28
+.if_next_29:
+.if_end_28:
+    mov  rax, [rbp-440]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 0
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_35
+    jmp  .while_end_25
+    jmp  .if_end_34
+.if_next_35:
+.if_end_34:
+    mov  rax, [rbp-400]
+    push rax
+    mov  rax, [rbp-440]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 4
+    pop  rcx
+    imul rax, rcx
+    pop  rcx
+    add  rax, rcx
+    mov  [rbp-400], rax
+    mov  rax, 1
+    mov  rcx, [rbp-408]
+    sub  rcx, rax
+    mov  rax, rcx
+    mov  [rbp-408], rax
+    jmp  .while_start_24
+.while_end_25:
+    jmp  .if_end_22
+.if_next_23:
+.if_end_22:
     mov  rax, [rbp-232]
     push rax
     mov  rax, [rbp-256]
     and  rax, 0xFF
     pop  rcx
     add  rax, rcx
-    mov  [rbp-576], rax
-    mov  rax, [rbp-576]
+    mov  [rbp-560], rax
+    mov  rax, [rbp-560]
     push rax
     mov  rax, 0x00
     pop  rcx
     add  rax, rcx
-    mov  [rbp-584], rax
-    mov  rax, [rbp-576]
+    mov  [rbp-568], rax
+    mov  rax, [rbp-560]
     push rax
     mov  rax, 0x04
     pop  rcx
     add  rax, rcx
-    mov  [rbp-592], rax
-    mov  rax, [rbp-576]
-    push rax
-    mov  rax, 0x38
-    pop  rcx
-    add  rax, rcx
-    mov  [rbp-600], rax
-    mov  rax, [rbp-576]
-    push rax
-    mov  rax, 0x30
-    pop  rcx
-    add  rax, rcx
-    mov  [rbp-608], rax
-    mov  rax, [rbp-576]
-    push rax
-    mov  rax, 0x18
-    pop  rcx
-    add  rax, rcx
-    mov  [rbp-616], rax
-    mov  rax, [rbp-584]
+    mov  [rbp-576], rax
+    mov  rax, [rbp-568]
     mov  eax, dword [rax]
     and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-584], rax
+    mov  rax, [rbp-576]
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-592], rax
+    sub  rsp, 8
+    mov  rax, [rbp-208]
     push rax
-    mov  rax, 0xFFFFFFFE
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_usbcmd_label
+    add  rsp, 56
+    mov  rax, [rbp-584]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x0A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    sub  rsp, 8
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_usbsts_label
+    add  rsp, 56
+    mov  rax, [rbp-592]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x0A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, [rbp-584]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0x00000002
     and  eax, 0xFFFFFFFF
     pop  rcx
-    and  rax, rcx
+    or   rax, rcx
     and  eax, 0xFFFFFFFF
     and  eax, 0xFFFFFFFF
-    mov  [rbp-624], rax
-    mov  rax, [rbp-584]
+    mov  [rbp-600], rax
+    mov  rax, [rbp-568]
     push rax
-    mov  rax, [rbp-624]
+    mov  rax, [rbp-600]
     and  eax, 0xFFFFFFFF
     and  eax, 0xFFFFFFFF
     pop  rcx
     mov  dword [rcx], eax
     mov  rax, 1000000
-    mov  [rbp-632], rax
+    mov  [rbp-608], rax
 .while_start_36:
-    mov  rax, [rbp-632]
+    mov  rax, [rbp-608]
     push rax
     mov  rax, 0
     pop  rcx
@@ -12580,11 +15644,11 @@ _start:
     movzx eax, al
     cmp  rax, 0
     je   .while_end_37
-    mov  rax, [rbp-592]
+    mov  rax, [rbp-568]
     mov  eax, dword [rax]
     and  eax, 0xFFFFFFFF
     push rax
-    mov  rax, 0x00000001
+    mov  rax, 0x00000002
     and  eax, 0xFFFFFFFF
     pop  rcx
     and  rax, rcx
@@ -12594,7 +15658,7 @@ _start:
     and  eax, 0xFFFFFFFF
     pop  rcx
     cmp  rcx, rax
-    setne al
+    sete al
     movzx eax, al
     cmp  rax, 0
     je   .if_next_39
@@ -12603,34 +15667,141 @@ _start:
 .if_next_39:
 .if_end_38:
     mov  rax, 1
-    mov  rcx, [rbp-632]
+    mov  rcx, [rbp-608]
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-632], rax
+    mov  [rbp-608], rax
     jmp  .while_start_36
 .while_end_37:
-    mov  rax, [rbp-584]
+    mov  rax, [rbp-568]
     mov  eax, dword [rax]
     and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-616], rax
+    mov  rax, [rbp-576]
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-624], rax
+    sub  rsp, 8
+    mov  rax, [rbp-208]
     push rax
-    mov  rax, 0x00000002
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_usbcmd_label
+    add  rsp, 56
+    mov  rax, [rbp-616]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x0A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    sub  rsp, 8
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_usbsts_label
+    add  rsp, 56
+    mov  rax, [rbp-624]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x0A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, [rbp-616]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0x00000001
     and  eax, 0xFFFFFFFF
     pop  rcx
     or   rax, rcx
     and  eax, 0xFFFFFFFF
     and  eax, 0xFFFFFFFF
-    mov  [rbp-640], rax
-    mov  rax, [rbp-584]
+    mov  [rbp-632], rax
+    mov  rax, [rbp-568]
     push rax
-    mov  rax, [rbp-640]
+    mov  rax, [rbp-632]
     and  eax, 0xFFFFFFFF
     and  eax, 0xFFFFFFFF
     pop  rcx
     mov  dword [rcx], eax
-    mov  rax, 2000000
-    mov  [rbp-648], rax
+    mov  rax, 1000000
+    mov  [rbp-640], rax
 .while_start_40:
-    mov  rax, [rbp-648]
+    mov  rax, [rbp-640]
     push rax
     mov  rax, 0
     pop  rcx
@@ -12639,11 +15810,11 @@ _start:
     movzx eax, al
     cmp  rax, 0
     je   .while_end_41
-    mov  rax, [rbp-584]
+    mov  rax, [rbp-576]
     mov  eax, dword [rax]
     and  eax, 0xFFFFFFFF
     push rax
-    mov  rax, 0x00000002
+    mov  rax, 0x00000001
     and  eax, 0xFFFFFFFF
     pop  rcx
     and  rax, rcx
@@ -12662,63 +15833,539 @@ _start:
 .if_next_43:
 .if_end_42:
     mov  rax, 1
-    mov  rcx, [rbp-648]
+    mov  rcx, [rbp-640]
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-648], rax
+    mov  [rbp-640], rax
     jmp  .while_start_40
 .while_end_41:
-    mov  rax, 1
+    mov  rax, [rbp-568]
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-648], rax
+    mov  rax, [rbp-576]
+    mov  eax, dword [rax]
     and  eax, 0xFFFFFFFF
     and  eax, 0xFFFFFFFF
     mov  [rbp-656], rax
-    mov  rax, [rbp-360]
+    sub  rsp, 8
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_usbcmd_label
+    add  rsp, 56
+    mov  rax, [rbp-648]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x0A
     and  rax, 0xFF
     push rax
-    mov  rax, 0
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    sub  rsp, 8
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_usbsts_label
+    add  rsp, 56
+    mov  rax, [rbp-656]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x0A
     and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, [rbp-320]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0x1F
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-664], rax
+    mov  rax, [rbp-320]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 27
+    and  eax, 0xFFFFFFFF
+    mov  rcx, rax
+    pop  rax
+    shr  rax, cl
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0x1F
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-672], rax
+    mov  rax, [rbp-672]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 5
+    and  eax, 0xFFFFFFFF
+    mov  rcx, rax
+    pop  rax
+    shl  rax, cl
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-664]
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    or   rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-680], rax
+    mov  rax, [rbp-680]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 32
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    cmp  rcx, rax
+    seta al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_45
+    mov  rax, 32
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-680], rax
+    jmp  .if_end_44
+.if_next_45:
+.if_end_44:
+    sub  rsp, 8
+    call rt_xhci_dcbaa
+    add  rsp, 8
+    mov  [rbp-688], rax
+    sub  rsp, 8
+    call rt_xhci_cmd_ring
+    add  rsp, 8
+    mov  [rbp-696], rax
+    sub  rsp, 8
+    call rt_xhci_evt_ring
+    add  rsp, 8
+    mov  [rbp-704], rax
+    sub  rsp, 8
+    call rt_xhci_erst
+    add  rsp, 8
+    mov  [rbp-712], rax
+    sub  rsp, 8
+    call rt_xhci_scratch_array
+    add  rsp, 8
+    mov  [rbp-720], rax
+    sub  rsp, 8
+    call rt_xhci_scratch_bufs
+    add  rsp, 8
+    mov  [rbp-728], rax
+    sub  rsp, 8
+    mov  rax, 2048
+    push rax
+    mov  rax, [rbp-688]
+    push rax
+    call xhci_zero
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 4096
+    push rax
+    mov  rax, [rbp-696]
+    push rax
+    call xhci_zero
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 4096
+    push rax
+    mov  rax, [rbp-704]
+    push rax
+    call xhci_zero
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 16
+    push rax
+    mov  rax, [rbp-712]
+    push rax
+    call xhci_zero
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 256
+    push rax
+    mov  rax, [rbp-720]
+    push rax
+    call xhci_zero
+    add  rsp, 24
+    sub  rsp, 8
+    mov  rax, 4096
+    push rax
+    mov  rax, 32
+    pop  rcx
+    imul rax, rcx
+    push rax
+    mov  rax, [rbp-728]
+    push rax
+    call xhci_zero
+    add  rsp, 24
+    mov  rax, [rbp-680]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    cmp  rcx, rax
+    seta al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_47
+    mov  rax, [rbp-720]
+    mov  [rbp-736], rax
+    mov  rax, [rbp-688]
+    mov  [rbp-744], rax
+    mov  rax, [rbp-744]
+    push rax
+    mov  rax, [rbp-720]
+    pop  rcx
+    mov  qword [rcx], rax
+    mov  rax, 0
+    mov  [rbp-752], rax
+.while_start_48:
+    mov  rax, [rbp-752]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-680]
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    cmp  rcx, rax
+    setb al
+    movzx eax, al
+    cmp  rax, 0
+    je   .while_end_49
+    mov  rax, [rbp-728]
+    push rax
+    mov  rax, [rbp-752]
+    push rax
+    mov  rax, 4096
+    pop  rcx
+    imul rax, rcx
+    mov  rcx, rax
+    pop  rax
+    add  rax, rcx
+    mov  [rbp-760], rax
+    mov  rax, [rbp-736]
+    push rax
+    mov  rax, [rbp-752]
+    mov  rcx, rax
+    pop  rax
+    imul rcx, 8
+    add  rax, rcx
+    push rax
+    mov  rax, [rbp-760]
+    pop  rcx
+    mov  qword [rcx], rax
+    mov  rax, 1
+    mov  rcx, [rbp-752]
+    add  rax, rcx
+    mov  [rbp-752], rax
+    jmp  .while_start_48
+.while_end_49:
+    jmp  .if_end_46
+.if_next_47:
+.if_end_46:
+    mov  rax, [rbp-232]
+    push rax
+    mov  rax, [rbp-256]
+    and  rax, 0xFF
+    pop  rcx
+    add  rax, rcx
+    mov  [rbp-768], rax
+    mov  rax, [rbp-768]
+    push rax
+    mov  rax, 0x00
+    pop  rcx
+    add  rax, rcx
+    mov  [rbp-776], rax
+    mov  rax, [rbp-768]
+    push rax
+    mov  rax, 0x04
+    pop  rcx
+    add  rax, rcx
+    mov  [rbp-784], rax
+    mov  rax, [rbp-768]
+    push rax
+    mov  rax, 0x38
+    pop  rcx
+    add  rax, rcx
+    mov  [rbp-792], rax
+    mov  rax, [rbp-768]
+    push rax
+    mov  rax, 0x30
+    pop  rcx
+    add  rax, rcx
+    mov  [rbp-800], rax
+    mov  rax, [rbp-768]
+    push rax
+    mov  rax, 0x18
+    pop  rcx
+    add  rax, rcx
+    mov  [rbp-808], rax
+    mov  rax, [rbp-776]
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0xFFFFFFFE
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-816], rax
+    mov  rax, [rbp-776]
+    push rax
+    mov  rax, [rbp-816]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    mov  dword [rcx], eax
+    mov  rax, 1000000
+    mov  [rbp-824], rax
+.while_start_50:
+    mov  rax, [rbp-824]
+    push rax
+    mov  rax, 0
+    pop  rcx
+    cmp  rcx, rax
+    setg al
+    movzx eax, al
+    cmp  rax, 0
+    je   .while_end_51
+    mov  rax, [rbp-784]
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0x00000001
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    cmp  rcx, rax
+    setne al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_53
+    jmp  .while_end_51
+    jmp  .if_end_52
+.if_next_53:
+.if_end_52:
+    mov  rax, 1
+    mov  rcx, [rbp-824]
+    sub  rcx, rax
+    mov  rax, rcx
+    mov  [rbp-824], rax
+    jmp  .while_start_50
+.while_end_51:
+    mov  rax, [rbp-776]
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0x00000002
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    or   rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-832], rax
+    mov  rax, [rbp-776]
+    push rax
+    mov  rax, [rbp-832]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    mov  dword [rcx], eax
+    mov  rax, 2000000
+    mov  [rbp-840], rax
+.while_start_54:
+    mov  rax, [rbp-840]
+    push rax
+    mov  rax, 0
+    pop  rcx
+    cmp  rcx, rax
+    setg al
+    movzx eax, al
+    cmp  rax, 0
+    je   .while_end_55
+    mov  rax, [rbp-776]
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0x00000002
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0
+    and  eax, 0xFFFFFFFF
     pop  rcx
     cmp  rcx, rax
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_45
+    je   .if_next_57
+    jmp  .while_end_55
+    jmp  .if_end_56
+.if_next_57:
+.if_end_56:
+    mov  rax, 1
+    mov  rcx, [rbp-840]
+    sub  rcx, rax
+    mov  rax, rcx
+    mov  [rbp-840], rax
+    jmp  .while_start_54
+.while_end_55:
+    mov  rax, [rbp-360]
+    and  rax, 0xFF
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-848], rax
+    mov  rax, [rbp-848]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_59
     mov  rax, 0
     and  eax, 0xFFFFFFFF
     and  eax, 0xFFFFFFFF
-    mov  [rbp-656], rax
-    jmp  .if_end_44
-.if_next_45:
-.if_end_44:
-    mov  rax, [rbp-600]
+    mov  [rbp-848], rax
+    jmp  .if_end_58
+.if_next_59:
+.if_end_58:
+    mov  rax, [rbp-792]
     push rax
-    mov  rax, [rbp-656]
+    mov  rax, [rbp-848]
     and  eax, 0xFFFFFFFF
     and  eax, 0xFFFFFFFF
     pop  rcx
     mov  dword [rcx], eax
-    mov  rax, [rbp-608]
+    mov  rax, [rbp-800]
     push rax
-    mov  rax, [rbp-496]
+    mov  rax, [rbp-688]
     pop  rcx
     mov  qword [rcx], rax
-    mov  rax, [rbp-616]
-    push rax
-    mov  rax, [rbp-504]
-    push rax
     mov  rax, 1
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-856], rax
+    mov  rax, 0
+    mov  [rbp-864], rax
+    sub  rsp, 8
+    mov  rax, [rbp-856]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-696]
+    push rax
+    call xhci_cmd_ring_init
+    add  rsp, 24
+    mov  rax, [rbp-808]
+    push rax
+    mov  rax, [rbp-696]
+    push rax
+    mov  rax, [rbp-856]
+    and  eax, 0xFFFFFFFF
     pop  rcx
     or   rax, rcx
     pop  rcx
     mov  qword [rcx], rax
-    mov  rax, [rbp-520]
-    mov  [rbp-664], rax
-    mov  rax, [rbp-664]
+    mov  rax, [rbp-712]
+    mov  [rbp-872], rax
+    mov  rax, [rbp-872]
     push rax
-    mov  rax, [rbp-512]
+    mov  rax, [rbp-704]
     pop  rcx
     mov  qword [rcx], rax
-    mov  rax, [rbp-664]
+    mov  rax, [rbp-872]
     push rax
     mov  rax, 1
     mov  rcx, rax
@@ -12741,69 +16388,75 @@ _start:
     and  eax, 0xFFFFFFFF
     pop  rcx
     add  rax, rcx
-    mov  [rbp-672], rax
-    mov  rax, [rbp-672]
+    mov  [rbp-880], rax
+    mov  rax, [rbp-880]
     push rax
     mov  rax, 0x20
     pop  rcx
     add  rax, rcx
-    mov  [rbp-680], rax
-    mov  rax, [rbp-672]
+    mov  [rbp-888], rax
+    mov  rax, [rbp-880]
     push rax
     mov  rax, 0x24
     pop  rcx
     add  rax, rcx
-    mov  [rbp-688], rax
-    mov  rax, [rbp-672]
+    mov  [rbp-896], rax
+    mov  rax, [rbp-880]
     push rax
     mov  rax, 0x28
     pop  rcx
     add  rax, rcx
-    mov  [rbp-696], rax
-    mov  rax, [rbp-672]
+    mov  [rbp-904], rax
+    mov  rax, [rbp-880]
     push rax
     mov  rax, 0x30
     pop  rcx
     add  rax, rcx
-    mov  [rbp-704], rax
-    mov  rax, [rbp-672]
+    mov  [rbp-912], rax
+    mov  rax, [rbp-880]
     push rax
     mov  rax, 0x38
     pop  rcx
     add  rax, rcx
-    mov  [rbp-712], rax
-    mov  rax, [rbp-688]
+    mov  [rbp-920], rax
+    mov  rax, [rbp-896]
     push rax
     mov  rax, 0
     and  eax, 0xFFFFFFFF
     and  eax, 0xFFFFFFFF
     pop  rcx
     mov  dword [rcx], eax
-    mov  rax, [rbp-696]
+    mov  rax, [rbp-904]
     push rax
     mov  rax, 1
     and  eax, 0xFFFFFFFF
     and  eax, 0xFFFFFFFF
     pop  rcx
     mov  dword [rcx], eax
-    mov  rax, [rbp-704]
+    mov  rax, [rbp-912]
     push rax
-    mov  rax, [rbp-520]
-    pop  rcx
-    mov  qword [rcx], rax
     mov  rax, [rbp-712]
-    push rax
-    mov  rax, [rbp-512]
     pop  rcx
     mov  qword [rcx], rax
-    mov  rax, [rbp-680]
+    mov  rax, [rbp-920]
+    push rax
+    mov  rax, [rbp-704]
+    pop  rcx
+    mov  qword [rcx], rax
+    mov  rax, [rbp-888]
     push rax
     mov  rax, 0x00000002
     and  eax, 0xFFFFFFFF
     and  eax, 0xFFFFFFFF
     pop  rcx
     mov  dword [rcx], eax
-    mov  rax, [rbp-584]
+    mov  rax, 1
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-928], rax
+    mov  rax, 0
+    mov  [rbp-936], rax
+    mov  rax, [rbp-776]
     mov  eax, dword [rax]
     and  eax, 0xFFFFFFFF
     push rax
@@ -12813,18 +16466,18 @@ _start:
     or   rax, rcx
     and  eax, 0xFFFFFFFF
     and  eax, 0xFFFFFFFF
-    mov  [rbp-720], rax
-    mov  rax, [rbp-584]
+    mov  [rbp-944], rax
+    mov  rax, [rbp-776]
     push rax
-    mov  rax, [rbp-720]
+    mov  rax, [rbp-944]
     and  eax, 0xFFFFFFFF
     and  eax, 0xFFFFFFFF
     pop  rcx
     mov  dword [rcx], eax
     mov  rax, 1000000
-    mov  [rbp-728], rax
-.while_start_46:
-    mov  rax, [rbp-728]
+    mov  [rbp-952], rax
+.while_start_60:
+    mov  rax, [rbp-952]
     push rax
     mov  rax, 0
     pop  rcx
@@ -12832,8 +16485,8 @@ _start:
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .while_end_47
-    mov  rax, [rbp-592]
+    je   .while_end_61
+    mov  rax, [rbp-784]
     mov  eax, dword [rax]
     and  eax, 0xFFFFFFFF
     push rax
@@ -12850,18 +16503,18 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_49
-    jmp  .while_end_47
-    jmp  .if_end_48
-.if_next_49:
-.if_end_48:
+    je   .if_next_63
+    jmp  .while_end_61
+    jmp  .if_end_62
+.if_next_63:
+.if_end_62:
     mov  rax, 1
-    mov  rcx, [rbp-728]
+    mov  rcx, [rbp-952]
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-728], rax
-    jmp  .while_start_46
-.while_end_47:
+    mov  [rbp-952], rax
+    jmp  .while_start_60
+.while_end_61:
     sub  rsp, 8
     mov  rax, [rbp-208]
     push rax
@@ -12877,7 +16530,7 @@ _start:
     push rax
     call fb_write_cfg_label
     add  rsp, 56
-    mov  rax, [rbp-656]
+    mov  rax, [rbp-848]
     and  eax, 0xFFFFFFFF
     push rax
     mov  rax, [rbp-208]
@@ -12926,7 +16579,7 @@ _start:
     push rax
     call fb_write_dcbaap_label
     add  rsp, 56
-    mov  rax, [rbp-496]
+    mov  rax, [rbp-688]
     push rax
     mov  rax, [rbp-208]
     push rax
@@ -12974,7 +16627,7 @@ _start:
     push rax
     call fb_write_crcr_label
     add  rsp, 56
-    mov  rax, [rbp-504]
+    mov  rax, [rbp-696]
     push rax
     mov  rax, 1
     pop  rcx
@@ -13026,7 +16679,7 @@ _start:
     push rax
     call fb_write_erstba_label
     add  rsp, 56
-    mov  rax, [rbp-520]
+    mov  rax, [rbp-712]
     push rax
     mov  rax, [rbp-208]
     push rax
@@ -13074,7 +16727,7 @@ _start:
     push rax
     call fb_write_erdp_label
     add  rsp, 56
-    mov  rax, [rbp-512]
+    mov  rax, [rbp-704]
     push rax
     mov  rax, [rbp-208]
     push rax
@@ -13122,7 +16775,7 @@ _start:
     push rax
     call fb_write_iman_label
     add  rsp, 56
-    mov  rax, [rbp-680]
+    mov  rax, [rbp-888]
     mov  eax, dword [rax]
     and  eax, 0xFFFFFFFF
     push rax
@@ -13157,25 +16810,1033 @@ _start:
     push rax
     call fb_putc
     add  rsp, 56
+    mov  rax, [rbp-232]
+    push rax
+    mov  rax, [rbp-336]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0xFFFFFFE0
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    add  rax, rcx
+    mov  [rbp-960], rax
+    mov  rax, [rbp-960]
+    mov  [rbp-968], rax
+    mov  rax, 9
+    push rax
+    mov  rax, 10
+    mov  rcx, rax
+    pop  rax
+    shl  rax, cl
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0
+    and  eax, 0xFFFFFFFF
+    push rax
+    lea  rax, [rbp-856]
+    push rax
+    lea  rax, [rbp-864]
+    push rax
+    mov  rax, [rbp-696]
+    push rax
+    call xhci_cmd_enqueue
+    add  rsp, 56
+    mov  rax, [rbp-968]
+    push rax
+    mov  rax, 0
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    mov  dword [rcx], eax
+    mov  rax, 2000000
+    mov  [rbp-976], rax
+    mov  rax, 0
+    mov  [rbp-984], rax
+    mov  rax, 0
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-992], rax
+    mov  rax, 0
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-1000], rax
+    mov  rax, 0
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-1008], rax
+    mov  rax, 0
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-1016], rax
+.while_start_64:
+    mov  rax, [rbp-976]
+    push rax
+    mov  rax, 0
+    pop  rcx
+    cmp  rcx, rax
+    setg al
+    movzx eax, al
+    cmp  rax, 0
+    setne al
+    movzx eax, al
+    push rax
+    mov  rax, [rbp-984]
+    push rax
+    mov  rax, 0
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    cmp  rax, 0
+    setne al
+    movzx eax, al
+    pop  rcx
+    and  rax, rcx
+    cmp  rax, 0
+    je   .while_end_65
+    lea  rax, [rbp-1016]
+    push rax
+    lea  rax, [rbp-1008]
+    push rax
+    lea  rax, [rbp-1000]
+    push rax
+    lea  rax, [rbp-992]
+    push rax
+    lea  rax, [rbp-928]
+    push rax
+    lea  rax, [rbp-936]
+    push rax
+    mov  rax, [rbp-704]
+    push rax
+    call xhci_evt_poll
+    add  rsp, 56
+    cmp  rax, 0
+    je   .if_next_67
+    mov  rax, [rbp-1016]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 10
+    and  eax, 0xFFFFFFFF
+    mov  rcx, rax
+    pop  rax
+    shr  rax, cl
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0x3F
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-1024], rax
+    mov  rax, [rbp-1016]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 24
+    and  eax, 0xFFFFFFFF
+    mov  rcx, rax
+    pop  rax
+    shr  rax, cl
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0xFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-1032], rax
+    mov  rax, [rbp-1008]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 24
+    and  eax, 0xFFFFFFFF
+    mov  rcx, rax
+    pop  rax
+    shr  rax, cl
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0xFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-1040], rax
+    mov  rax, [rbp-704]
+    push rax
+    mov  rax, [rbp-936]
+    push rax
+    mov  rax, 16
+    pop  rcx
+    imul rax, rcx
+    pop  rcx
+    add  rax, rcx
+    mov  [rbp-1048], rax
+    mov  rax, [rbp-920]
+    push rax
+    mov  rax, [rbp-1048]
+    push rax
+    mov  rax, 0x8
+    pop  rcx
+    or   rax, rcx
+    pop  rcx
+    mov  qword [rcx], rax
+    mov  rax, [rbp-1024]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 33
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_69
+    mov  rax, 1
+    mov  [rbp-984], rax
+    sub  rsp, 8
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_slot_label
+    add  rsp, 56
+    mov  rax, [rbp-1032]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x20
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    sub  rsp, 8
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_ccode_label
+    add  rsp, 56
+    mov  rax, [rbp-1040]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x0A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    jmp  .if_end_68
+.if_next_69:
+.if_end_68:
+    jmp  .if_end_66
+.if_next_67:
+.if_end_66:
+    mov  rax, 1
+    mov  rcx, [rbp-976]
+    sub  rcx, rax
+    mov  rax, rcx
+    mov  [rbp-976], rax
+    jmp  .while_start_64
+.while_end_65:
+    mov  rax, 1
+    mov  [rbp-1056], rax
+.while_start_70:
+    mov  rax, [rbp-1056]
+    push rax
+    mov  rax, [rbp-352]
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    setle al
+    movzx eax, al
+    cmp  rax, 0
+    je   .while_end_71
+    mov  rax, [rbp-768]
+    push rax
+    mov  rax, 0x400
+    pop  rcx
+    add  rax, rcx
+    push rax
+    mov  rax, [rbp-1056]
+    push rax
+    mov  rax, 1
+    pop  rcx
+    sub  rcx, rax
+    mov  rax, rcx
+    push rax
+    mov  rax, 0x10
+    pop  rcx
+    imul rax, rcx
+    pop  rcx
+    add  rax, rcx
+    mov  [rbp-1064], rax
+    mov  rax, [rbp-1064]
+    mov  [rbp-1072], rax
+    mov  rax, [rbp-1072]
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-1080], rax
+    mov  rax, [rbp-1056]
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_portsc_label
+    add  rsp, 56
+    mov  rax, [rbp-1080]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x0A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 1
+    mov  rcx, [rbp-1056]
+    add  rax, rcx
+    mov  [rbp-1056], rax
+    jmp  .while_start_70
+.while_end_71:
+    mov  rax, 0x00FE0000
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-1088], rax
+    mov  rax, 1
+    mov  [rbp-1096], rax
+.while_start_72:
+    mov  rax, [rbp-1096]
+    push rax
+    mov  rax, [rbp-352]
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    setle al
+    movzx eax, al
+    cmp  rax, 0
+    je   .while_end_73
+    mov  rax, [rbp-768]
+    push rax
+    mov  rax, 0x400
+    pop  rcx
+    add  rax, rcx
+    push rax
+    mov  rax, [rbp-1096]
+    push rax
+    mov  rax, 1
+    pop  rcx
+    sub  rcx, rax
+    mov  rax, rcx
+    push rax
+    mov  rax, 0x10
+    pop  rcx
+    imul rax, rcx
+    pop  rcx
+    add  rax, rcx
+    mov  [rbp-1104], rax
+    mov  rax, [rbp-1104]
+    mov  [rbp-1112], rax
+    mov  rax, [rbp-1112]
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-1120], rax
+    mov  rax, [rbp-1120]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0x10
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    or   rax, rcx
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0x200
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    or   rax, rcx
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-1088]
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    or   rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-1128], rax
+    mov  rax, [rbp-1112]
+    push rax
+    mov  rax, [rbp-1128]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    mov  dword [rcx], eax
+    mov  rax, 200000
+    mov  [rbp-1136], rax
+.while_start_74:
+    mov  rax, [rbp-1136]
+    push rax
+    mov  rax, 0
+    pop  rcx
+    cmp  rcx, rax
+    setg al
+    movzx eax, al
+    cmp  rax, 0
+    je   .while_end_75
+    mov  rax, [rbp-1112]
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0x10
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_77
+    jmp  .while_end_75
+    jmp  .if_end_76
+.if_next_77:
+.if_end_76:
+    mov  rax, 1
+    mov  rcx, [rbp-1136]
+    sub  rcx, rax
+    mov  rax, rcx
+    mov  [rbp-1136], rax
+    jmp  .while_start_74
+.while_end_75:
+    mov  rax, 200000
+    mov  [rbp-1144], rax
+.while_start_78:
+    mov  rax, [rbp-1144]
+    push rax
+    mov  rax, 0
+    pop  rcx
+    cmp  rcx, rax
+    setg al
+    movzx eax, al
+    cmp  rax, 0
+    je   .while_end_79
+    mov  rax, 1
+    mov  rcx, [rbp-1144]
+    sub  rcx, rax
+    mov  rax, rcx
+    mov  [rbp-1144], rax
+    jmp  .while_start_78
+.while_end_79:
+    mov  rax, [rbp-1112]
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-1152], rax
+    mov  rax, [rbp-1096]
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_portr_label
+    add  rsp, 56
+    mov  rax, [rbp-1152]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x0A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, [rbp-1152]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 1
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-1160], rax
+    mov  rax, [rbp-1152]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 1
+    and  eax, 0xFFFFFFFF
+    mov  rcx, rax
+    pop  rax
+    shr  rax, cl
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 1
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-1168], rax
+    mov  rax, [rbp-1152]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 5
+    and  eax, 0xFFFFFFFF
+    mov  rcx, rax
+    pop  rax
+    shr  rax, cl
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0xF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-1176], rax
+    mov  rax, [rbp-1152]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 10
+    and  eax, 0xFFFFFFFF
+    mov  rcx, rax
+    pop  rax
+    shr  rax, cl
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0xF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-1184], rax
+    sub  rsp, 8
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_ccs_label
+    add  rsp, 56
+    mov  rax, [rbp-1160]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x20
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    sub  rsp, 8
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_ped_label
+    add  rsp, 56
+    mov  rax, [rbp-1168]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x20
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    sub  rsp, 8
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_pls_label
+    add  rsp, 56
+    mov  rax, [rbp-1176]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x20
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    sub  rsp, 8
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_spd_label
+    add  rsp, 56
+    mov  rax, [rbp-1184]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x0A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 1
+    mov  rcx, [rbp-1096]
+    add  rax, rcx
+    mov  [rbp-1096], rax
+    jmp  .while_start_72
+.while_end_73:
+    mov  rax, 1
+    mov  [rbp-1192], rax
+.while_start_80:
+    mov  rax, [rbp-1192]
+    push rax
+    mov  rax, [rbp-352]
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    setle al
+    movzx eax, al
+    cmp  rax, 0
+    je   .while_end_81
+    mov  rax, [rbp-768]
+    push rax
+    mov  rax, 0x400
+    pop  rcx
+    add  rax, rcx
+    push rax
+    mov  rax, [rbp-1192]
+    push rax
+    mov  rax, 1
+    pop  rcx
+    sub  rcx, rax
+    mov  rax, rcx
+    push rax
+    mov  rax, 0x10
+    pop  rcx
+    imul rax, rcx
+    pop  rcx
+    add  rax, rcx
+    mov  [rbp-1200], rax
+    mov  rax, [rbp-1200]
+    mov  [rbp-1208], rax
+    mov  rax, [rbp-1208]
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-1216], rax
+    mov  rax, [rbp-1216]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0xFFFFFE1F
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    and  rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-1224], rax
+    mov  rax, [rbp-1224]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0x00010000
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    or   rax, rcx
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, 0x00000200
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    or   rax, rcx
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-1088]
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    or   rax, rcx
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-1224], rax
+    mov  rax, [rbp-1208]
+    push rax
+    mov  rax, [rbp-1224]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    pop  rcx
+    mov  dword [rcx], eax
+    mov  rax, 200000
+    mov  [rbp-1232], rax
+.while_start_82:
+    mov  rax, [rbp-1232]
+    push rax
+    mov  rax, 0
+    pop  rcx
+    cmp  rcx, rax
+    setg al
+    movzx eax, al
+    cmp  rax, 0
+    je   .while_end_83
+    mov  rax, 1
+    mov  rcx, [rbp-1232]
+    sub  rcx, rax
+    mov  rax, rcx
+    mov  [rbp-1232], rax
+    jmp  .while_start_82
+.while_end_83:
+    mov  rax, [rbp-1208]
+    mov  eax, dword [rax]
+    and  eax, 0xFFFFFFFF
+    and  eax, 0xFFFFFFFF
+    mov  [rbp-1240], rax
+    mov  rax, [rbp-1192]
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_portu_label
+    add  rsp, 56
+    mov  rax, [rbp-1240]
+    and  eax, 0xFFFFFFFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_write_hex_u64
+    add  rsp, 56
+    mov  rax, 0x0A
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-208]
+    push rax
+    mov  rax, [rbp-200]
+    push rax
+    mov  rax, [rbp-32]
+    push rax
+    mov  rax, [rbp-24]
+    push rax
+    mov  rax, [rbp-16]
+    push rax
+    mov  rax, [rbp-216]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    mov  rax, 1
+    mov  rcx, [rbp-1192]
+    add  rax, rcx
+    mov  [rbp-1192], rax
+    jmp  .while_start_80
+.while_end_81:
     mov  rax, [rbp-200]
     mov  rax, qword [rax]
-    mov  [rbp-736], rax
+    mov  [rbp-1248], rax
     mov  rax, [rbp-208]
     mov  rax, qword [rax]
-    mov  [rbp-744], rax
-    lea  rax, [rbp-736]
-    mov  [rbp-752], rax
-    lea  rax, [rbp-744]
-    mov  [rbp-760], rax
-.while_start_50:
+    mov  [rbp-1256], rax
+    lea  rax, [rbp-1248]
+    mov  [rbp-1264], rax
+    lea  rax, [rbp-1256]
+    mov  [rbp-1272], rax
+.while_start_84:
     mov  rax, 1
     cmp  rax, 0
-    je   .while_end_51
+    je   .while_end_85
     sub  rsp, 8
     call uefi_read_key
     add  rsp, 8
-    mov  [rbp-768], rax
-    mov  rax, [rbp-768]
+    mov  [rbp-1280], rax
+    mov  rax, [rbp-1280]
     push rax
     mov  rax, 0
     pop  rcx
@@ -13183,16 +17844,16 @@ _start:
     setne al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_53
-    mov  rax, [rbp-768]
+    je   .if_next_87
+    mov  rax, [rbp-1280]
     push rax
     mov  rax, 0xFFFF
     pop  rcx
     and  rax, rcx
     and  rax, 0xFFFF
     and  rax, 0xFFFF
-    mov  [rbp-776], rax
-    mov  rax, [rbp-776]
+    mov  [rbp-1288], rax
+    mov  rax, [rbp-1288]
     and  rax, 0xFFFF
     push rax
     mov  rax, 0x0D
@@ -13202,13 +17863,13 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_55
+    je   .if_next_89
     mov  rax, 0x0A
     and  rax, 0xFF
     push rax
-    mov  rax, [rbp-760]
+    mov  rax, [rbp-1272]
     push rax
-    mov  rax, [rbp-752]
+    mov  rax, [rbp-1264]
     push rax
     mov  rax, [rbp-32]
     push rax
@@ -13220,9 +17881,9 @@ _start:
     push rax
     call fb_putc
     add  rsp, 56
-    jmp  .if_end_54
-.if_next_55:
-    mov  rax, [rbp-776]
+    jmp  .if_end_88
+.if_next_89:
+    mov  rax, [rbp-1288]
     and  rax, 0xFFFF
     push rax
     mov  rax, 0x0A
@@ -13232,13 +17893,13 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_56
+    je   .if_next_90
     mov  rax, 0x0A
     and  rax, 0xFF
     push rax
-    mov  rax, [rbp-760]
+    mov  rax, [rbp-1272]
     push rax
-    mov  rax, [rbp-752]
+    mov  rax, [rbp-1264]
     push rax
     mov  rax, [rbp-32]
     push rax
@@ -13250,9 +17911,9 @@ _start:
     push rax
     call fb_putc
     add  rsp, 56
-    jmp  .if_end_54
-.if_next_56:
-    mov  rax, [rbp-776]
+    jmp  .if_end_88
+.if_next_90:
+    mov  rax, [rbp-1288]
     and  rax, 0xFFFF
     push rax
     mov  rax, 0x08
@@ -13262,8 +17923,8 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_57
-    mov  rax, [rbp-752]
+    je   .if_next_91
+    mov  rax, [rbp-1264]
     mov  rax, qword [rax]
     push rax
     mov  rax, 0
@@ -13272,10 +17933,10 @@ _start:
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_59
-    mov  rax, [rbp-752]
+    je   .if_next_93
+    mov  rax, [rbp-1264]
     push rax
-    mov  rax, [rbp-752]
+    mov  rax, [rbp-1264]
     mov  rax, qword [rax]
     push rax
     mov  rax, 1
@@ -13284,15 +17945,15 @@ _start:
     mov  rax, rcx
     pop  rcx
     mov  qword [rcx], rax
-    jmp  .if_end_58
-.if_next_59:
-.if_end_58:
+    jmp  .if_end_92
+.if_next_93:
+.if_end_92:
     mov  rax, 0x20
     and  rax, 0xFF
     push rax
-    mov  rax, [rbp-760]
+    mov  rax, [rbp-1272]
     push rax
-    mov  rax, [rbp-752]
+    mov  rax, [rbp-1264]
     push rax
     mov  rax, [rbp-32]
     push rax
@@ -13304,9 +17965,9 @@ _start:
     push rax
     call fb_putc
     add  rsp, 56
-    jmp  .if_end_54
-.if_next_57:
-    mov  rax, [rbp-776]
+    jmp  .if_end_88
+.if_next_91:
+    mov  rax, [rbp-1288]
     and  rax, 0xFFFF
     push rax
     mov  rax, 0xFF
@@ -13316,9 +17977,9 @@ _start:
     and  rax, 0xFFFF
     and  rax, 0xFF
     push rax
-    mov  rax, [rbp-760]
+    mov  rax, [rbp-1272]
     push rax
-    mov  rax, [rbp-752]
+    mov  rax, [rbp-1264]
     push rax
     mov  rax, [rbp-32]
     push rax
@@ -13330,67 +17991,67 @@ _start:
     push rax
     call fb_putc
     add  rsp, 56
-    jmp  .if_end_54
-.if_next_60:
-.if_end_54:
-    jmp  .if_end_52
-.if_next_53:
-.if_end_52:
+    jmp  .if_end_88
+.if_next_94:
+.if_end_88:
+    jmp  .if_end_86
+.if_next_87:
+.if_end_86:
     nop
-    jmp  .while_start_50
-.while_end_51:
+    jmp  .while_start_84
+.while_end_85:
     jmp  .if_end_16
 .if_next_17:
 .if_end_16:
     sub  rsp, 8
     call rt_uefi_line
     add  rsp, 8
-    mov  [rbp-784], rax
+    mov  [rbp-1296], rax
     sub  rsp, 8
     call rt_uefi_last_line
     add  rsp, 8
-    mov  [rbp-792], rax
+    mov  [rbp-1304], rax
     sub  rsp, 8
     call rt_uefi_hist_base
     add  rsp, 8
-    mov  [rbp-800], rax
+    mov  [rbp-1312], rax
     sub  rsp, 8
     call rt_uefi_hist_len_base
     add  rsp, 8
-    mov  [rbp-808], rax
+    mov  [rbp-1320], rax
     sub  rsp, 8
     call rt_uefi_edit_buf
     add  rsp, 8
-    mov  [rbp-816], rax
+    mov  [rbp-1328], rax
     mov  rax, 0
-    mov  [rbp-824], rax
+    mov  [rbp-1336], rax
     mov  rax, 0
-    mov  [rbp-832], rax
+    mov  [rbp-1344], rax
     mov  rax, 0
-    mov  [rbp-840], rax
+    mov  [rbp-1352], rax
     mov  rax, 0
-    mov  [rbp-848], rax
+    mov  [rbp-1360], rax
     mov  rax, 256
-    mov  [rbp-856], rax
+    mov  [rbp-1368], rax
     mov  rax, 0
-    mov  [rbp-864], rax
+    mov  [rbp-1376], rax
     mov  rax, 0
-    mov  [rbp-872], rax
+    mov  [rbp-1384], rax
     mov  rax, 0
     push rax
     mov  rax, 1
     pop  rcx
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-880], rax
+    mov  [rbp-1392], rax
     mov  rax, 0
-    mov  [rbp-888], rax
+    mov  [rbp-1400], rax
     mov  rax, 0
-    mov  [rbp-896], rax
+    mov  [rbp-1408], rax
     mov  rax, 0
-    mov  [rbp-904], rax
+    mov  [rbp-1416], rax
     mov  rax, 0
-    mov  [rbp-912], rax
+    mov  [rbp-1424], rax
     sub  rsp, 8
     mov  rax, [rbp-80]
     and  rax, 0xFFFF
@@ -13417,10 +18078,10 @@ _start:
     add  rsp, 40
     mov  rax, [rbp-152]
     mov  rax, qword [rax]
-    mov  [rbp-904], rax
+    mov  [rbp-1416], rax
     mov  rax, [rbp-160]
     mov  rax, qword [rax]
-    mov  [rbp-912], rax
+    mov  [rbp-1424], rax
     sub  rsp, 8
     mov  rax, 0x3E
     and  rax, 0xFF
@@ -13440,29 +18101,29 @@ _start:
     call serial_write_byte
     add  rsp, 24
     mov  rax, 1
-    mov  [rbp-920], rax
-.while_start_61:
-    mov  rax, [rbp-920]
+    mov  [rbp-1432], rax
+.while_start_95:
+    mov  rax, [rbp-1432]
     cmp  rax, 0
-    je   .while_end_62
+    je   .while_end_96
     mov  rax, 0
-    mov  [rbp-928], rax
-    mov  rax, 0
-    and  rax, 0xFFFF
-    and  rax, 0xFFFF
-    mov  [rbp-936], rax
+    mov  [rbp-1440], rax
     mov  rax, 0
     and  rax, 0xFFFF
     and  rax, 0xFFFF
-    mov  [rbp-944], rax
+    mov  [rbp-1448], rax
+    mov  rax, 0
+    and  rax, 0xFFFF
+    and  rax, 0xFFFF
+    mov  [rbp-1456], rax
     mov  rax, [rbp-48]
     cmp  rax, 0
-    je   .if_next_64
+    je   .if_next_98
     sub  rsp, 8
     call uefi_read_key
     add  rsp, 8
-    mov  [rbp-928], rax
-    mov  rax, [rbp-928]
+    mov  [rbp-1440], rax
+    mov  rax, [rbp-1440]
     push rax
     mov  rax, 0
     pop  rcx
@@ -13470,16 +18131,16 @@ _start:
     setne al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_66
-    mov  rax, [rbp-928]
+    je   .if_next_100
+    mov  rax, [rbp-1440]
     push rax
     mov  rax, 0xFFFF
     pop  rcx
     and  rax, rcx
     and  rax, 0xFFFF
     and  rax, 0xFFFF
-    mov  [rbp-936], rax
-    mov  rax, [rbp-928]
+    mov  [rbp-1448], rax
+    mov  rax, [rbp-1440]
     push rax
     mov  rax, 16
     mov  rcx, rax
@@ -13491,19 +18152,19 @@ _start:
     and  rax, rcx
     and  rax, 0xFFFF
     and  rax, 0xFFFF
-    mov  [rbp-944], rax
-    jmp  .if_end_65
-.if_next_66:
-.if_end_65:
-    jmp  .if_end_63
-.if_next_64:
-.if_end_63:
+    mov  [rbp-1456], rax
+    jmp  .if_end_99
+.if_next_100:
+.if_end_99:
+    jmp  .if_end_97
+.if_next_98:
+.if_end_97:
     mov  rax, [rbp-48]
     cmp  rax, 0
     setne al
     movzx eax, al
     push rax
-    mov  rax, [rbp-936]
+    mov  rax, [rbp-1448]
     and  rax, 0xFFFF
     push rax
     mov  rax, 0
@@ -13516,7 +18177,7 @@ _start:
     setne al
     movzx eax, al
     push rax
-    mov  rax, [rbp-944]
+    mov  rax, [rbp-1456]
     and  rax, 0xFFFF
     push rax
     mov  rax, 0
@@ -13536,8 +18197,8 @@ _start:
     pop  rcx
     and  rax, rcx
     cmp  rax, 0
-    je   .if_next_68
-    mov  rax, [rbp-944]
+    je   .if_next_102
+    mov  rax, [rbp-1456]
     and  rax, 0xFFFF
     push rax
     mov  rax, 0
@@ -13547,8 +18208,8 @@ _start:
     setne al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_70
-    mov  rax, [rbp-944]
+    je   .if_next_104
+    mov  rax, [rbp-1456]
     and  rax, 0xFFFF
     push rax
     mov  rax, 1
@@ -13558,8 +18219,8 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_72
-    mov  rax, [rbp-872]
+    je   .if_next_106
+    mov  rax, [rbp-1384]
     push rax
     mov  rax, 0
     pop  rcx
@@ -13567,13 +18228,13 @@ _start:
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_74
+    je   .if_next_108
     mov  rax, [rbp-64]
     and  rax, 0xFFFF
     push rax
     call serial_log_key_up
     add  rsp, 8
-    mov  rax, [rbp-880]
+    mov  rax, [rbp-1392]
     push rax
     mov  rax, 0
     pop  rcx
@@ -13581,25 +18242,25 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_76
-    mov  rax, [rbp-824]
+    je   .if_next_110
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-816]
+    mov  rax, [rbp-1328]
     push rax
     call line_copy
     add  rsp, 24
-    mov  rax, [rbp-824]
-    mov  [rbp-888], rax
-    mov  rax, [rbp-864]
+    mov  rax, [rbp-1336]
+    mov  [rbp-1400], rax
+    mov  rax, [rbp-1376]
     push rax
     mov  rax, 1
     pop  rcx
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-880], rax
-    mov  rax, [rbp-880]
+    mov  [rbp-1392], rax
+    mov  rax, [rbp-1392]
     push rax
     mov  rax, 0
     pop  rcx
@@ -13607,25 +18268,25 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_78
+    je   .if_next_112
     mov  rax, 8
-    mov  rcx, [rbp-880]
+    mov  rcx, [rbp-1392]
     add  rax, rcx
-    mov  [rbp-880], rax
-    jmp  .if_end_77
-.if_next_78:
-.if_end_77:
-    jmp  .if_end_75
-.if_next_76:
-    mov  rax, [rbp-864]
+    mov  [rbp-1392], rax
+    jmp  .if_end_111
+.if_next_112:
+.if_end_111:
+    jmp  .if_end_109
+.if_next_110:
+    mov  rax, [rbp-1376]
     push rax
-    mov  rax, [rbp-872]
+    mov  rax, [rbp-1384]
     pop  rcx
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-952], rax
-.while_start_80:
-    mov  rax, [rbp-952]
+    mov  [rbp-1464], rax
+.while_start_114:
+    mov  rax, [rbp-1464]
     push rax
     mov  rax, 0
     pop  rcx
@@ -13633,30 +18294,30 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .while_end_81
+    je   .while_end_115
     mov  rax, 8
-    mov  rcx, [rbp-952]
+    mov  rcx, [rbp-1464]
     add  rax, rcx
-    mov  [rbp-952], rax
-    jmp  .while_start_80
-.while_end_81:
-    mov  rax, [rbp-880]
+    mov  [rbp-1464], rax
+    jmp  .while_start_114
+.while_end_115:
+    mov  rax, [rbp-1392]
     push rax
-    mov  rax, [rbp-952]
+    mov  rax, [rbp-1464]
     pop  rcx
     cmp  rcx, rax
     setne al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_83
-    mov  rax, [rbp-880]
+    je   .if_next_117
+    mov  rax, [rbp-1392]
     push rax
     mov  rax, 1
     pop  rcx
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-880], rax
-    mov  rax, [rbp-880]
+    mov  [rbp-1392], rax
+    mov  rax, [rbp-1392]
     push rax
     mov  rax, 0
     pop  rcx
@@ -13664,58 +18325,58 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_85
+    je   .if_next_119
     mov  rax, 8
-    mov  rcx, [rbp-880]
+    mov  rcx, [rbp-1392]
     add  rax, rcx
-    mov  [rbp-880], rax
-    jmp  .if_end_84
-.if_next_85:
-.if_end_84:
-    jmp  .if_end_82
-.if_next_83:
-.if_end_82:
-    jmp  .if_end_75
-.if_next_79:
-.if_end_75:
+    mov  [rbp-1392], rax
+    jmp  .if_end_118
+.if_next_119:
+.if_end_118:
+    jmp  .if_end_116
+.if_next_117:
+.if_end_116:
+    jmp  .if_end_109
+.if_next_113:
+.if_end_109:
     sub  rsp, 8
-    mov  rax, [rbp-880]
+    mov  rax, [rbp-1392]
     push rax
-    mov  rax, [rbp-800]
+    mov  rax, [rbp-1312]
     push rax
     call hist_entry_ptr
     add  rsp, 24
-    mov  [rbp-960], rax
+    mov  [rbp-1472], rax
     sub  rsp, 8
-    mov  rax, [rbp-880]
+    mov  rax, [rbp-1392]
     push rax
-    mov  rax, [rbp-808]
+    mov  rax, [rbp-1320]
     push rax
     call hist_get_len
     add  rsp, 24
-    mov  [rbp-824], rax
-    mov  rax, [rbp-824]
+    mov  [rbp-1336], rax
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-960]
+    mov  rax, [rbp-1472]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
     call line_copy
     add  rsp, 24
-    mov  rax, [rbp-824]
-    mov  [rbp-848], rax
+    mov  rax, [rbp-1336]
+    mov  [rbp-1360], rax
     sub  rsp, 8
-    mov  rax, [rbp-848]
+    mov  rax, [rbp-1360]
     push rax
-    mov  rax, [rbp-840]
+    mov  rax, [rbp-1352]
     push rax
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-912]
+    mov  rax, [rbp-1424]
     push rax
-    mov  rax, [rbp-904]
+    mov  rax, [rbp-1416]
     push rax
     mov  rax, [rbp-80]
     and  rax, 0xFFFF
@@ -13728,14 +18389,14 @@ _start:
     push rax
     call line_redraw
     add  rsp, 88
-    mov  rax, [rbp-824]
-    mov  [rbp-840], rax
-    jmp  .if_end_73
-.if_next_74:
-.if_end_73:
-    jmp  .if_end_71
-.if_next_72:
-    mov  rax, [rbp-944]
+    mov  rax, [rbp-1336]
+    mov  [rbp-1352], rax
+    jmp  .if_end_107
+.if_next_108:
+.if_end_107:
+    jmp  .if_end_105
+.if_next_106:
+    mov  rax, [rbp-1456]
     and  rax, 0xFFFF
     push rax
     mov  rax, 2
@@ -13745,8 +18406,8 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_88
-    mov  rax, [rbp-880]
+    je   .if_next_122
+    mov  rax, [rbp-1392]
     push rax
     mov  rax, 0
     pop  rcx
@@ -13754,20 +18415,20 @@ _start:
     setge al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_90
+    je   .if_next_124
     mov  rax, [rbp-64]
     and  rax, 0xFFFF
     push rax
     call serial_log_key_down
     add  rsp, 8
-    mov  rax, [rbp-864]
+    mov  rax, [rbp-1376]
     push rax
     mov  rax, 1
     pop  rcx
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-968], rax
-    mov  rax, [rbp-968]
+    mov  [rbp-1480], rax
+    mov  rax, [rbp-1480]
     push rax
     mov  rax, 0
     pop  rcx
@@ -13775,49 +18436,49 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_92
+    je   .if_next_126
     mov  rax, 8
-    mov  rcx, [rbp-968]
+    mov  rcx, [rbp-1480]
     add  rax, rcx
-    mov  [rbp-968], rax
-    jmp  .if_end_91
-.if_next_92:
-.if_end_91:
-    mov  rax, [rbp-880]
+    mov  [rbp-1480], rax
+    jmp  .if_end_125
+.if_next_126:
+.if_end_125:
+    mov  rax, [rbp-1392]
     push rax
-    mov  rax, [rbp-968]
+    mov  rax, [rbp-1480]
     pop  rcx
     cmp  rcx, rax
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_94
+    je   .if_next_128
     mov  rax, 0
     push rax
     mov  rax, 1
     pop  rcx
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-880], rax
-    mov  rax, [rbp-888]
+    mov  [rbp-1392], rax
+    mov  rax, [rbp-1400]
     push rax
-    mov  rax, [rbp-816]
+    mov  rax, [rbp-1328]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
     call line_copy
     add  rsp, 24
-    mov  rax, [rbp-888]
-    mov  [rbp-824], rax
-    jmp  .if_end_93
-.if_next_94:
-    mov  rax, [rbp-880]
+    mov  rax, [rbp-1400]
+    mov  [rbp-1336], rax
+    jmp  .if_end_127
+.if_next_128:
+    mov  rax, [rbp-1392]
     push rax
     mov  rax, 1
     pop  rcx
     add  rax, rcx
-    mov  [rbp-880], rax
-    mov  rax, [rbp-880]
+    mov  [rbp-1392], rax
+    mov  rax, [rbp-1392]
     push rax
     mov  rax, 8
     pop  rcx
@@ -13825,56 +18486,56 @@ _start:
     setge al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_97
+    je   .if_next_131
     mov  rax, 8
-    mov  rcx, [rbp-880]
+    mov  rcx, [rbp-1392]
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-880], rax
-    jmp  .if_end_96
-.if_next_97:
-.if_end_96:
+    mov  [rbp-1392], rax
+    jmp  .if_end_130
+.if_next_131:
+.if_end_130:
     sub  rsp, 8
-    mov  rax, [rbp-880]
+    mov  rax, [rbp-1392]
     push rax
-    mov  rax, [rbp-800]
+    mov  rax, [rbp-1312]
     push rax
     call hist_entry_ptr
     add  rsp, 24
-    mov  [rbp-976], rax
+    mov  [rbp-1488], rax
     sub  rsp, 8
-    mov  rax, [rbp-880]
+    mov  rax, [rbp-1392]
     push rax
-    mov  rax, [rbp-808]
+    mov  rax, [rbp-1320]
     push rax
     call hist_get_len
     add  rsp, 24
-    mov  [rbp-824], rax
-    mov  rax, [rbp-824]
+    mov  [rbp-1336], rax
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-976]
+    mov  rax, [rbp-1488]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
     call line_copy
     add  rsp, 24
-    jmp  .if_end_93
-.if_next_95:
-.if_end_93:
-    mov  rax, [rbp-824]
-    mov  [rbp-848], rax
+    jmp  .if_end_127
+.if_next_129:
+.if_end_127:
+    mov  rax, [rbp-1336]
+    mov  [rbp-1360], rax
     sub  rsp, 8
-    mov  rax, [rbp-848]
+    mov  rax, [rbp-1360]
     push rax
-    mov  rax, [rbp-840]
+    mov  rax, [rbp-1352]
     push rax
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-912]
+    mov  rax, [rbp-1424]
     push rax
-    mov  rax, [rbp-904]
+    mov  rax, [rbp-1416]
     push rax
     mov  rax, [rbp-80]
     and  rax, 0xFFFF
@@ -13887,14 +18548,14 @@ _start:
     push rax
     call line_redraw
     add  rsp, 88
-    mov  rax, [rbp-824]
-    mov  [rbp-840], rax
-    jmp  .if_end_89
-.if_next_90:
-.if_end_89:
-    jmp  .if_end_87
-.if_next_88:
-    mov  rax, [rbp-944]
+    mov  rax, [rbp-1336]
+    mov  [rbp-1352], rax
+    jmp  .if_end_123
+.if_next_124:
+.if_end_123:
+    jmp  .if_end_121
+.if_next_122:
+    mov  rax, [rbp-1456]
     and  rax, 0xFFFF
     push rax
     mov  rax, 4
@@ -13904,8 +18565,8 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_100
-    mov  rax, [rbp-848]
+    je   .if_next_134
+    mov  rax, [rbp-1360]
     push rax
     mov  rax, 0
     pop  rcx
@@ -13913,29 +18574,29 @@ _start:
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_102
+    je   .if_next_136
     mov  rax, [rbp-64]
     and  rax, 0xFFFF
     push rax
     call serial_log_key_left
     add  rsp, 8
     mov  rax, 1
-    mov  rcx, [rbp-848]
+    mov  rcx, [rbp-1360]
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-848], rax
+    mov  [rbp-1360], rax
     sub  rsp, 8
-    mov  rax, [rbp-848]
+    mov  rax, [rbp-1360]
     push rax
-    mov  rax, [rbp-840]
+    mov  rax, [rbp-1352]
     push rax
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-912]
+    mov  rax, [rbp-1424]
     push rax
-    mov  rax, [rbp-904]
+    mov  rax, [rbp-1416]
     push rax
     mov  rax, [rbp-80]
     and  rax, 0xFFFF
@@ -13948,12 +18609,12 @@ _start:
     push rax
     call line_redraw
     add  rsp, 88
-    jmp  .if_end_101
-.if_next_102:
-.if_end_101:
-    jmp  .if_end_99
-.if_next_100:
-    mov  rax, [rbp-944]
+    jmp  .if_end_135
+.if_next_136:
+.if_end_135:
+    jmp  .if_end_133
+.if_next_134:
+    mov  rax, [rbp-1456]
     and  rax, 0xFFFF
     push rax
     mov  rax, 3
@@ -13963,37 +18624,37 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_105
-    mov  rax, [rbp-848]
+    je   .if_next_139
+    mov  rax, [rbp-1360]
     push rax
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     pop  rcx
     cmp  rcx, rax
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_107
+    je   .if_next_141
     mov  rax, [rbp-64]
     and  rax, 0xFFFF
     push rax
     call serial_log_key_right
     add  rsp, 8
     mov  rax, 1
-    mov  rcx, [rbp-848]
+    mov  rcx, [rbp-1360]
     add  rax, rcx
-    mov  [rbp-848], rax
+    mov  [rbp-1360], rax
     sub  rsp, 8
-    mov  rax, [rbp-848]
+    mov  rax, [rbp-1360]
     push rax
-    mov  rax, [rbp-840]
+    mov  rax, [rbp-1352]
     push rax
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-912]
+    mov  rax, [rbp-1424]
     push rax
-    mov  rax, [rbp-904]
+    mov  rax, [rbp-1416]
     push rax
     mov  rax, [rbp-80]
     and  rax, 0xFFFF
@@ -14006,26 +18667,26 @@ _start:
     push rax
     call line_redraw
     add  rsp, 88
-    jmp  .if_end_106
-.if_next_107:
-.if_end_106:
-    jmp  .if_end_104
-.if_next_105:
-.if_end_104:
-    jmp  .if_end_99
-.if_next_103:
-.if_end_99:
-    jmp  .if_end_87
-.if_next_98:
-.if_end_87:
-    jmp  .if_end_71
-.if_next_86:
-.if_end_71:
-    jmp  .while_start_61
-    jmp  .if_end_69
-.if_next_70:
-.if_end_69:
-    mov  rax, [rbp-936]
+    jmp  .if_end_140
+.if_next_141:
+.if_end_140:
+    jmp  .if_end_138
+.if_next_139:
+.if_end_138:
+    jmp  .if_end_133
+.if_next_137:
+.if_end_133:
+    jmp  .if_end_121
+.if_next_132:
+.if_end_121:
+    jmp  .if_end_105
+.if_next_120:
+.if_end_105:
+    jmp  .while_start_95
+    jmp  .if_end_103
+.if_next_104:
+.if_end_103:
+    mov  rax, [rbp-1448]
     and  rax, 0xFFFF
     push rax
     mov  rax, 0
@@ -14035,13 +18696,13 @@ _start:
     setne al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_109
-    mov  rax, [rbp-936]
+    je   .if_next_143
+    mov  rax, [rbp-1448]
     and  rax, 0xFFFF
     and  rax, 0xFF
     and  rax, 0xFF
-    mov  [rbp-984], rax
-    mov  rax, [rbp-984]
+    mov  [rbp-1496], rax
+    mov  rax, [rbp-1496]
     and  rax, 0xFF
     push rax
     mov  rax, 0x0D
@@ -14051,15 +18712,15 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_111
+    je   .if_next_145
     mov  rax, 0x0A
     and  rax, 0xFF
     and  rax, 0xFF
-    mov  [rbp-984], rax
-    jmp  .if_end_110
-.if_next_111:
-.if_end_110:
-    mov  rax, [rbp-984]
+    mov  [rbp-1496], rax
+    jmp  .if_end_144
+.if_next_145:
+.if_end_144:
+    mov  rax, [rbp-1496]
     and  rax, 0xFF
     push rax
     mov  rax, 0x08
@@ -14069,8 +18730,8 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_113
-    mov  rax, [rbp-848]
+    je   .if_next_147
+    mov  rax, [rbp-1360]
     push rax
     mov  rax, 0
     pop  rcx
@@ -14078,18 +18739,18 @@ _start:
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_115
-    mov  rax, [rbp-848]
+    je   .if_next_149
+    mov  rax, [rbp-1360]
     push rax
     mov  rax, 1
     pop  rcx
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-992], rax
-.while_start_116:
-    mov  rax, [rbp-992]
+    mov  [rbp-1504], rax
+.while_start_150:
+    mov  rax, [rbp-1504]
     push rax
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     push rax
     mov  rax, 1
     pop  rcx
@@ -14100,17 +18761,17 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .while_end_117
-    mov  rax, [rbp-784]
+    je   .while_end_151
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-992]
+    mov  rax, [rbp-1504]
     mov  rcx, rax
     pop  rax
     add  rax, rcx
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-992]
+    mov  rax, [rbp-1504]
     mov  rcx, rax
     pop  rax
     add  rax, rcx
@@ -14125,33 +18786,33 @@ _start:
     pop  rcx
     mov  byte [rcx], al
     mov  rax, 1
-    mov  rcx, [rbp-992]
+    mov  rcx, [rbp-1504]
     add  rax, rcx
-    mov  [rbp-992], rax
-    jmp  .while_start_116
-.while_end_117:
+    mov  [rbp-1504], rax
+    jmp  .while_start_150
+.while_end_151:
     mov  rax, 1
-    mov  rcx, [rbp-824]
+    mov  rcx, [rbp-1336]
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-824], rax
+    mov  [rbp-1336], rax
     mov  rax, 1
-    mov  rcx, [rbp-848]
+    mov  rcx, [rbp-1360]
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-848], rax
+    mov  [rbp-1360], rax
     sub  rsp, 8
-    mov  rax, [rbp-848]
+    mov  rax, [rbp-1360]
     push rax
-    mov  rax, [rbp-840]
+    mov  rax, [rbp-1352]
     push rax
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-912]
+    mov  rax, [rbp-1424]
     push rax
-    mov  rax, [rbp-904]
+    mov  rax, [rbp-1416]
     push rax
     mov  rax, [rbp-80]
     and  rax, 0xFFFF
@@ -14164,16 +18825,16 @@ _start:
     push rax
     call line_redraw
     add  rsp, 88
-    mov  rax, [rbp-824]
-    mov  [rbp-840], rax
-    jmp  .if_end_114
-.if_next_115:
-.if_end_114:
-    jmp  .while_start_61
-    jmp  .if_end_112
-.if_next_113:
-.if_end_112:
-    mov  rax, [rbp-984]
+    mov  rax, [rbp-1336]
+    mov  [rbp-1352], rax
+    jmp  .if_end_148
+.if_next_149:
+.if_end_148:
+    jmp  .while_start_95
+    jmp  .if_end_146
+.if_next_147:
+.if_end_146:
+    mov  rax, [rbp-1496]
     and  rax, 0xFF
     push rax
     mov  rax, 0x0A
@@ -14183,13 +18844,13 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_119
+    je   .if_next_153
     mov  rax, [rbp-64]
     and  rax, 0xFFFF
     push rax
     call serial_write_newline
     add  rsp, 8
-    mov  rax, [rbp-984]
+    mov  rax, [rbp-1496]
     and  rax, 0xFF
     push rax
     mov  rax, [rbp-80]
@@ -14203,7 +18864,7 @@ _start:
     push rax
     call tty_putc
     add  rsp, 40
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     push rax
     mov  rax, 0
     pop  rcx
@@ -14211,46 +18872,46 @@ _start:
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_121
-    mov  rax, [rbp-824]
+    je   .if_next_155
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-792]
+    mov  rax, [rbp-1304]
     push rax
     call line_copy
     add  rsp, 24
-    mov  rax, [rbp-824]
-    mov  [rbp-832], rax
+    mov  rax, [rbp-1336]
+    mov  [rbp-1344], rax
     sub  rsp, 8
-    mov  rax, [rbp-864]
+    mov  rax, [rbp-1376]
     push rax
-    mov  rax, [rbp-800]
+    mov  rax, [rbp-1312]
     push rax
     call hist_entry_ptr
     add  rsp, 24
-    mov  [rbp-1000], rax
-    mov  rax, [rbp-824]
+    mov  [rbp-1512], rax
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-1000]
+    mov  rax, [rbp-1512]
     push rax
     call line_copy
     add  rsp, 24
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-864]
+    mov  rax, [rbp-1376]
     push rax
-    mov  rax, [rbp-808]
+    mov  rax, [rbp-1320]
     push rax
     call hist_set_len
     add  rsp, 24
     mov  rax, 1
-    mov  rcx, [rbp-864]
+    mov  rcx, [rbp-1376]
     add  rax, rcx
-    mov  [rbp-864], rax
-    mov  rax, [rbp-864]
+    mov  [rbp-1376], rax
+    mov  rax, [rbp-1376]
     push rax
     mov  rax, 8
     pop  rcx
@@ -14258,13 +18919,13 @@ _start:
     setge al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_123
+    je   .if_next_157
     mov  rax, 0
-    mov  [rbp-864], rax
-    jmp  .if_end_122
-.if_next_123:
-.if_end_122:
-    mov  rax, [rbp-872]
+    mov  [rbp-1376], rax
+    jmp  .if_end_156
+.if_next_157:
+.if_end_156:
+    mov  rax, [rbp-1384]
     push rax
     mov  rax, 8
     pop  rcx
@@ -14272,20 +18933,20 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_125
+    je   .if_next_159
     mov  rax, 1
-    mov  rcx, [rbp-872]
+    mov  rcx, [rbp-1384]
     add  rax, rcx
-    mov  [rbp-872], rax
-    jmp  .if_end_124
-.if_next_125:
-.if_end_124:
-    jmp  .if_end_120
-.if_next_121:
-.if_end_120:
-    mov  rax, [rbp-824]
+    mov  [rbp-1384], rax
+    jmp  .if_end_158
+.if_next_159:
+.if_end_158:
+    jmp  .if_end_154
+.if_next_155:
+.if_end_154:
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
     mov  rax, [rbp-64]
     and  rax, 0xFFFF
@@ -14302,18 +18963,18 @@ _start:
     call run_command
     add  rsp, 56
     mov  rax, 0
-    mov  [rbp-824], rax
+    mov  [rbp-1336], rax
     mov  rax, 0
-    mov  [rbp-848], rax
+    mov  [rbp-1360], rax
     mov  rax, 0
-    mov  [rbp-840], rax
+    mov  [rbp-1352], rax
     mov  rax, 0
     push rax
     mov  rax, 1
     pop  rcx
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-880], rax
+    mov  [rbp-1392], rax
     sub  rsp, 8
     mov  rax, [rbp-80]
     and  rax, 0xFFFF
@@ -14328,10 +18989,10 @@ _start:
     add  rsp, 40
     mov  rax, [rbp-152]
     mov  rax, qword [rax]
-    mov  [rbp-904], rax
+    mov  [rbp-1416], rax
     mov  rax, [rbp-160]
     mov  rax, qword [rax]
-    mov  [rbp-912], rax
+    mov  [rbp-1424], rax
     sub  rsp, 8
     mov  rax, 0x3E
     and  rax, 0xFF
@@ -14350,11 +19011,11 @@ _start:
     push rax
     call serial_write_byte
     add  rsp, 24
-    jmp  .while_start_61
-    jmp  .if_end_118
-.if_next_119:
-.if_end_118:
-    mov  rax, [rbp-984]
+    jmp  .while_start_95
+    jmp  .if_end_152
+.if_next_153:
+.if_end_152:
+    mov  rax, [rbp-1496]
     and  rax, 0xFF
     push rax
     mov  rax, 0x20
@@ -14364,14 +19025,14 @@ _start:
     setb al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_127
-    jmp  .while_start_61
-    jmp  .if_end_126
-.if_next_127:
-.if_end_126:
-    mov  rax, [rbp-824]
+    je   .if_next_161
+    jmp  .while_start_95
+    jmp  .if_end_160
+.if_next_161:
+.if_end_160:
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-856]
+    mov  rax, [rbp-1368]
     push rax
     mov  rax, 1
     pop  rcx
@@ -14382,31 +19043,31 @@ _start:
     setge al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_129
-    jmp  .while_start_61
-    jmp  .if_end_128
-.if_next_129:
-.if_end_128:
-    mov  rax, [rbp-824]
+    je   .if_next_163
+    jmp  .while_start_95
+    jmp  .if_end_162
+.if_next_163:
+.if_end_162:
+    mov  rax, [rbp-1336]
     mov  [rbp-88], rax
-.while_start_130:
+.while_start_164:
     mov  rax, [rbp-88]
     push rax
-    mov  rax, [rbp-848]
+    mov  rax, [rbp-1360]
     pop  rcx
     cmp  rcx, rax
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .while_end_131
-    mov  rax, [rbp-784]
+    je   .while_end_165
+    mov  rax, [rbp-1296]
     push rax
     mov  rax, [rbp-88]
     mov  rcx, rax
     pop  rax
     add  rax, rcx
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
     mov  rax, [rbp-88]
     mov  rcx, rax
@@ -14427,30 +19088,30 @@ _start:
     sub  rcx, rax
     mov  rax, rcx
     mov  [rbp-88], rax
-    jmp  .while_start_130
-.while_end_131:
-    mov  rax, [rbp-784]
+    jmp  .while_start_164
+.while_end_165:
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-848]
+    mov  rax, [rbp-1360]
     mov  rcx, rax
     pop  rax
     add  rax, rcx
     push rax
-    mov  rax, [rbp-984]
+    mov  rax, [rbp-1496]
     and  rax, 0xFF
     and  rax, 0xFF
     pop  rcx
     mov  byte [rcx], al
     mov  rax, 1
-    mov  rcx, [rbp-824]
+    mov  rcx, [rbp-1336]
     add  rax, rcx
-    mov  [rbp-824], rax
+    mov  [rbp-1336], rax
     mov  rax, 1
-    mov  rcx, [rbp-848]
+    mov  rcx, [rbp-1360]
     add  rax, rcx
-    mov  [rbp-848], rax
+    mov  [rbp-1360], rax
     sub  rsp, 8
-    mov  rax, [rbp-984]
+    mov  rax, [rbp-1496]
     and  rax, 0xFF
     push rax
     mov  rax, [rbp-64]
@@ -14459,17 +19120,17 @@ _start:
     call serial_write_byte
     add  rsp, 24
     sub  rsp, 8
-    mov  rax, [rbp-848]
+    mov  rax, [rbp-1360]
     push rax
-    mov  rax, [rbp-840]
+    mov  rax, [rbp-1352]
     push rax
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-912]
+    mov  rax, [rbp-1424]
     push rax
-    mov  rax, [rbp-904]
+    mov  rax, [rbp-1416]
     push rax
     mov  rax, [rbp-80]
     and  rax, 0xFFFF
@@ -14482,40 +19143,40 @@ _start:
     push rax
     call line_redraw
     add  rsp, 88
-    mov  rax, [rbp-824]
-    mov  [rbp-840], rax
-    jmp  .while_start_61
-    jmp  .if_end_108
-.if_next_109:
-.if_end_108:
-    jmp  .if_end_67
-.if_next_68:
-.if_end_67:
+    mov  rax, [rbp-1336]
+    mov  [rbp-1352], rax
+    jmp  .while_start_95
+    jmp  .if_end_142
+.if_next_143:
+.if_end_142:
+    jmp  .if_end_101
+.if_next_102:
+.if_end_101:
     mov  rax, 0
     and  rax, 0xFF
     and  rax, 0xFF
-    mov  [rbp-1008], rax
+    mov  [rbp-1520], rax
     mov  rax, [rbp-120]
     cmp  rax, 0
-    je   .if_next_133
+    je   .if_next_167
     sub  rsp, 8
     call kbd_read_scancode_irq
     add  rsp, 8
     and  rax, 0xFF
     and  rax, 0xFF
-    mov  [rbp-1008], rax
-    jmp  .if_end_132
-.if_next_133:
+    mov  [rbp-1520], rax
+    jmp  .if_end_166
+.if_next_167:
     sub  rsp, 8
     call kbd_read_scancode
     add  rsp, 8
     and  rax, 0xFF
     and  rax, 0xFF
-    mov  [rbp-1008], rax
-    jmp  .if_end_132
-.if_next_134:
-.if_end_132:
-    mov  rax, [rbp-1008]
+    mov  [rbp-1520], rax
+    jmp  .if_end_166
+.if_next_168:
+.if_end_166:
+    mov  rax, [rbp-1520]
     and  rax, 0xFF
     push rax
     mov  rax, 0
@@ -14525,12 +19186,12 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_136
-    jmp  .while_start_61
-    jmp  .if_end_135
-.if_next_136:
-.if_end_135:
-    mov  rax, [rbp-1008]
+    je   .if_next_170
+    jmp  .while_start_95
+    jmp  .if_end_169
+.if_next_170:
+.if_end_169:
+    mov  rax, [rbp-1520]
     and  rax, 0xFF
     push rax
     mov  rax, 0xE0
@@ -14540,14 +19201,14 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_138
+    je   .if_next_172
     mov  rax, 1
-    mov  [rbp-896], rax
-    jmp  .while_start_61
-    jmp  .if_end_137
-.if_next_138:
-.if_end_137:
-    mov  rax, [rbp-1008]
+    mov  [rbp-1408], rax
+    jmp  .while_start_95
+    jmp  .if_end_171
+.if_next_172:
+.if_end_171:
+    mov  rax, [rbp-1520]
     and  rax, 0xFF
     push rax
     mov  rax, 0xE1
@@ -14557,15 +19218,15 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_140
-    jmp  .while_start_61
-    jmp  .if_end_139
-.if_next_140:
-.if_end_139:
-    mov  rax, [rbp-896]
+    je   .if_next_174
+    jmp  .while_start_95
+    jmp  .if_end_173
+.if_next_174:
+.if_end_173:
+    mov  rax, [rbp-1408]
     cmp  rax, 0
-    je   .if_next_142
-    mov  rax, [rbp-1008]
+    je   .if_next_176
+    mov  rax, [rbp-1520]
     and  rax, 0xFF
     push rax
     mov  rax, 0x48
@@ -14575,8 +19236,8 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_144
-    mov  rax, [rbp-872]
+    je   .if_next_178
+    mov  rax, [rbp-1384]
     push rax
     mov  rax, 0
     pop  rcx
@@ -14584,13 +19245,13 @@ _start:
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_146
+    je   .if_next_180
     mov  rax, [rbp-64]
     and  rax, 0xFFFF
     push rax
     call serial_log_key_up
     add  rsp, 8
-    mov  rax, [rbp-880]
+    mov  rax, [rbp-1392]
     push rax
     mov  rax, 0
     pop  rcx
@@ -14598,25 +19259,25 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_148
-    mov  rax, [rbp-824]
+    je   .if_next_182
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-816]
+    mov  rax, [rbp-1328]
     push rax
     call line_copy
     add  rsp, 24
-    mov  rax, [rbp-824]
-    mov  [rbp-888], rax
-    mov  rax, [rbp-864]
+    mov  rax, [rbp-1336]
+    mov  [rbp-1400], rax
+    mov  rax, [rbp-1376]
     push rax
     mov  rax, 1
     pop  rcx
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-880], rax
-    mov  rax, [rbp-880]
+    mov  [rbp-1392], rax
+    mov  rax, [rbp-1392]
     push rax
     mov  rax, 0
     pop  rcx
@@ -14624,25 +19285,25 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_150
+    je   .if_next_184
     mov  rax, 8
-    mov  rcx, [rbp-880]
+    mov  rcx, [rbp-1392]
     add  rax, rcx
-    mov  [rbp-880], rax
-    jmp  .if_end_149
-.if_next_150:
-.if_end_149:
-    jmp  .if_end_147
-.if_next_148:
-    mov  rax, [rbp-864]
+    mov  [rbp-1392], rax
+    jmp  .if_end_183
+.if_next_184:
+.if_end_183:
+    jmp  .if_end_181
+.if_next_182:
+    mov  rax, [rbp-1376]
     push rax
-    mov  rax, [rbp-872]
+    mov  rax, [rbp-1384]
     pop  rcx
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-1016], rax
-.while_start_152:
-    mov  rax, [rbp-1016]
+    mov  [rbp-1528], rax
+.while_start_186:
+    mov  rax, [rbp-1528]
     push rax
     mov  rax, 0
     pop  rcx
@@ -14650,30 +19311,30 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .while_end_153
+    je   .while_end_187
     mov  rax, 8
-    mov  rcx, [rbp-1016]
+    mov  rcx, [rbp-1528]
     add  rax, rcx
-    mov  [rbp-1016], rax
-    jmp  .while_start_152
-.while_end_153:
-    mov  rax, [rbp-880]
+    mov  [rbp-1528], rax
+    jmp  .while_start_186
+.while_end_187:
+    mov  rax, [rbp-1392]
     push rax
-    mov  rax, [rbp-1016]
+    mov  rax, [rbp-1528]
     pop  rcx
     cmp  rcx, rax
     setne al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_155
-    mov  rax, [rbp-880]
+    je   .if_next_189
+    mov  rax, [rbp-1392]
     push rax
     mov  rax, 1
     pop  rcx
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-880], rax
-    mov  rax, [rbp-880]
+    mov  [rbp-1392], rax
+    mov  rax, [rbp-1392]
     push rax
     mov  rax, 0
     pop  rcx
@@ -14681,58 +19342,58 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_157
+    je   .if_next_191
     mov  rax, 8
-    mov  rcx, [rbp-880]
+    mov  rcx, [rbp-1392]
     add  rax, rcx
-    mov  [rbp-880], rax
-    jmp  .if_end_156
-.if_next_157:
-.if_end_156:
-    jmp  .if_end_154
-.if_next_155:
-.if_end_154:
-    jmp  .if_end_147
-.if_next_151:
-.if_end_147:
+    mov  [rbp-1392], rax
+    jmp  .if_end_190
+.if_next_191:
+.if_end_190:
+    jmp  .if_end_188
+.if_next_189:
+.if_end_188:
+    jmp  .if_end_181
+.if_next_185:
+.if_end_181:
     sub  rsp, 8
-    mov  rax, [rbp-880]
+    mov  rax, [rbp-1392]
     push rax
-    mov  rax, [rbp-800]
+    mov  rax, [rbp-1312]
     push rax
     call hist_entry_ptr
     add  rsp, 24
-    mov  [rbp-1024], rax
+    mov  [rbp-1536], rax
     sub  rsp, 8
-    mov  rax, [rbp-880]
+    mov  rax, [rbp-1392]
     push rax
-    mov  rax, [rbp-808]
+    mov  rax, [rbp-1320]
     push rax
     call hist_get_len
     add  rsp, 24
-    mov  [rbp-824], rax
-    mov  rax, [rbp-824]
+    mov  [rbp-1336], rax
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-1024]
+    mov  rax, [rbp-1536]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
     call line_copy
     add  rsp, 24
-    mov  rax, [rbp-824]
-    mov  [rbp-848], rax
+    mov  rax, [rbp-1336]
+    mov  [rbp-1360], rax
     sub  rsp, 8
-    mov  rax, [rbp-848]
+    mov  rax, [rbp-1360]
     push rax
-    mov  rax, [rbp-840]
+    mov  rax, [rbp-1352]
     push rax
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-912]
+    mov  rax, [rbp-1424]
     push rax
-    mov  rax, [rbp-904]
+    mov  rax, [rbp-1416]
     push rax
     mov  rax, [rbp-80]
     and  rax, 0xFFFF
@@ -14745,14 +19406,14 @@ _start:
     push rax
     call line_redraw
     add  rsp, 88
-    mov  rax, [rbp-824]
-    mov  [rbp-840], rax
-    jmp  .if_end_145
-.if_next_146:
-.if_end_145:
-    jmp  .if_end_143
-.if_next_144:
-    mov  rax, [rbp-1008]
+    mov  rax, [rbp-1336]
+    mov  [rbp-1352], rax
+    jmp  .if_end_179
+.if_next_180:
+.if_end_179:
+    jmp  .if_end_177
+.if_next_178:
+    mov  rax, [rbp-1520]
     and  rax, 0xFF
     push rax
     mov  rax, 0x50
@@ -14762,8 +19423,8 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_160
-    mov  rax, [rbp-880]
+    je   .if_next_194
+    mov  rax, [rbp-1392]
     push rax
     mov  rax, 0
     pop  rcx
@@ -14771,20 +19432,20 @@ _start:
     setge al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_162
+    je   .if_next_196
     mov  rax, [rbp-64]
     and  rax, 0xFFFF
     push rax
     call serial_log_key_down
     add  rsp, 8
-    mov  rax, [rbp-864]
+    mov  rax, [rbp-1376]
     push rax
     mov  rax, 1
     pop  rcx
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-1032], rax
-    mov  rax, [rbp-1032]
+    mov  [rbp-1544], rax
+    mov  rax, [rbp-1544]
     push rax
     mov  rax, 0
     pop  rcx
@@ -14792,49 +19453,49 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_164
+    je   .if_next_198
     mov  rax, 8
-    mov  rcx, [rbp-1032]
+    mov  rcx, [rbp-1544]
     add  rax, rcx
-    mov  [rbp-1032], rax
-    jmp  .if_end_163
-.if_next_164:
-.if_end_163:
-    mov  rax, [rbp-880]
+    mov  [rbp-1544], rax
+    jmp  .if_end_197
+.if_next_198:
+.if_end_197:
+    mov  rax, [rbp-1392]
     push rax
-    mov  rax, [rbp-1032]
+    mov  rax, [rbp-1544]
     pop  rcx
     cmp  rcx, rax
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_166
+    je   .if_next_200
     mov  rax, 0
     push rax
     mov  rax, 1
     pop  rcx
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-880], rax
-    mov  rax, [rbp-888]
+    mov  [rbp-1392], rax
+    mov  rax, [rbp-1400]
     push rax
-    mov  rax, [rbp-816]
+    mov  rax, [rbp-1328]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
     call line_copy
     add  rsp, 24
-    mov  rax, [rbp-888]
-    mov  [rbp-824], rax
-    jmp  .if_end_165
-.if_next_166:
-    mov  rax, [rbp-880]
+    mov  rax, [rbp-1400]
+    mov  [rbp-1336], rax
+    jmp  .if_end_199
+.if_next_200:
+    mov  rax, [rbp-1392]
     push rax
     mov  rax, 1
     pop  rcx
     add  rax, rcx
-    mov  [rbp-880], rax
-    mov  rax, [rbp-880]
+    mov  [rbp-1392], rax
+    mov  rax, [rbp-1392]
     push rax
     mov  rax, 8
     pop  rcx
@@ -14842,56 +19503,56 @@ _start:
     setge al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_169
+    je   .if_next_203
     mov  rax, 8
-    mov  rcx, [rbp-880]
+    mov  rcx, [rbp-1392]
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-880], rax
-    jmp  .if_end_168
-.if_next_169:
-.if_end_168:
+    mov  [rbp-1392], rax
+    jmp  .if_end_202
+.if_next_203:
+.if_end_202:
     sub  rsp, 8
-    mov  rax, [rbp-880]
+    mov  rax, [rbp-1392]
     push rax
-    mov  rax, [rbp-800]
+    mov  rax, [rbp-1312]
     push rax
     call hist_entry_ptr
     add  rsp, 24
-    mov  [rbp-1040], rax
+    mov  [rbp-1552], rax
     sub  rsp, 8
-    mov  rax, [rbp-880]
+    mov  rax, [rbp-1392]
     push rax
-    mov  rax, [rbp-808]
+    mov  rax, [rbp-1320]
     push rax
     call hist_get_len
     add  rsp, 24
-    mov  [rbp-824], rax
-    mov  rax, [rbp-824]
+    mov  [rbp-1336], rax
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-1040]
+    mov  rax, [rbp-1552]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
     call line_copy
     add  rsp, 24
-    jmp  .if_end_165
-.if_next_167:
-.if_end_165:
-    mov  rax, [rbp-824]
-    mov  [rbp-848], rax
+    jmp  .if_end_199
+.if_next_201:
+.if_end_199:
+    mov  rax, [rbp-1336]
+    mov  [rbp-1360], rax
     sub  rsp, 8
-    mov  rax, [rbp-848]
+    mov  rax, [rbp-1360]
     push rax
-    mov  rax, [rbp-840]
+    mov  rax, [rbp-1352]
     push rax
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-912]
+    mov  rax, [rbp-1424]
     push rax
-    mov  rax, [rbp-904]
+    mov  rax, [rbp-1416]
     push rax
     mov  rax, [rbp-80]
     and  rax, 0xFFFF
@@ -14904,14 +19565,14 @@ _start:
     push rax
     call line_redraw
     add  rsp, 88
-    mov  rax, [rbp-824]
-    mov  [rbp-840], rax
-    jmp  .if_end_161
-.if_next_162:
-.if_end_161:
-    jmp  .if_end_159
-.if_next_160:
-    mov  rax, [rbp-1008]
+    mov  rax, [rbp-1336]
+    mov  [rbp-1352], rax
+    jmp  .if_end_195
+.if_next_196:
+.if_end_195:
+    jmp  .if_end_193
+.if_next_194:
+    mov  rax, [rbp-1520]
     and  rax, 0xFF
     push rax
     mov  rax, 0x4B
@@ -14921,8 +19582,8 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_172
-    mov  rax, [rbp-848]
+    je   .if_next_206
+    mov  rax, [rbp-1360]
     push rax
     mov  rax, 0
     pop  rcx
@@ -14930,29 +19591,29 @@ _start:
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_174
+    je   .if_next_208
     mov  rax, [rbp-64]
     and  rax, 0xFFFF
     push rax
     call serial_log_key_left
     add  rsp, 8
     mov  rax, 1
-    mov  rcx, [rbp-848]
+    mov  rcx, [rbp-1360]
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-848], rax
+    mov  [rbp-1360], rax
     sub  rsp, 8
-    mov  rax, [rbp-848]
+    mov  rax, [rbp-1360]
     push rax
-    mov  rax, [rbp-840]
+    mov  rax, [rbp-1352]
     push rax
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-912]
+    mov  rax, [rbp-1424]
     push rax
-    mov  rax, [rbp-904]
+    mov  rax, [rbp-1416]
     push rax
     mov  rax, [rbp-80]
     and  rax, 0xFFFF
@@ -14965,12 +19626,12 @@ _start:
     push rax
     call line_redraw
     add  rsp, 88
-    jmp  .if_end_173
-.if_next_174:
-.if_end_173:
-    jmp  .if_end_171
-.if_next_172:
-    mov  rax, [rbp-1008]
+    jmp  .if_end_207
+.if_next_208:
+.if_end_207:
+    jmp  .if_end_205
+.if_next_206:
+    mov  rax, [rbp-1520]
     and  rax, 0xFF
     push rax
     mov  rax, 0x4D
@@ -14980,37 +19641,37 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_177
-    mov  rax, [rbp-848]
+    je   .if_next_211
+    mov  rax, [rbp-1360]
     push rax
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     pop  rcx
     cmp  rcx, rax
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_179
+    je   .if_next_213
     mov  rax, [rbp-64]
     and  rax, 0xFFFF
     push rax
     call serial_log_key_right
     add  rsp, 8
     mov  rax, 1
-    mov  rcx, [rbp-848]
+    mov  rcx, [rbp-1360]
     add  rax, rcx
-    mov  [rbp-848], rax
+    mov  [rbp-1360], rax
     sub  rsp, 8
-    mov  rax, [rbp-848]
+    mov  rax, [rbp-1360]
     push rax
-    mov  rax, [rbp-840]
+    mov  rax, [rbp-1352]
     push rax
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-912]
+    mov  rax, [rbp-1424]
     push rax
-    mov  rax, [rbp-904]
+    mov  rax, [rbp-1416]
     push rax
     mov  rax, [rbp-80]
     and  rax, 0xFFFF
@@ -15023,28 +19684,28 @@ _start:
     push rax
     call line_redraw
     add  rsp, 88
-    jmp  .if_end_178
-.if_next_179:
-.if_end_178:
-    jmp  .if_end_176
-.if_next_177:
-.if_end_176:
-    jmp  .if_end_171
-.if_next_175:
-.if_end_171:
-    jmp  .if_end_159
-.if_next_170:
-.if_end_159:
-    jmp  .if_end_143
-.if_next_158:
-.if_end_143:
+    jmp  .if_end_212
+.if_next_213:
+.if_end_212:
+    jmp  .if_end_210
+.if_next_211:
+.if_end_210:
+    jmp  .if_end_205
+.if_next_209:
+.if_end_205:
+    jmp  .if_end_193
+.if_next_204:
+.if_end_193:
+    jmp  .if_end_177
+.if_next_192:
+.if_end_177:
     mov  rax, 0
-    mov  [rbp-896], rax
-    jmp  .while_start_61
-    jmp  .if_end_141
-.if_next_142:
-.if_end_141:
-    mov  rax, [rbp-1008]
+    mov  [rbp-1408], rax
+    jmp  .while_start_95
+    jmp  .if_end_175
+.if_next_176:
+.if_end_175:
+    mov  rax, [rbp-1520]
     and  rax, 0xFF
     push rax
     mov  rax, 0x80
@@ -15060,8 +19721,8 @@ _start:
     setne al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_181
-    mov  rax, [rbp-1008]
+    je   .if_next_215
+    mov  rax, [rbp-1520]
     and  rax, 0xFF
     push rax
     mov  rax, 0x7F
@@ -15070,8 +19731,8 @@ _start:
     and  rax, rcx
     and  rax, 0xFF
     and  rax, 0xFF
-    mov  [rbp-1048], rax
-    mov  rax, [rbp-1048]
+    mov  [rbp-1560], rax
+    mov  rax, [rbp-1560]
     and  rax, 0xFF
     push rax
     mov  rax, 0x2A
@@ -15084,7 +19745,7 @@ _start:
     setne al
     movzx eax, al
     push rax
-    mov  rax, [rbp-1048]
+    mov  rax, [rbp-1560]
     and  rax, 0xFF
     push rax
     mov  rax, 0x36
@@ -15099,17 +19760,17 @@ _start:
     pop  rcx
     or   rax, rcx
     cmp  rax, 0
-    je   .if_next_183
+    je   .if_next_217
     mov  rax, 0
     mov  [rbp-168], rax
-    jmp  .if_end_182
-.if_next_183:
-.if_end_182:
-    jmp  .while_start_61
-    jmp  .if_end_180
-.if_next_181:
-.if_end_180:
-    mov  rax, [rbp-1008]
+    jmp  .if_end_216
+.if_next_217:
+.if_end_216:
+    jmp  .while_start_95
+    jmp  .if_end_214
+.if_next_215:
+.if_end_214:
+    mov  rax, [rbp-1520]
     and  rax, 0xFF
     push rax
     mov  rax, 0x2A
@@ -15122,7 +19783,7 @@ _start:
     setne al
     movzx eax, al
     push rax
-    mov  rax, [rbp-1008]
+    mov  rax, [rbp-1520]
     and  rax, 0xFF
     push rax
     mov  rax, 0x36
@@ -15137,25 +19798,25 @@ _start:
     pop  rcx
     or   rax, rcx
     cmp  rax, 0
-    je   .if_next_185
+    je   .if_next_219
     mov  rax, 1
     mov  [rbp-168], rax
-    jmp  .while_start_61
-    jmp  .if_end_184
-.if_next_185:
-.if_end_184:
+    jmp  .while_start_95
+    jmp  .if_end_218
+.if_next_219:
+.if_end_218:
     sub  rsp, 8
     mov  rax, [rbp-168]
     push rax
-    mov  rax, [rbp-1008]
+    mov  rax, [rbp-1520]
     and  rax, 0xFF
     push rax
     call kbd_scancode_to_ascii
     add  rsp, 24
     and  rax, 0xFF
     and  rax, 0xFF
-    mov  [rbp-1056], rax
-    mov  rax, [rbp-1056]
+    mov  [rbp-1568], rax
+    mov  rax, [rbp-1568]
     and  rax, 0xFF
     push rax
     mov  rax, 0
@@ -15165,12 +19826,12 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_187
-    jmp  .while_start_61
-    jmp  .if_end_186
-.if_next_187:
-.if_end_186:
-    mov  rax, [rbp-1056]
+    je   .if_next_221
+    jmp  .while_start_95
+    jmp  .if_end_220
+.if_next_221:
+.if_end_220:
+    mov  rax, [rbp-1568]
     and  rax, 0xFF
     push rax
     mov  rax, 0x08
@@ -15180,8 +19841,8 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_189
-    mov  rax, [rbp-848]
+    je   .if_next_223
+    mov  rax, [rbp-1360]
     push rax
     mov  rax, 0
     pop  rcx
@@ -15189,18 +19850,18 @@ _start:
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_191
-    mov  rax, [rbp-848]
+    je   .if_next_225
+    mov  rax, [rbp-1360]
     push rax
     mov  rax, 1
     pop  rcx
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-1064], rax
-.while_start_192:
-    mov  rax, [rbp-1064]
+    mov  [rbp-1576], rax
+.while_start_226:
+    mov  rax, [rbp-1576]
     push rax
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     push rax
     mov  rax, 1
     pop  rcx
@@ -15211,17 +19872,17 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .while_end_193
-    mov  rax, [rbp-784]
+    je   .while_end_227
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-1064]
+    mov  rax, [rbp-1576]
     mov  rcx, rax
     pop  rax
     add  rax, rcx
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-1064]
+    mov  rax, [rbp-1576]
     mov  rcx, rax
     pop  rax
     add  rax, rcx
@@ -15236,33 +19897,33 @@ _start:
     pop  rcx
     mov  byte [rcx], al
     mov  rax, 1
-    mov  rcx, [rbp-1064]
+    mov  rcx, [rbp-1576]
     add  rax, rcx
-    mov  [rbp-1064], rax
-    jmp  .while_start_192
-.while_end_193:
+    mov  [rbp-1576], rax
+    jmp  .while_start_226
+.while_end_227:
     mov  rax, 1
-    mov  rcx, [rbp-824]
+    mov  rcx, [rbp-1336]
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-824], rax
+    mov  [rbp-1336], rax
     mov  rax, 1
-    mov  rcx, [rbp-848]
+    mov  rcx, [rbp-1360]
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-848], rax
+    mov  [rbp-1360], rax
     sub  rsp, 8
-    mov  rax, [rbp-848]
+    mov  rax, [rbp-1360]
     push rax
-    mov  rax, [rbp-840]
+    mov  rax, [rbp-1352]
     push rax
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-912]
+    mov  rax, [rbp-1424]
     push rax
-    mov  rax, [rbp-904]
+    mov  rax, [rbp-1416]
     push rax
     mov  rax, [rbp-80]
     and  rax, 0xFFFF
@@ -15275,16 +19936,16 @@ _start:
     push rax
     call line_redraw
     add  rsp, 88
-    mov  rax, [rbp-824]
-    mov  [rbp-840], rax
-    jmp  .if_end_190
-.if_next_191:
-.if_end_190:
-    jmp  .while_start_61
-    jmp  .if_end_188
-.if_next_189:
-.if_end_188:
-    mov  rax, [rbp-1056]
+    mov  rax, [rbp-1336]
+    mov  [rbp-1352], rax
+    jmp  .if_end_224
+.if_next_225:
+.if_end_224:
+    jmp  .while_start_95
+    jmp  .if_end_222
+.if_next_223:
+.if_end_222:
+    mov  rax, [rbp-1568]
     and  rax, 0xFF
     push rax
     mov  rax, 0x0A
@@ -15294,13 +19955,13 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_195
+    je   .if_next_229
     mov  rax, [rbp-64]
     and  rax, 0xFFFF
     push rax
     call serial_write_newline
     add  rsp, 8
-    mov  rax, [rbp-1056]
+    mov  rax, [rbp-1568]
     and  rax, 0xFF
     push rax
     mov  rax, [rbp-80]
@@ -15314,7 +19975,7 @@ _start:
     push rax
     call tty_putc
     add  rsp, 40
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     push rax
     mov  rax, 0
     pop  rcx
@@ -15322,46 +19983,46 @@ _start:
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_197
-    mov  rax, [rbp-824]
+    je   .if_next_231
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-792]
+    mov  rax, [rbp-1304]
     push rax
     call line_copy
     add  rsp, 24
-    mov  rax, [rbp-824]
-    mov  [rbp-832], rax
+    mov  rax, [rbp-1336]
+    mov  [rbp-1344], rax
     sub  rsp, 8
-    mov  rax, [rbp-864]
+    mov  rax, [rbp-1376]
     push rax
-    mov  rax, [rbp-800]
+    mov  rax, [rbp-1312]
     push rax
     call hist_entry_ptr
     add  rsp, 24
-    mov  [rbp-1072], rax
-    mov  rax, [rbp-824]
+    mov  [rbp-1584], rax
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-1072]
+    mov  rax, [rbp-1584]
     push rax
     call line_copy
     add  rsp, 24
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-864]
+    mov  rax, [rbp-1376]
     push rax
-    mov  rax, [rbp-808]
+    mov  rax, [rbp-1320]
     push rax
     call hist_set_len
     add  rsp, 24
     mov  rax, 1
-    mov  rcx, [rbp-864]
+    mov  rcx, [rbp-1376]
     add  rax, rcx
-    mov  [rbp-864], rax
-    mov  rax, [rbp-864]
+    mov  [rbp-1376], rax
+    mov  rax, [rbp-1376]
     push rax
     mov  rax, 8
     pop  rcx
@@ -15369,13 +20030,13 @@ _start:
     setge al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_199
+    je   .if_next_233
     mov  rax, 0
-    mov  [rbp-864], rax
-    jmp  .if_end_198
-.if_next_199:
-.if_end_198:
-    mov  rax, [rbp-872]
+    mov  [rbp-1376], rax
+    jmp  .if_end_232
+.if_next_233:
+.if_end_232:
+    mov  rax, [rbp-1384]
     push rax
     mov  rax, 8
     pop  rcx
@@ -15383,20 +20044,20 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_201
+    je   .if_next_235
     mov  rax, 1
-    mov  rcx, [rbp-872]
+    mov  rcx, [rbp-1384]
     add  rax, rcx
-    mov  [rbp-872], rax
-    jmp  .if_end_200
-.if_next_201:
-.if_end_200:
-    jmp  .if_end_196
-.if_next_197:
-.if_end_196:
-    mov  rax, [rbp-824]
+    mov  [rbp-1384], rax
+    jmp  .if_end_234
+.if_next_235:
+.if_end_234:
+    jmp  .if_end_230
+.if_next_231:
+.if_end_230:
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
     mov  rax, [rbp-64]
     and  rax, 0xFFFF
@@ -15413,18 +20074,18 @@ _start:
     call run_command
     add  rsp, 56
     mov  rax, 0
-    mov  [rbp-824], rax
+    mov  [rbp-1336], rax
     mov  rax, 0
-    mov  [rbp-848], rax
+    mov  [rbp-1360], rax
     mov  rax, 0
-    mov  [rbp-840], rax
+    mov  [rbp-1352], rax
     mov  rax, 0
     push rax
     mov  rax, 1
     pop  rcx
     sub  rcx, rax
     mov  rax, rcx
-    mov  [rbp-880], rax
+    mov  [rbp-1392], rax
     sub  rsp, 8
     mov  rax, [rbp-80]
     and  rax, 0xFFFF
@@ -15439,10 +20100,10 @@ _start:
     add  rsp, 40
     mov  rax, [rbp-152]
     mov  rax, qword [rax]
-    mov  [rbp-904], rax
+    mov  [rbp-1416], rax
     mov  rax, [rbp-160]
     mov  rax, qword [rax]
-    mov  [rbp-912], rax
+    mov  [rbp-1424], rax
     sub  rsp, 8
     mov  rax, 0x3E
     and  rax, 0xFF
@@ -15461,11 +20122,11 @@ _start:
     push rax
     call serial_write_byte
     add  rsp, 24
-    jmp  .while_start_61
-    jmp  .if_end_194
-.if_next_195:
-.if_end_194:
-    mov  rax, [rbp-1056]
+    jmp  .while_start_95
+    jmp  .if_end_228
+.if_next_229:
+.if_end_228:
+    mov  rax, [rbp-1568]
     and  rax, 0xFF
     push rax
     mov  rax, 0x20
@@ -15475,14 +20136,14 @@ _start:
     setb al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_203
-    jmp  .while_start_61
-    jmp  .if_end_202
-.if_next_203:
-.if_end_202:
-    mov  rax, [rbp-824]
+    je   .if_next_237
+    jmp  .while_start_95
+    jmp  .if_end_236
+.if_next_237:
+.if_end_236:
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-856]
+    mov  rax, [rbp-1368]
     push rax
     mov  rax, 1
     pop  rcx
@@ -15493,31 +20154,31 @@ _start:
     setge al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_205
-    jmp  .while_start_61
-    jmp  .if_end_204
-.if_next_205:
-.if_end_204:
-    mov  rax, [rbp-824]
+    je   .if_next_239
+    jmp  .while_start_95
+    jmp  .if_end_238
+.if_next_239:
+.if_end_238:
+    mov  rax, [rbp-1336]
     mov  [rbp-88], rax
-.while_start_206:
+.while_start_240:
     mov  rax, [rbp-88]
     push rax
-    mov  rax, [rbp-848]
+    mov  rax, [rbp-1360]
     pop  rcx
     cmp  rcx, rax
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .while_end_207
-    mov  rax, [rbp-784]
+    je   .while_end_241
+    mov  rax, [rbp-1296]
     push rax
     mov  rax, [rbp-88]
     mov  rcx, rax
     pop  rax
     add  rax, rcx
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
     mov  rax, [rbp-88]
     mov  rcx, rax
@@ -15538,30 +20199,30 @@ _start:
     sub  rcx, rax
     mov  rax, rcx
     mov  [rbp-88], rax
-    jmp  .while_start_206
-.while_end_207:
-    mov  rax, [rbp-784]
+    jmp  .while_start_240
+.while_end_241:
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-848]
+    mov  rax, [rbp-1360]
     mov  rcx, rax
     pop  rax
     add  rax, rcx
     push rax
-    mov  rax, [rbp-1056]
+    mov  rax, [rbp-1568]
     and  rax, 0xFF
     and  rax, 0xFF
     pop  rcx
     mov  byte [rcx], al
     mov  rax, 1
-    mov  rcx, [rbp-824]
+    mov  rcx, [rbp-1336]
     add  rax, rcx
-    mov  [rbp-824], rax
+    mov  [rbp-1336], rax
     mov  rax, 1
-    mov  rcx, [rbp-848]
+    mov  rcx, [rbp-1360]
     add  rax, rcx
-    mov  [rbp-848], rax
+    mov  [rbp-1360], rax
     sub  rsp, 8
-    mov  rax, [rbp-1056]
+    mov  rax, [rbp-1568]
     and  rax, 0xFF
     push rax
     mov  rax, [rbp-64]
@@ -15570,17 +20231,17 @@ _start:
     call serial_write_byte
     add  rsp, 24
     sub  rsp, 8
-    mov  rax, [rbp-848]
+    mov  rax, [rbp-1360]
     push rax
-    mov  rax, [rbp-840]
+    mov  rax, [rbp-1352]
     push rax
-    mov  rax, [rbp-824]
+    mov  rax, [rbp-1336]
     push rax
-    mov  rax, [rbp-784]
+    mov  rax, [rbp-1296]
     push rax
-    mov  rax, [rbp-912]
+    mov  rax, [rbp-1424]
     push rax
-    mov  rax, [rbp-904]
+    mov  rax, [rbp-1416]
     push rax
     mov  rax, [rbp-80]
     and  rax, 0xFFFF
@@ -15593,10 +20254,10 @@ _start:
     push rax
     call line_redraw
     add  rsp, 88
-    mov  rax, [rbp-824]
-    mov  [rbp-840], rax
-    jmp  .while_start_61
-.while_end_62:
+    mov  rax, [rbp-1336]
+    mov  [rbp-1352], rax
+    jmp  .while_start_95
+.while_end_96:
     leave
     ret
 
