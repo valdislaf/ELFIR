@@ -165,10 +165,16 @@ uefi_present:
     ret
 
 uefi_has_st:
+    mov     al, [rel uefi_bs_exited]
+    cmp     al, 0
+    jne     .no_st
     mov     rax, [rel uefi_st]
     test    rax, rax
     setne   al
     movzx   eax, al
+    ret
+.no_st:
+    xor     eax, eax
     ret
 
 uefi_get_xhci_base:

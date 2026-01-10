@@ -3846,7 +3846,7 @@ static GenResult genFunctionAsm(const Func& f, Mode mode, Type retType,
     if (!hasRet && retType != Type::Void) {
         throw Error("Function '" + f.name + "' must contain 'ret <expr>;' in v0");
     }
-    if (!hasRet && retType == Type::Void) {
+    if (retType == Type::Void) {
         emitCleanupStrs(body, cg, labelId);
         body << "    leave\n";
         body << "    ret\n";

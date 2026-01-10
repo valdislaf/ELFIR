@@ -26,6 +26,9 @@ global rt_xhci_evt_ring
 global rt_xhci_erst
 global rt_xhci_scratch_array
 global rt_xhci_scratch_bufs
+global rt_xhci_input_ctx
+global rt_xhci_dev_ctx
+global rt_xhci_ep0_ring
 global uefi_present:weak
 global uefi_read_key:weak
 global uefi_print:weak
@@ -33,6 +36,7 @@ global uefi_clear:weak
 global uefi_set_cursor_pos:weak
 extern irq_timer_tick
 extern irq_kbd_push
+global rt_i8042_init
 
 %define COM1 0x3F8
 %define VGA_BASE 0xB8000
@@ -60,6 +64,7 @@ rt_kbd_head: resb 1
 rt_kbd_tail: resb 1
 alignb 1
 rt_kbd_buf: resb 64
+alignb 8
 alignb 4096
 rt_pml4: resq 512
 alignb 4096
@@ -80,6 +85,12 @@ alignb 64
 rt_xhci_scratch_array_mem: resq 32
 alignb 4096
 rt_xhci_scratch_bufs_mem: resb 4096 * 32
+alignb 64
+rt_xhci_input_ctx_mem: resb 2048
+alignb 64
+rt_xhci_dev_ctx_mem: resb 2048
+alignb 64
+rt_xhci_ep0_ring_mem: resb 4096
 alignb 8
 rt_str_heap_pos: resq 1
 alignb 16
@@ -198,6 +209,52 @@ idt_desc:
     dq idt_table
 
 section .text
+rt_i8042_init:
+    ; enable keyboard interface (0xAE)
+.wait_ibf0:
+    in   al, 0x64
+    test al, 0x02
+    jnz  .wait_ibf0
+    mov  al, 0xAE
+    out  0x64, al
+
+    ; read command byte (0x20)
+.wait_ibf1:
+    in   al, 0x64
+    test al, 0x02
+    jnz  .wait_ibf1
+    mov  al, 0x20
+    out  0x64, al
+
+    ; wait output buffer full
+.wait_obf:
+    in   al, 0x64
+    test al, 0x01
+    jz   .wait_obf
+    in   al, 0x60
+    mov  bl, al
+
+    ; set IRQ1 enable (bit0=1), ensure keyboard not disabled (bit4=0)
+    or   bl, 0x01
+    and  bl, 0xEF
+
+    ; write command byte (0x60) + value
+.wait_ibf2:
+    in   al, 0x64
+    test al, 0x02
+    jnz  .wait_ibf2
+    mov  al, 0x60
+    out  0x64, al
+
+.wait_ibf3:
+    in   al, 0x64
+    test al, 0x02
+    jnz  .wait_ibf3
+    mov  al, bl
+    out  0x60, al
+
+    xor  eax, eax
+    ret
 
 rt_uefi_tmp:
     lea     rax, [rel rt_uefi_tmp_buf]
@@ -239,6 +296,7 @@ rt_kbd_buf_ptr:
     lea     rax, [rel rt_kbd_buf]
     ret
 
+
 rt_xhci_dcbaa:
     lea     rax, [rel rt_xhci_dcbaa_mem]
     ret
@@ -261,6 +319,18 @@ rt_xhci_scratch_array:
 
 rt_xhci_scratch_bufs:
     lea     rax, [rel rt_xhci_scratch_bufs_mem]
+    ret
+
+rt_xhci_input_ctx:
+    lea     rax, [rel rt_xhci_input_ctx_mem]
+    ret
+
+rt_xhci_dev_ctx:
+    lea     rax, [rel rt_xhci_dev_ctx_mem]
+    ret
+
+rt_xhci_ep0_ring:
+    lea     rax, [rel rt_xhci_ep0_ring_mem]
     ret
 
 ; Map low 1GiB and framebuffer 1GiB region using 2MiB pages.
@@ -502,7 +572,8 @@ idt_set_entry:
     add     rdx, rax
     mov     rax, rsi
     mov     word [rdx + 0], ax
-    mov     word [rdx + 2], 0x08
+    mov     ax, cs
+    mov     word [rdx + 2], ax
     mov     byte [rdx + 4], 0
     mov     byte [rdx + 5], 0x8E
     shr     rax, 16
@@ -696,7 +767,21 @@ irq0_stub:
     push    r13
     push    r14
     push    r15
+    mov     rbx, rsp
+    and     rbx, 0xF
+    cmp     rbx, 0
+    jne     .irq0_aligned
+    sub     rsp, 8
+    mov     rbx, 1
+    jmp     .irq0_align_done
+.irq0_aligned:
+    xor     rbx, rbx
+.irq0_align_done:
     call    irq_timer_tick
+    test    rbx, rbx
+    jz      .irq0_restore_done
+    add     rsp, 8
+.irq0_restore_done:
     mov     al, 0x20
     out     0x20, al
     pop     r15
@@ -732,15 +817,31 @@ irq1_stub:
     push    r13
     push    r14
     push    r15
+    mov     rbx, rsp
+    and     rbx, 0xF
+    cmp     rbx, 0
+    jne     .irq1_aligned
+    sub     rsp, 8
+    mov     rbx, 1
+    jmp     .irq1_align_done
+.irq1_aligned:
+    xor     rbx, rbx
+.irq1_align_done:
     in      al, 0x64
     test    al, 0x01
     jz      .irq1_done
     in      al, 0x60
-    movzx   rax, al
-    push    rax
+    movzx   eax, al
+   ; push    rax
+    mov     edi, eax
+	call    rt_print_hex_u64_raw
     call    irq_kbd_push
-    add     rsp, 8
+   ; add     rsp, 8
 .irq1_done:
+    test    rbx, rbx
+    jz      .irq1_restore_done
+    add     rsp, 8
+.irq1_restore_done:
     mov     al, 0x20
     out     0x20, al
     pop     r15
