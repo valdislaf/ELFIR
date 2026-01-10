@@ -19,6 +19,7 @@ global rt_ticks_ptr
 global rt_kbd_head_ptr
 global rt_kbd_tail_ptr
 global rt_kbd_buf_ptr
+global rt_map_fb
 global uefi_present:weak
 global uefi_read_key:weak
 global uefi_print:weak
@@ -53,6 +54,14 @@ rt_kbd_head: resb 1
 rt_kbd_tail: resb 1
 alignb 1
 rt_kbd_buf: resb 64
+alignb 4096
+rt_pml4: resq 512
+alignb 4096
+rt_pdpt: resq 512
+alignb 4096
+rt_pd_low: resq 512
+alignb 4096
+rt_pd_fb: resq 512
 alignb 8
 rt_str_heap_pos: resq 1
 alignb 16
@@ -210,6 +219,80 @@ rt_kbd_tail_ptr:
 
 rt_kbd_buf_ptr:
     lea     rax, [rel rt_kbd_buf]
+    ret
+
+; Map low 1GiB and framebuffer 1GiB region using 2MiB pages.
+; rdi = framebuffer physical base
+rt_map_fb:
+    push    rbx
+    push    r12
+    push    r13
+    mov     rbx, rdi
+
+    cld
+    xor     eax, eax
+    lea     rdi, [rel rt_pml4]
+    mov     rcx, 512
+    rep stosq
+    lea     rdi, [rel rt_pdpt]
+    mov     rcx, 512
+    rep stosq
+    lea     rdi, [rel rt_pd_low]
+    mov     rcx, 512
+    rep stosq
+    %define PDE_2M_UC 0x9B
+    lea     rdi, [rel rt_pd_fb]
+    mov     rcx, 512
+    rep stosq
+
+    lea     rdi, [rel rt_pd_low]
+    mov     rcx, 512
+    xor     rax, rax
+.low_loop:
+    mov     r8, rax
+    or      r8, 0x83
+    mov     [rdi], r8
+    add     rax, 0x200000
+    add     rdi, 8
+    dec     rcx
+    jnz     .low_loop
+
+    mov     r12, rbx
+    and     r12, 0xFFFFFFFFC0000000
+    mov     r13, rbx
+    shr     r13, 30
+    and     r13, 0x1FF
+
+    lea     rdi, [rel rt_pd_fb]
+    mov     rcx, 512
+    mov     rax, r12
+.fb_loop:
+    mov     r8, rax
+    or      r8, PDE_2M_UC
+    mov     [rdi], r8
+    add     rax, 0x200000
+    add     rdi, 8
+    dec     rcx
+    jnz     .fb_loop
+
+    lea     rax, [rel rt_pd_low]
+    or      rax, 0x3
+    mov     [rel rt_pdpt], rax
+    lea     rax, [rel rt_pd_fb]
+    or      rax, 0x3
+    mov     [rel rt_pdpt + r13*8], rax
+
+    lea     rax, [rel rt_pdpt]
+    or      rax, 0x3
+    mov     [rel rt_pml4], rax
+
+    lea     rax, [rel rt_pml4]
+    mov     cr3, rax
+
+    xor     eax, eax
+    pop     r13
+    pop     r12
+    pop     rbx
     ret
 
 rt_serial_init_if_needed:

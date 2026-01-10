@@ -21,8 +21,15 @@ global uefi_read_key
 global uefi_read_key_wait
 global uefi_print_marker
 global uefi_get_xhci_base
+global uefi_get_fb_base
+global uefi_get_fb_stride
+global uefi_get_fb_width
+global uefi_get_fb_height
+global uefi_has_st
 
 extern _start
+extern rt_map_fb
+extern idt_init
 
 ; -------------------------------
 ; Константы смещений (x86-64)
@@ -49,43 +56,183 @@ extern _start
 %define BS_WaitForEvent          0x140  ; смещение функции WaitForEvent в таблице BS (обычно 0x140 для UEFI 2.x)
 ; Примечание: если ваша прошивка иная, можно не использовать ожидание и просто опрашивать ReadKeyStroke.
 
+%define COM1 0x3F8
+%define UEFI_SKIP_RT_MAP_FB 1
+%define UEFI_HANG_IN_ENTRY 0
+
 section .bss
 align 8
 uefi_st:       resq 1
 uefi_xhci_base: resq 1
+uefi_fb_base:   resq 1
+uefi_fb_stride: resq 1
+uefi_fb_width:  resq 1
+uefi_fb_height: resq 1
+uefi_bs_exited: resb 1
+align 16
+kernel_stack:  resb 16384
+kernel_stack_top:
 
 section .text
 
+uart_init:
+    mov     dx, COM1 + 1
+    xor     al, al
+    out     dx, al          ; IER = 0
+
+    mov     dx, COM1 + 3
+    mov     al, 0x80
+    out     dx, al          ; DLAB = 1
+
+    mov     dx, COM1 + 0
+    mov     al, 0x01
+    out     dx, al          ; DLL = 1 (115200)
+
+    mov     dx, COM1 + 1
+    xor     al, al
+    out     dx, al          ; DLM = 0
+
+    mov     dx, COM1 + 3
+    mov     al, 0x03
+    out     dx, al          ; 8N1
+
+    mov     dx, COM1 + 2
+    mov     al, 0xC7
+    out     dx, al          ; FIFO enable + clear
+
+    mov     dx, COM1 + 4
+    mov     al, 0x0B
+    out     dx, al          ; OUT2 | RTS | DTR
+    ret
+
+uart_putc:
+    mov     dx, COM1
+    out     dx, al
+    ret
+
 ; ---------------------------------------------------------------------------
-; Вход из загрузчика: SystemTable=RDI, xHCI MMIO base=RSI
-; Сохраняем SystemTable и MMIO адрес, передаём управление в _start (ядро)
+; Вход из загрузчика: SystemTable=RDI, xHCI MMIO base=RSI,
+; framebuffer в RDX/RCX/R8/R9
+; Сохраняем SystemTable и MMIO/FB адреса, передаём управление в _start (ядро)
 ; ---------------------------------------------------------------------------
 uefi_entry:
+    cli
+    ; RDI=SystemTable, RSI=xHCI, RDX=fb_base, RCX=fb_stride, R8=fb_width, R9=fb_height
+    test    rdx, rdx
+    jz      .skip_early_green
+    mov     r10, rcx                     ; stride
+    mov     r11, r8                      ; width
+    mov     r12, r9                      ; height
+    xor     r13d, r13d                   ; yy = 0
+.eg_row:
+    mov     rax, r13
+    add     rax, 80                      ; y = 80
+    cmp     rax, r12
+    jae     .skip_early_green
+    mov     rbx, rax
+    imul    rbx, r10                     ; row = y * stride
+    xor     r14d, r14d                   ; xx = 0
+.eg_col:
+    cmp     r14, 64
+    jae     .eg_next
+    cmp     r14, r11
+    jae     .eg_next
+    mov     rsi, rbx
+    add     rsi, r14
+    shl     rsi, 2
+    mov     dword [rdx + rsi], 0x0000FF00
+    inc     r14
+    jmp     .eg_col
+.eg_next:
+    inc     r13
+    cmp     r13, 32
+    jb      .eg_row
+.skip_early_green:
+
+    lea     rsp, [rel kernel_stack_top]
+    and     rsp, -16
+    test    rdx, rdx
+    jz      .skip_early_yellow
+    mov     r10, rcx                     ; stride
+    mov     r11, r8                      ; width
+    mov     r12, r9                      ; height
+    xor     r13d, r13d                   ; yy = 0
+.ey_row:
+    mov     rax, r13
+    add     rax, 120                     ; y = 120
+    cmp     rax, r12
+    jae     .skip_early_yellow
+    mov     rbx, rax
+    imul    rbx, r10                     ; row = y * stride
+    xor     r14d, r14d                   ; xx = 0
+.ey_col:
+    cmp     r14, 64
+    jae     .ey_next
+    cmp     r14, r11
+    jae     .ey_next
+    mov     rsi, rbx
+    add     rsi, r14
+    shl     rsi, 2
+    mov     dword [rdx + rsi], 0x00FFFF00
+    inc     r14
+    jmp     .ey_col
+.ey_next:
+    inc     r13
+    cmp     r13, 32
+    jb      .ey_row
+.skip_early_yellow:
     mov     [rel uefi_st], rdi
     mov     [rel uefi_xhci_base], rsi
+    mov     [rel uefi_fb_base], rdx
+    mov     [rel uefi_fb_stride], rcx
+    mov     [rel uefi_fb_width], r8
+    mov     [rel uefi_fb_height], r9
+    mov     byte [rel uefi_bs_exited], 1
 
-    ; Печать "ENTRY" через UEFI, если ConOut есть
-    push    rbx
-    push    r12
-    mov     rax, [rel uefi_st]
-    test    rax, rax
-    jz      .skip_early_print
-    mov     rbx, [rax + ST_CONOUT]
-    test    rbx, rbx
-    jz      .skip_early_print
-    mov     r12, rsp
-    and     rsp, -16
-    sub     rsp, 32
-    mov     rax, [rbx + OFF_OutputString]
-    mov     rcx, rbx
-    lea     rdx, [rel uefi_entry_msg]
-    call    rax
-    mov     rsp, r12
-.skip_early_print:
-    pop     r12
-    pop     rbx
+    call    idt_init
 
-    ; Переходим в ядро
+%if UEFI_SKIP_RT_MAP_FB
+    nop
+%else
+    mov     rdi, [rel uefi_fb_base]
+    call    rt_map_fb
+%endif
+    mov     rdx, [rel uefi_fb_base]
+    test    rdx, rdx
+    jz      .skip_early_blue
+    mov     r10, [rel uefi_fb_stride]
+    mov     r11, [rel uefi_fb_width]
+    mov     r12, [rel uefi_fb_height]
+    xor     r13d, r13d                   ; yy = 0
+.eb_row:
+    mov     rax, r13
+    add     rax, 160                     ; y = 160
+    cmp     rax, r12
+    jae     .skip_early_blue
+    mov     rbx, rax
+    imul    rbx, r10                     ; row = y * stride
+    xor     r14d, r14d                   ; xx = 0
+.eb_col:
+    cmp     r14, 64
+    jae     .eb_next
+    cmp     r14, r11
+    jae     .eb_next
+    mov     rsi, rbx
+    add     rsi, r14
+    shl     rsi, 2
+    mov     dword [rdx + rsi], 0x000000FF
+    inc     r14
+    jmp     .eb_col
+.eb_next:
+    inc     r13
+    cmp     r13, 32
+    jb      .eb_row
+.skip_early_blue:
+%if UEFI_HANG_IN_ENTRY
+.hang_entry:
+    jmp     .hang_entry
+%endif
+
     call    _start
 
 .hang:
@@ -97,6 +244,19 @@ uefi_entry:
 ; uefi_present(): i64 (1 если SystemTable сохранена)
 ; ---------------------------------------------------------------------------
 uefi_present:
+    mov     al, [rel uefi_bs_exited]
+    cmp     al, 0
+    jne     .no_uefi
+    mov     rax, [rel uefi_st]
+    test    rax, rax
+    setne   al
+    movzx   eax, al
+    ret
+.no_uefi:
+    xor     eax, eax
+    ret
+
+uefi_has_st:
     mov     rax, [rel uefi_st]
     test    rax, rax
     setne   al
@@ -105,6 +265,22 @@ uefi_present:
 
 uefi_get_xhci_base:
     mov     rax, [rel uefi_xhci_base]
+    ret
+
+uefi_get_fb_base:
+    mov     rax, [rel uefi_fb_base]
+    ret
+
+uefi_get_fb_stride:
+    mov     rax, [rel uefi_fb_stride]
+    ret
+
+uefi_get_fb_width:
+    mov     rax, [rel uefi_fb_width]
+    ret
+
+uefi_get_fb_height:
+    mov     rax, [rel uefi_fb_height]
     ret
 
 ; ---------------------------------------------------------------------------

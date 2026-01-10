@@ -171,6 +171,35 @@ static void print_status(CHAR16 *label, EFI_STATUS status) {
     Print(L"%s: %r\n", label, status);
 }
 
+static inline void outb(UINT16 port, UINT8 v) {
+    __asm__ __volatile__("outb %0, %1" : : "a"(v), "Nd"(port));
+}
+
+static void com1_init_min(void) {
+    outb(0x3F8 + 1, 0x00);
+    outb(0x3F8 + 3, 0x80);
+    outb(0x3F8 + 0, 0x01);
+    outb(0x3F8 + 1, 0x00);
+    outb(0x3F8 + 3, 0x03);
+    outb(0x3F8 + 2, 0xC7);
+    outb(0x3F8 + 4, 0x0B);
+}
+
+static EFI_STATUS find_gop(EFI_GRAPHICS_OUTPUT_PROTOCOL **out_gop) {
+    EFI_STATUS status;
+    EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
+
+    status = uefi_call_wrapper(gBS->LocateProtocol, 3,
+                               &gEfiGraphicsOutputProtocolGuid,
+                               NULL, (void **)&gop);
+    if (EFI_ERROR(status) || !gop || !gop->Mode || !gop->Mode->Info) {
+        return status;
+    }
+
+    *out_gop = gop;
+    return EFI_SUCCESS;
+}
+
 static UINT64 find_xhci_base(void) {
     EFI_STATUS status;
     EFI_HANDLE *handles = NULL;
@@ -256,16 +285,36 @@ static EFI_STATUS exit_boot_services(EFI_HANDLE image) {
     status = uefi_call_wrapper(gBS->GetMemoryMap, 5, &map_size, map, &map_key, &desc_size, &desc_version);
     if (!EFI_ERROR(status)) {
         status = uefi_call_wrapper(gBS->ExitBootServices, 2, image, map_key);
-        if (EFI_ERROR(status)) {
-            status = uefi_call_wrapper(gBS->GetMemoryMap, 5, &map_size, map, &map_key, &desc_size, &desc_version);
+        if (!EFI_ERROR(status)) {
+            return status; /* Boot services are gone; do not call gBS again */
+        }
+        status = uefi_call_wrapper(gBS->GetMemoryMap, 5, &map_size, map, &map_key, &desc_size, &desc_version);
+        if (!EFI_ERROR(status)) {
+            status = uefi_call_wrapper(gBS->ExitBootServices, 2, image, map_key);
             if (!EFI_ERROR(status)) {
-                status = uefi_call_wrapper(gBS->ExitBootServices, 2, image, map_key);
+                return status;
             }
         }
     }
 
     uefi_call_wrapper(gBS->FreePool, 1, map);
     return status;
+}
+
+#define DEBUG_JUMP_BEFORE_EXIT 0
+static void kernel_stub(UINT64 fb_base, UINT64 fb_stride, UINT64 fb_width, UINT64 fb_height) {
+    if (fb_base != 0 && fb_stride != 0) {
+        UINT32 *fb = (UINT32 *)(UINTN)fb_base;
+        UINTN x, y;
+        for (y = 160; y < 192 && y < fb_height; ++y) {
+            for (x = 0; x < 64 && x < fb_width; ++x) {
+                fb[y * fb_stride + x] = 0x0000FF00; /* green */
+            }
+        }
+    }
+    for (;;) {
+        __asm__ __volatile__("hlt");
+    }
 }
 
 static EFI_FILE_HANDLE find_root_for_path(CHAR16 *path) {
@@ -320,29 +369,62 @@ static EFI_FILE_HANDLE find_root_for_path(CHAR16 *path) {
     return NULL;
 }
 
-__attribute__((noreturn))
-static void jump_to_kernel(EFI_PHYSICAL_ADDRESS entry, EFI_SYSTEM_TABLE *st, UINT64 xhci_base) {
+static UINTN prepare_kernel_stack(void) {
     UINTN stack_pages = 16; /* 64 KiB */
-    EFI_PHYSICAL_ADDRESS stack_base = 0;
+    EFI_PHYSICAL_ADDRESS stack_base = 0x3FFFFFFF;
     UINTN stack_top;
 
-    if (uefi_call_wrapper(gBS->AllocatePages, 4, AllocateAnyPages, EfiLoaderData, stack_pages, &stack_base) != EFI_SUCCESS) {
-        Print(L"UEFI: failed to allocate stack\n");
+    if (uefi_call_wrapper(gBS->AllocatePages, 4, AllocateMaxAddress, EfiLoaderData, stack_pages, &stack_base) != EFI_SUCCESS) {
+        Print(L"UEFI: failed to allocate low stack\n");
         while (1) { }
     }
 
     stack_top = (UINTN)(stack_base + (stack_pages << 12));
     stack_top &= ~((UINTN)0xF);
     stack_top -= 8; /* make RSP look like a normal call entry (retaddr slot) */
+    return stack_top;
+}
 
+__attribute__((noreturn))
+static void jump_to_kernel(EFI_PHYSICAL_ADDRESS entry, EFI_SYSTEM_TABLE *st,
+                           UINT64 xhci_base, UINT64 fb_base, UINT64 fb_stride,
+                           UINT64 fb_width, UINT64 fb_height, UINTN stack_top) {
     __asm__ __volatile__(
+        "cli\n"
+        "cld\n"
         "mov %0, %%rsp\n"
-        "mov %1, %%rdi\n"
-        "mov %2, %%rsi\n"
-        "jmp *%3\n"
+        "mov %5, %%r8\n"
+        "mov %6, %%r9\n"
+        "jmp *%7\n"
         :
-        : "r"(stack_top), "r"(st), "r"(xhci_base), "r"((void *)(UINTN)entry)
-        : "memory"
+        : "r"(stack_top), "D"(st), "S"(xhci_base), "d"(fb_base),
+          "c"(fb_stride), "r"(fb_width), "r"(fb_height),
+          "a"((void *)(UINTN)entry)
+        : "memory", "r8", "r9"
+    );
+
+    while (1) { }
+}
+
+__attribute__((noreturn))
+static void jump_to_kernel_keep_stack(EFI_PHYSICAL_ADDRESS entry, EFI_SYSTEM_TABLE *st,
+                                      UINT64 xhci_base, UINT64 fb_base, UINT64 fb_stride,
+                                      UINT64 fb_width, UINT64 fb_height) {
+    __asm__ __volatile__(
+        "cli\n"
+        "cld\n"
+        "and $-16, %%rsp\n"
+        "sub $8, %%rsp\n"
+        "xor %%rax, %%rax\n"
+        "mov %%rax, (%%rsp)\n"
+        "mov %4, %%r8\n"
+        "mov %5, %%r9\n"
+        "jmp *%6\n"
+        :
+        : "D"(st), "S"(xhci_base), "d"(fb_base),
+          "c"(fb_stride), "r"(fb_width), "r"(fb_height),
+          "a"((void *)(UINTN)entry)
+        : "memory", "r8", "r9"
     );
 
     while (1) { }
@@ -358,9 +440,22 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
     EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *sfs = NULL;
     EFI_FILE_HANDLE file_root = NULL;
     UINT64 xhci_base = 0;
+    EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
+    UINT64 fb_base = 0;
+    UINT64 fb_stride = 0;
+    UINT64 fb_width = 0;
+    UINT64 fb_height = 0;
+    UINTN stack_top = 0;
 
     InitializeLib(ImageHandle, SystemTable);
     g_image_handle = ImageHandle;
+
+    status = uefi_call_wrapper(gBS->SetWatchdogTimer, 4, 0, 0, 0, NULL);
+    if (EFI_ERROR(status)) {
+        print_status(L"UEFI: SetWatchdogTimer(0) failed", status);
+    } else {
+        Print(L"UEFI: watchdog disabled\n");
+    }
 
     status = uefi_call_wrapper(gBS->OpenProtocol, 6,
                                ImageHandle,
@@ -418,7 +513,53 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
         return status;
     }
 
+    {
+        UINT8 *p = (UINT8 *)(UINTN)entry;
+        Print(L"UEFI: entry bytes %02x %02x %02x %02x\n", p[0], p[1], p[2], p[3]);
+    }
+
     xhci_base = find_xhci_base();
+    status = find_gop(&gop);
+    if (!EFI_ERROR(status) && gop && gop->Mode && gop->Mode->Info) {
+        fb_base = (UINT64)gop->Mode->FrameBufferBase;
+        fb_stride = (UINT64)gop->Mode->Info->PixelsPerScanLine;
+        fb_width = (UINT64)gop->Mode->Info->HorizontalResolution;
+        fb_height = (UINT64)gop->Mode->Info->VerticalResolution;
+        Print(L"UEFI: GOP fb=%lx stride=%lu %lux%lu\n",
+              fb_base, fb_stride, fb_width, fb_height);
+        {
+            UINT32 *fb = (UINT32 *)(UINTN)fb_base;
+            UINTN x, y;
+            for (y = 0; y < 32 && y < fb_height; ++y) {
+                for (x = 0; x < 64 && x < fb_width; ++x) {
+                    fb[y * fb_stride + x] = 0x00FFFFFF;
+                }
+            }
+        }
+    } else {
+        Print(L"UEFI: GOP not available\n");
+    }
+
+    stack_top = prepare_kernel_stack();
+
+#if DEBUG_JUMP_BEFORE_EXIT
+    Print(L"UEFI: debug jump before ExitBootServices\n");
+    if (fb_base != 0 && fb_stride != 0) {
+        UINT32 *fb = (UINT32 *)(UINTN)fb_base;
+        UINTN x, y;
+        for (y = 80; y < 112 && y < fb_height; ++y) {
+            for (x = 0; x < 64 && x < fb_width; ++x) {
+                fb[y * fb_stride + x] = 0x0000FFFF; /* cyan */
+            }
+        }
+    }
+    entry = (EFI_PHYSICAL_ADDRESS)(UINTN)kernel_stub;
+    jump_to_kernel_keep_stack(entry, SystemTable, xhci_base, fb_base, fb_stride, fb_width, fb_height);
+    return EFI_SUCCESS;
+#endif
+
+    com1_init_min();
+    outb(0x3F8, 'A');
     Print(L"UEFI: calling ExitBootServices() before jumping to kernel...\n");
     status = exit_boot_services(ImageHandle);
     if (EFI_ERROR(status)) {
@@ -426,6 +567,20 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
         return status;
     }
 
-    jump_to_kernel(entry, SystemTable, xhci_base);
+    if (fb_base != 0 && fb_stride != 0) {
+        UINT32 *fb = (UINT32 *)(UINTN)fb_base;
+        UINTN x, y;
+        for (y = 120; y < 152 && y < fb_height; ++y) {
+            for (x = 0; x < 64 && x < fb_width; ++x) {
+                fb[y * fb_stride + x] = 0x00FF00FF;
+            }
+        }
+    }
+    com1_init_min();
+    outb(0x3F8, 'B');
+
+    com1_init_min();
+    outb(0x3F8, 'J');
+    jump_to_kernel(entry, SystemTable, xhci_base, fb_base, fb_stride, fb_width, fb_height, stack_top);
     return EFI_SUCCESS;
 }
