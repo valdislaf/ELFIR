@@ -162,7 +162,7 @@ fn tty_write_hex_u64(ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr, u64 v
 
 fn u64 fb_glyph(u8 ch) {
     if (ch == u8(0x30)) { ret u64(0x003C666E7666663C); } // 0
-    if (ch == u8(0x31)) { ret u64(0x003C181818381800); } // 1
+    if (ch == u8(0x31)) { ret u64(0x003C181818183818); } // 1
     if (ch == u8(0x32)) { ret u64(0x007E60300C06663C); } // 2
     if (ch == u8(0x33)) { ret u64(0x003C66061C06663C); } // 3
     if (ch == u8(0x34)) { ret u64(0x000C0C7E6C3C1C0C); } // 4
@@ -174,23 +174,29 @@ fn u64 fb_glyph(u8 ch) {
     if (ch == u8(0x41)) { ret u64(0x0066667E66663C18); } // A
     if (ch == u8(0x42)) { ret u64(0x007C66667C66667C); } // B
     if (ch == u8(0x43)) { ret u64(0x003C66606060663C); } // C
-    if (ch == u8(0x44)) { ret u64(0x7C6666666666667C); } // D
+    if (ch == u8(0x44)) { ret u64(0x00786C6666666C78); } // D
     if (ch == u8(0x45)) { ret u64(0x007E60607C60607E); } // E
     if (ch == u8(0x46)) { ret u64(0x006060607C60607E); } // F
-    if (ch == u8(0x47)) { ret u64(0x003C6660606E663C); } // G
+    if (ch == u8(0x47)) { ret u64(0x003C666E6060663C); } // G
     if (ch == u8(0x48)) { ret u64(0x006666667E666666); } // H
     if (ch == u8(0x49)) { ret u64(0x003C18181818183C); } // I
+    if (ch == u8(0x4A)) { ret u64(0x00386C0C0C0C0C1E); } // J
+    if (ch == u8(0x4B)) { ret u64(0x0066666C786C6666); } // K
     if (ch == u8(0x4C)) { ret u64(0x007E606060606060); } // L
     if (ch == u8(0x4D)) { ret u64(0x006363636B7F7763); } // M
     if (ch == u8(0x4E)) { ret u64(0x0066666E7E766666); } // N
     if (ch == u8(0x4F)) { ret u64(0x003C66666666663C); } // O
     if (ch == u8(0x50)) { ret u64(0x006060607C66667C); } // P
+    if (ch == u8(0x51)) { ret u64(0x063C6E666666663C); } // Q
     if (ch == u8(0x52)) { ret u64(0x0066666C7C66667C); } // R
     if (ch == u8(0x53)) { ret u64(0x003C66063C60663C); } // S
     if (ch == u8(0x54)) { ret u64(0x001818181818187E); } // T
     if (ch == u8(0x55)) { ret u64(0x003C666666666666); } // U
     if (ch == u8(0x56)) { ret u64(0x00183C6666666666); } // V
+    if (ch == u8(0x57)) { ret u64(0x0063777F6B636363); } // W
     if (ch == u8(0x58)) { ret u64(0x0066663C183C6666); } // X
+    if (ch == u8(0x59)) { ret u64(0x00181818183C6666); } // Y
+    if (ch == u8(0x5A)) { ret u64(0x007E6030180C067E); } // Z
     if (ch == u8(0x5F)) { ret u64(0x007E000000000000); } // _
     if (ch == u8(0x3D)) { ret u64(0x00007E00007E0000); } // =
     ret u64(0);
@@ -2361,13 +2367,6 @@ fn _start() {
         if (sc == u8(0)) {
             continue;
         }
-        if (fb_out != ptr<u32>(0)) {
-            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x53)); // S
-            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
-            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D)); // =
-            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(sc));
-            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
-        }
         if (sc == u8(0xE0)) {
             e0 = 1;
             continue;
@@ -2445,6 +2444,7 @@ fn _start() {
             u8 rel = sc & u8(0x7F);
             if ((rel == u8(0x2A)) || (rel == u8(0x36))) {
                 shift = 0;
+                continue;
             }
             continue;
         }
@@ -2455,6 +2455,12 @@ fn _start() {
         u8 ch = kbd_scancode_to_ascii(sc, shift);
         if (ch == u8(0)) {
             continue;
+        }
+        if (ch >= u8(0x61) && ch <= u8(0x7A)) {
+            ch = ch - u8(0x20);
+        }
+        if (fb_out != ptr<u32>(0)) {
+            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, ch);
         }
         if (ch == u8(0x08)) {
             if (cur > 0) {

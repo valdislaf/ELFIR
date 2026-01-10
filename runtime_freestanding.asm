@@ -234,8 +234,9 @@ rt_i8042_init:
     in   al, 0x60
     mov  bl, al
 
-    ; set IRQ1 enable (bit0=1), ensure keyboard not disabled (bit4=0)
-    or   bl, 0x01
+    ; set IRQ1 enable (bit0=1), enable scancode translation (bit6=1),
+    ; ensure keyboard not disabled (bit4=0)
+    or   bl, 0x41
     and  bl, 0xEF
 
     ; write command byte (0x60) + value
@@ -252,6 +253,44 @@ rt_i8042_init:
     jnz  .wait_ibf3
     mov  al, bl
     out  0x60, al
+
+    ; set scancode set 1 (0xF0 0x01) on the keyboard
+.wait_ibf4:
+    in   al, 0x64
+    test al, 0x02
+    jnz  .wait_ibf4
+    mov  al, 0xF0
+    out  0x60, al
+.wait_obf2:
+    in   al, 0x64
+    test al, 0x01
+    jz   .wait_obf2
+    in   al, 0x60
+
+.wait_ibf5:
+    in   al, 0x64
+    test al, 0x02
+    jnz  .wait_ibf5
+    mov  al, 0x01
+    out  0x60, al
+.wait_obf3:
+    in   al, 0x64
+    test al, 0x01
+    jz   .wait_obf3
+    in   al, 0x60
+
+    ; enable scanning (0xF4)
+.wait_ibf6:
+    in   al, 0x64
+    test al, 0x02
+    jnz  .wait_ibf6
+    mov  al, 0xF4
+    out  0x60, al
+.wait_obf4:
+    in   al, 0x64
+    test al, 0x01
+    jz   .wait_obf4
+    in   al, 0x60
 
     xor  eax, eax
     ret

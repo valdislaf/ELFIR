@@ -1138,7 +1138,7 @@ fb_glyph:
     movzx eax, al
     cmp  rax, 0
     je   .if_next_3
-    mov  rax, 0x003C181818381800
+    mov  rax, 0x003C181818183818
     leave
     ret
     jmp  .if_end_2
@@ -1342,7 +1342,7 @@ fb_glyph:
     movzx eax, al
     cmp  rax, 0
     je   .if_next_27
-    mov  rax, 0x7C6666666666667C
+    mov  rax, 0x00786C6666666C78
     leave
     ret
     jmp  .if_end_26
@@ -1393,7 +1393,7 @@ fb_glyph:
     movzx eax, al
     cmp  rax, 0
     je   .if_next_33
-    mov  rax, 0x003C6660606E663C
+    mov  rax, 0x003C666E6060663C
     leave
     ret
     jmp  .if_end_32
@@ -1436,7 +1436,7 @@ fb_glyph:
     mov  rax, [rbp-8]
     and  rax, 0xFF
     push rax
-    mov  rax, 0x4C
+    mov  rax, 0x4A
     and  rax, 0xFF
     pop  rcx
     cmp  rcx, rax
@@ -1444,12 +1444,46 @@ fb_glyph:
     movzx eax, al
     cmp  rax, 0
     je   .if_next_39
-    mov  rax, 0x007E606060606060
+    mov  rax, 0x00386C0C0C0C0C1E
     leave
     ret
     jmp  .if_end_38
 .if_next_39:
 .if_end_38:
+    mov  rax, [rbp-8]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 0x4B
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_41
+    mov  rax, 0x0066666C786C6666
+    leave
+    ret
+    jmp  .if_end_40
+.if_next_41:
+.if_end_40:
+    mov  rax, [rbp-8]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 0x4C
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_43
+    mov  rax, 0x007E606060606060
+    leave
+    ret
+    jmp  .if_end_42
+.if_next_43:
+.if_end_42:
     mov  rax, [rbp-8]
     and  rax, 0xFF
     push rax
@@ -1460,13 +1494,13 @@ fb_glyph:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_41
+    je   .if_next_45
     mov  rax, 0x006363636B7F7763
     leave
     ret
-    jmp  .if_end_40
-.if_next_41:
-.if_end_40:
+    jmp  .if_end_44
+.if_next_45:
+.if_end_44:
     mov  rax, [rbp-8]
     and  rax, 0xFF
     push rax
@@ -1477,13 +1511,13 @@ fb_glyph:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_43
+    je   .if_next_47
     mov  rax, 0x0066666E7E766666
     leave
     ret
-    jmp  .if_end_42
-.if_next_43:
-.if_end_42:
+    jmp  .if_end_46
+.if_next_47:
+.if_end_46:
     mov  rax, [rbp-8]
     and  rax, 0xFF
     push rax
@@ -1494,13 +1528,13 @@ fb_glyph:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_45
+    je   .if_next_49
     mov  rax, 0x003C66666666663C
     leave
     ret
-    jmp  .if_end_44
-.if_next_45:
-.if_end_44:
+    jmp  .if_end_48
+.if_next_49:
+.if_end_48:
     mov  rax, [rbp-8]
     and  rax, 0xFF
     push rax
@@ -1511,13 +1545,30 @@ fb_glyph:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_47
+    je   .if_next_51
     mov  rax, 0x006060607C66667C
     leave
     ret
-    jmp  .if_end_46
-.if_next_47:
-.if_end_46:
+    jmp  .if_end_50
+.if_next_51:
+.if_end_50:
+    mov  rax, [rbp-8]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 0x51
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_53
+    mov  rax, 0x063C6E666666663C
+    leave
+    ret
+    jmp  .if_end_52
+.if_next_53:
+.if_end_52:
     mov  rax, [rbp-8]
     and  rax, 0xFF
     push rax
@@ -1528,13 +1579,13 @@ fb_glyph:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_49
+    je   .if_next_55
     mov  rax, 0x0066666C7C66667C
     leave
     ret
-    jmp  .if_end_48
-.if_next_49:
-.if_end_48:
+    jmp  .if_end_54
+.if_next_55:
+.if_end_54:
     mov  rax, [rbp-8]
     and  rax, 0xFF
     push rax
@@ -1545,13 +1596,13 @@ fb_glyph:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_51
+    je   .if_next_57
     mov  rax, 0x003C66063C60663C
     leave
     ret
-    jmp  .if_end_50
-.if_next_51:
-.if_end_50:
+    jmp  .if_end_56
+.if_next_57:
+.if_end_56:
     mov  rax, [rbp-8]
     and  rax, 0xFF
     push rax
@@ -1562,13 +1613,13 @@ fb_glyph:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_53
+    je   .if_next_59
     mov  rax, 0x001818181818187E
     leave
     ret
-    jmp  .if_end_52
-.if_next_53:
-.if_end_52:
+    jmp  .if_end_58
+.if_next_59:
+.if_end_58:
     mov  rax, [rbp-8]
     and  rax, 0xFF
     push rax
@@ -1579,13 +1630,13 @@ fb_glyph:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_55
+    je   .if_next_61
     mov  rax, 0x003C666666666666
     leave
     ret
-    jmp  .if_end_54
-.if_next_55:
-.if_end_54:
+    jmp  .if_end_60
+.if_next_61:
+.if_end_60:
     mov  rax, [rbp-8]
     and  rax, 0xFF
     push rax
@@ -1596,13 +1647,30 @@ fb_glyph:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_57
+    je   .if_next_63
     mov  rax, 0x00183C6666666666
     leave
     ret
-    jmp  .if_end_56
-.if_next_57:
-.if_end_56:
+    jmp  .if_end_62
+.if_next_63:
+.if_end_62:
+    mov  rax, [rbp-8]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 0x57
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_65
+    mov  rax, 0x0063777F6B636363
+    leave
+    ret
+    jmp  .if_end_64
+.if_next_65:
+.if_end_64:
     mov  rax, [rbp-8]
     and  rax, 0xFF
     push rax
@@ -1613,13 +1681,47 @@ fb_glyph:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_59
+    je   .if_next_67
     mov  rax, 0x0066663C183C6666
     leave
     ret
-    jmp  .if_end_58
-.if_next_59:
-.if_end_58:
+    jmp  .if_end_66
+.if_next_67:
+.if_end_66:
+    mov  rax, [rbp-8]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 0x59
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_69
+    mov  rax, 0x00181818183C6666
+    leave
+    ret
+    jmp  .if_end_68
+.if_next_69:
+.if_end_68:
+    mov  rax, [rbp-8]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 0x5A
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_71
+    mov  rax, 0x007E6030180C067E
+    leave
+    ret
+    jmp  .if_end_70
+.if_next_71:
+.if_end_70:
     mov  rax, [rbp-8]
     and  rax, 0xFF
     push rax
@@ -1630,13 +1732,13 @@ fb_glyph:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_61
+    je   .if_next_73
     mov  rax, 0x007E000000000000
     leave
     ret
-    jmp  .if_end_60
-.if_next_61:
-.if_end_60:
+    jmp  .if_end_72
+.if_next_73:
+.if_end_72:
     mov  rax, [rbp-8]
     and  rax, 0xFF
     push rax
@@ -1647,13 +1749,13 @@ fb_glyph:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_63
+    je   .if_next_75
     mov  rax, 0x00007E00007E0000
     leave
     ret
-    jmp  .if_end_62
-.if_next_63:
-.if_end_62:
+    jmp  .if_end_74
+.if_next_75:
+.if_end_74:
     mov  rax, 0
     leave
     ret
@@ -21372,103 +21474,6 @@ _start:
     jmp  .if_end_232
 .if_next_233:
 .if_end_232:
-    mov  rax, [rbp-376]
-    push rax
-    mov  rax, 0
-    pop  rcx
-    cmp  rcx, rax
-    setne al
-    movzx eax, al
-    cmp  rax, 0
-    je   .if_next_235
-    mov  rax, 0x53
-    and  rax, 0xFF
-    push rax
-    mov  rax, [rbp-432]
-    push rax
-    mov  rax, [rbp-424]
-    push rax
-    mov  rax, [rbp-400]
-    push rax
-    mov  rax, [rbp-392]
-    push rax
-    mov  rax, [rbp-384]
-    push rax
-    mov  rax, [rbp-376]
-    push rax
-    call fb_putc
-    add  rsp, 56
-    mov  rax, 0x43
-    and  rax, 0xFF
-    push rax
-    mov  rax, [rbp-432]
-    push rax
-    mov  rax, [rbp-424]
-    push rax
-    mov  rax, [rbp-400]
-    push rax
-    mov  rax, [rbp-392]
-    push rax
-    mov  rax, [rbp-384]
-    push rax
-    mov  rax, [rbp-376]
-    push rax
-    call fb_putc
-    add  rsp, 56
-    mov  rax, 0x3D
-    and  rax, 0xFF
-    push rax
-    mov  rax, [rbp-432]
-    push rax
-    mov  rax, [rbp-424]
-    push rax
-    mov  rax, [rbp-400]
-    push rax
-    mov  rax, [rbp-392]
-    push rax
-    mov  rax, [rbp-384]
-    push rax
-    mov  rax, [rbp-376]
-    push rax
-    call fb_putc
-    add  rsp, 56
-    mov  rax, [rbp-2176]
-    and  rax, 0xFF
-    push rax
-    mov  rax, [rbp-432]
-    push rax
-    mov  rax, [rbp-424]
-    push rax
-    mov  rax, [rbp-400]
-    push rax
-    mov  rax, [rbp-392]
-    push rax
-    mov  rax, [rbp-384]
-    push rax
-    mov  rax, [rbp-376]
-    push rax
-    call fb_write_hex_u64
-    add  rsp, 56
-    mov  rax, 0x0A
-    and  rax, 0xFF
-    push rax
-    mov  rax, [rbp-432]
-    push rax
-    mov  rax, [rbp-424]
-    push rax
-    mov  rax, [rbp-400]
-    push rax
-    mov  rax, [rbp-392]
-    push rax
-    mov  rax, [rbp-384]
-    push rax
-    mov  rax, [rbp-376]
-    push rax
-    call fb_putc
-    add  rsp, 56
-    jmp  .if_end_234
-.if_next_235:
-.if_end_234:
     mov  rax, [rbp-2176]
     and  rax, 0xFF
     push rax
@@ -21479,13 +21484,13 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_237
+    je   .if_next_235
     mov  rax, 1
     mov  [rbp-2024], rax
     jmp  .while_start_152
-    jmp  .if_end_236
-.if_next_237:
-.if_end_236:
+    jmp  .if_end_234
+.if_next_235:
+.if_end_234:
     mov  rax, [rbp-2176]
     and  rax, 0xFF
     push rax
@@ -21496,14 +21501,14 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_239
+    je   .if_next_237
     jmp  .while_start_152
-    jmp  .if_end_238
-.if_next_239:
-.if_end_238:
+    jmp  .if_end_236
+.if_next_237:
+.if_end_236:
     mov  rax, [rbp-2024]
     cmp  rax, 0
-    je   .if_next_241
+    je   .if_next_239
     mov  rax, [rbp-2176]
     and  rax, 0xFF
     push rax
@@ -21514,7 +21519,7 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_243
+    je   .if_next_241
     mov  rax, [rbp-2000]
     push rax
     mov  rax, 0
@@ -21523,7 +21528,7 @@ _start:
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_245
+    je   .if_next_243
     mov  rax, [rbp-112]
     and  rax, 0xFFFF
     push rax
@@ -21537,7 +21542,7 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_247
+    je   .if_next_245
     mov  rax, [rbp-1952]
     push rax
     mov  rax, [rbp-1912]
@@ -21563,16 +21568,16 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_249
+    je   .if_next_247
     mov  rax, 8
     mov  rcx, [rbp-2008]
     add  rax, rcx
     mov  [rbp-2008], rax
-    jmp  .if_end_248
-.if_next_249:
-.if_end_248:
     jmp  .if_end_246
 .if_next_247:
+.if_end_246:
+    jmp  .if_end_244
+.if_next_245:
     mov  rax, [rbp-1992]
     push rax
     mov  rax, [rbp-2000]
@@ -21580,7 +21585,7 @@ _start:
     sub  rcx, rax
     mov  rax, rcx
     mov  [rbp-2184], rax
-.while_start_251:
+.while_start_249:
     mov  rax, [rbp-2184]
     push rax
     mov  rax, 0
@@ -21589,13 +21594,13 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .while_end_252
+    je   .while_end_250
     mov  rax, 8
     mov  rcx, [rbp-2184]
     add  rax, rcx
     mov  [rbp-2184], rax
-    jmp  .while_start_251
-.while_end_252:
+    jmp  .while_start_249
+.while_end_250:
     mov  rax, [rbp-2008]
     push rax
     mov  rax, [rbp-2184]
@@ -21604,7 +21609,7 @@ _start:
     setne al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_254
+    je   .if_next_252
     mov  rax, [rbp-2008]
     push rax
     mov  rax, 1
@@ -21620,20 +21625,20 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_256
+    je   .if_next_254
     mov  rax, 8
     mov  rcx, [rbp-2008]
     add  rax, rcx
     mov  [rbp-2008], rax
-    jmp  .if_end_255
-.if_next_256:
-.if_end_255:
     jmp  .if_end_253
 .if_next_254:
 .if_end_253:
-    jmp  .if_end_246
-.if_next_250:
-.if_end_246:
+    jmp  .if_end_251
+.if_next_252:
+.if_end_251:
+    jmp  .if_end_244
+.if_next_248:
+.if_end_244:
     sub  rsp, 8
     mov  rax, [rbp-2008]
     push rax
@@ -21686,11 +21691,11 @@ _start:
     add  rsp, 88
     mov  rax, [rbp-1952]
     mov  [rbp-1968], rax
-    jmp  .if_end_244
-.if_next_245:
-.if_end_244:
     jmp  .if_end_242
 .if_next_243:
+.if_end_242:
+    jmp  .if_end_240
+.if_next_241:
     mov  rax, [rbp-2176]
     and  rax, 0xFF
     push rax
@@ -21701,7 +21706,7 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_259
+    je   .if_next_257
     mov  rax, [rbp-2008]
     push rax
     mov  rax, 0
@@ -21710,7 +21715,7 @@ _start:
     setge al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_261
+    je   .if_next_259
     mov  rax, [rbp-112]
     and  rax, 0xFFFF
     push rax
@@ -21731,14 +21736,14 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_263
+    je   .if_next_261
     mov  rax, 8
     mov  rcx, [rbp-2200]
     add  rax, rcx
     mov  [rbp-2200], rax
-    jmp  .if_end_262
-.if_next_263:
-.if_end_262:
+    jmp  .if_end_260
+.if_next_261:
+.if_end_260:
     mov  rax, [rbp-2008]
     push rax
     mov  rax, [rbp-2200]
@@ -21747,7 +21752,7 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_265
+    je   .if_next_263
     mov  rax, 0
     push rax
     mov  rax, 1
@@ -21765,8 +21770,8 @@ _start:
     add  rsp, 24
     mov  rax, [rbp-2016]
     mov  [rbp-1952], rax
-    jmp  .if_end_264
-.if_next_265:
+    jmp  .if_end_262
+.if_next_263:
     mov  rax, [rbp-2008]
     push rax
     mov  rax, 1
@@ -21781,15 +21786,15 @@ _start:
     setge al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_268
+    je   .if_next_266
     mov  rax, 8
     mov  rcx, [rbp-2008]
     sub  rcx, rax
     mov  rax, rcx
     mov  [rbp-2008], rax
-    jmp  .if_end_267
-.if_next_268:
-.if_end_267:
+    jmp  .if_end_265
+.if_next_266:
+.if_end_265:
     sub  rsp, 8
     mov  rax, [rbp-2008]
     push rax
@@ -21814,9 +21819,9 @@ _start:
     push rax
     call line_copy
     add  rsp, 24
-    jmp  .if_end_264
-.if_next_266:
-.if_end_264:
+    jmp  .if_end_262
+.if_next_264:
+.if_end_262:
     mov  rax, [rbp-1952]
     mov  [rbp-1976], rax
     sub  rsp, 8
@@ -21845,11 +21850,11 @@ _start:
     add  rsp, 88
     mov  rax, [rbp-1952]
     mov  [rbp-1968], rax
-    jmp  .if_end_260
-.if_next_261:
-.if_end_260:
     jmp  .if_end_258
 .if_next_259:
+.if_end_258:
+    jmp  .if_end_256
+.if_next_257:
     mov  rax, [rbp-2176]
     and  rax, 0xFF
     push rax
@@ -21860,7 +21865,7 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_271
+    je   .if_next_269
     mov  rax, [rbp-1976]
     push rax
     mov  rax, 0
@@ -21869,7 +21874,7 @@ _start:
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_273
+    je   .if_next_271
     mov  rax, [rbp-112]
     and  rax, 0xFFFF
     push rax
@@ -21904,11 +21909,11 @@ _start:
     push rax
     call line_redraw
     add  rsp, 88
-    jmp  .if_end_272
-.if_next_273:
-.if_end_272:
     jmp  .if_end_270
 .if_next_271:
+.if_end_270:
+    jmp  .if_end_268
+.if_next_269:
     mov  rax, [rbp-2176]
     and  rax, 0xFF
     push rax
@@ -21919,7 +21924,7 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_276
+    je   .if_next_274
     mov  rax, [rbp-1976]
     push rax
     mov  rax, [rbp-1952]
@@ -21928,7 +21933,7 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_278
+    je   .if_next_276
     mov  rax, [rbp-112]
     and  rax, 0xFFFF
     push rax
@@ -21962,27 +21967,27 @@ _start:
     push rax
     call line_redraw
     add  rsp, 88
-    jmp  .if_end_277
-.if_next_278:
-.if_end_277:
     jmp  .if_end_275
 .if_next_276:
 .if_end_275:
-    jmp  .if_end_270
+    jmp  .if_end_273
 .if_next_274:
-.if_end_270:
-    jmp  .if_end_258
-.if_next_269:
-.if_end_258:
-    jmp  .if_end_242
-.if_next_257:
-.if_end_242:
+.if_end_273:
+    jmp  .if_end_268
+.if_next_272:
+.if_end_268:
+    jmp  .if_end_256
+.if_next_267:
+.if_end_256:
+    jmp  .if_end_240
+.if_next_255:
+.if_end_240:
     mov  rax, 0
     mov  [rbp-2024], rax
     jmp  .while_start_152
-    jmp  .if_end_240
-.if_next_241:
-.if_end_240:
+    jmp  .if_end_238
+.if_next_239:
+.if_end_238:
     mov  rax, [rbp-2176]
     and  rax, 0xFF
     push rax
@@ -21999,7 +22004,7 @@ _start:
     setne al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_280
+    je   .if_next_278
     mov  rax, [rbp-2176]
     and  rax, 0xFF
     push rax
@@ -22038,16 +22043,17 @@ _start:
     pop  rcx
     or   rax, rcx
     cmp  rax, 0
-    je   .if_next_282
+    je   .if_next_280
     mov  rax, 0
     mov  [rbp-368], rax
-    jmp  .if_end_281
-.if_next_282:
-.if_end_281:
     jmp  .while_start_152
     jmp  .if_end_279
 .if_next_280:
 .if_end_279:
+    jmp  .while_start_152
+    jmp  .if_end_277
+.if_next_278:
+.if_end_277:
     mov  rax, [rbp-2176]
     and  rax, 0xFF
     push rax
@@ -22076,13 +22082,13 @@ _start:
     pop  rcx
     or   rax, rcx
     cmp  rax, 0
-    je   .if_next_284
+    je   .if_next_282
     mov  rax, 1
     mov  [rbp-368], rax
     jmp  .while_start_152
-    jmp  .if_end_283
-.if_next_284:
-.if_end_283:
+    jmp  .if_end_281
+.if_next_282:
+.if_end_281:
     sub  rsp, 8
     mov  rax, [rbp-368]
     push rax
@@ -22104,11 +22110,83 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_286
+    je   .if_next_284
     jmp  .while_start_152
+    jmp  .if_end_283
+.if_next_284:
+.if_end_283:
+    mov  rax, [rbp-2224]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 0x61
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    setae al
+    movzx eax, al
+    cmp  rax, 0
+    setne al
+    movzx eax, al
+    push rax
+    mov  rax, [rbp-2224]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 0x7A
+    and  rax, 0xFF
+    pop  rcx
+    cmp  rcx, rax
+    setbe al
+    movzx eax, al
+    cmp  rax, 0
+    setne al
+    movzx eax, al
+    pop  rcx
+    and  rax, rcx
+    cmp  rax, 0
+    je   .if_next_286
+    mov  rax, [rbp-2224]
+    and  rax, 0xFF
+    push rax
+    mov  rax, 0x20
+    and  rax, 0xFF
+    pop  rcx
+    sub  rcx, rax
+    mov  rax, rcx
+    and  rax, 0xFF
+    and  rax, 0xFF
+    mov  [rbp-2224], rax
     jmp  .if_end_285
 .if_next_286:
 .if_end_285:
+    mov  rax, [rbp-376]
+    push rax
+    mov  rax, 0
+    pop  rcx
+    cmp  rcx, rax
+    setne al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_288
+    mov  rax, [rbp-2224]
+    and  rax, 0xFF
+    push rax
+    mov  rax, [rbp-432]
+    push rax
+    mov  rax, [rbp-424]
+    push rax
+    mov  rax, [rbp-400]
+    push rax
+    mov  rax, [rbp-392]
+    push rax
+    mov  rax, [rbp-384]
+    push rax
+    mov  rax, [rbp-376]
+    push rax
+    call fb_putc
+    add  rsp, 56
+    jmp  .if_end_287
+.if_next_288:
+.if_end_287:
     mov  rax, [rbp-2224]
     and  rax, 0xFF
     push rax
@@ -22119,7 +22197,7 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_288
+    je   .if_next_290
     mov  rax, [rbp-1976]
     push rax
     mov  rax, 0
@@ -22128,7 +22206,7 @@ _start:
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_290
+    je   .if_next_292
     mov  rax, [rbp-1976]
     push rax
     mov  rax, 1
@@ -22136,7 +22214,7 @@ _start:
     sub  rcx, rax
     mov  rax, rcx
     mov  [rbp-2232], rax
-.while_start_291:
+.while_start_293:
     mov  rax, [rbp-2232]
     push rax
     mov  rax, [rbp-1952]
@@ -22150,7 +22228,7 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .while_end_292
+    je   .while_end_294
     mov  rax, [rbp-1912]
     push rax
     mov  rax, [rbp-2232]
@@ -22178,8 +22256,8 @@ _start:
     mov  rcx, [rbp-2232]
     add  rax, rcx
     mov  [rbp-2232], rax
-    jmp  .while_start_291
-.while_end_292:
+    jmp  .while_start_293
+.while_end_294:
     mov  rax, 1
     mov  rcx, [rbp-1952]
     sub  rcx, rax
@@ -22216,13 +22294,13 @@ _start:
     add  rsp, 88
     mov  rax, [rbp-1952]
     mov  [rbp-1968], rax
+    jmp  .if_end_291
+.if_next_292:
+.if_end_291:
+    jmp  .while_start_152
     jmp  .if_end_289
 .if_next_290:
 .if_end_289:
-    jmp  .while_start_152
-    jmp  .if_end_287
-.if_next_288:
-.if_end_287:
     mov  rax, [rbp-2224]
     and  rax, 0xFF
     push rax
@@ -22233,7 +22311,7 @@ _start:
     sete al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_294
+    je   .if_next_296
     mov  rax, [rbp-112]
     and  rax, 0xFFFF
     push rax
@@ -22261,7 +22339,7 @@ _start:
     setne al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_296
+    je   .if_next_298
     mov  rax, [rbp-2224]
     and  rax, 0xFF
     push rax
@@ -22279,9 +22357,9 @@ _start:
     push rax
     call fb_putc
     add  rsp, 56
-    jmp  .if_end_295
-.if_next_296:
-.if_end_295:
+    jmp  .if_end_297
+.if_next_298:
+.if_end_297:
     mov  rax, [rbp-1952]
     push rax
     mov  rax, 0
@@ -22290,7 +22368,7 @@ _start:
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_298
+    je   .if_next_300
     mov  rax, [rbp-1952]
     push rax
     mov  rax, [rbp-1912]
@@ -22337,12 +22415,12 @@ _start:
     setge al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_300
+    je   .if_next_302
     mov  rax, 0
     mov  [rbp-1992], rax
-    jmp  .if_end_299
-.if_next_300:
-.if_end_299:
+    jmp  .if_end_301
+.if_next_302:
+.if_end_301:
     mov  rax, [rbp-2000]
     push rax
     mov  rax, 8
@@ -22351,17 +22429,17 @@ _start:
     setl al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_302
+    je   .if_next_304
     mov  rax, 1
     mov  rcx, [rbp-2000]
     add  rax, rcx
     mov  [rbp-2000], rax
-    jmp  .if_end_301
-.if_next_302:
-.if_end_301:
-    jmp  .if_end_297
-.if_next_298:
-.if_end_297:
+    jmp  .if_end_303
+.if_next_304:
+.if_end_303:
+    jmp  .if_end_299
+.if_next_300:
+.if_end_299:
     mov  rax, [rbp-1952]
     push rax
     mov  rax, [rbp-1912]
@@ -22430,9 +22508,9 @@ _start:
     call serial_write_byte
     add  rsp, 24
     jmp  .while_start_152
-    jmp  .if_end_293
-.if_next_294:
-.if_end_293:
+    jmp  .if_end_295
+.if_next_296:
+.if_end_295:
     mov  rax, [rbp-2224]
     and  rax, 0xFF
     push rax
@@ -22443,11 +22521,11 @@ _start:
     setb al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_304
+    je   .if_next_306
     jmp  .while_start_152
-    jmp  .if_end_303
-.if_next_304:
-.if_end_303:
+    jmp  .if_end_305
+.if_next_306:
+.if_end_305:
     mov  rax, [rbp-1952]
     push rax
     mov  rax, [rbp-1984]
@@ -22461,14 +22539,14 @@ _start:
     setge al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_306
+    je   .if_next_308
     jmp  .while_start_152
-    jmp  .if_end_305
-.if_next_306:
-.if_end_305:
+    jmp  .if_end_307
+.if_next_308:
+.if_end_307:
     mov  rax, [rbp-1952]
     mov  [rbp-176], rax
-.while_start_307:
+.while_start_309:
     mov  rax, [rbp-176]
     push rax
     mov  rax, [rbp-1976]
@@ -22477,7 +22555,7 @@ _start:
     setg al
     movzx eax, al
     cmp  rax, 0
-    je   .while_end_308
+    je   .while_end_310
     mov  rax, [rbp-1912]
     push rax
     mov  rax, [rbp-176]
@@ -22506,8 +22584,8 @@ _start:
     sub  rcx, rax
     mov  rax, rcx
     mov  [rbp-176], rax
-    jmp  .while_start_307
-.while_end_308:
+    jmp  .while_start_309
+.while_end_310:
     mov  rax, [rbp-1912]
     push rax
     mov  rax, [rbp-1976]
@@ -22545,7 +22623,7 @@ _start:
     setne al
     movzx eax, al
     cmp  rax, 0
-    je   .if_next_310
+    je   .if_next_312
     mov  rax, [rbp-2224]
     and  rax, 0xFF
     push rax
@@ -22563,9 +22641,9 @@ _start:
     push rax
     call fb_putc
     add  rsp, 56
-    jmp  .if_end_309
-.if_next_310:
-.if_end_309:
+    jmp  .if_end_311
+.if_next_312:
+.if_end_311:
     sub  rsp, 8
     mov  rax, [rbp-1976]
     push rax
