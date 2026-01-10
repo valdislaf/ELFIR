@@ -29,6 +29,8 @@ global rt_xhci_scratch_bufs
 global rt_xhci_input_ctx
 global rt_xhci_dev_ctx
 global rt_xhci_ep0_ring
+global rt_xhci_kbd_ring
+global rt_usb_buf_ptr
 global uefi_present:weak
 global uefi_read_key:weak
 global uefi_print:weak
@@ -91,11 +93,15 @@ alignb 64
 rt_xhci_dev_ctx_mem: resb 2048
 alignb 64
 rt_xhci_ep0_ring_mem: resb 4096
+alignb 64
+rt_xhci_kbd_ring_mem: resb 4096
 alignb 8
 rt_str_heap_pos: resq 1
 alignb 16
 rt_str_heap: resb 65536
 rt_str_heap_end:
+alignb 16
+rt_usb_buf: resb 512
 
 alignb 16
 idt_table: resb 256 * 16
@@ -370,6 +376,14 @@ rt_xhci_dev_ctx:
 
 rt_xhci_ep0_ring:
     lea     rax, [rel rt_xhci_ep0_ring_mem]
+    ret
+
+rt_xhci_kbd_ring:
+    lea     rax, [rel rt_xhci_kbd_ring_mem]
+    ret
+
+rt_usb_buf_ptr:
+    lea     rax, [rel rt_usb_buf]
     ret
 
 ; Map low 1GiB and framebuffer 1GiB region using 2MiB pages.
