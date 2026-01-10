@@ -118,69 +118,8 @@ uart_putc:
 uefi_entry:
     cli
     ; RDI=SystemTable, RSI=xHCI, RDX=fb_base, RCX=fb_stride, R8=fb_width, R9=fb_height
-    test    rdx, rdx
-    jz      .skip_early_green
-    mov     r10, rcx                     ; stride
-    mov     r11, r8                      ; width
-    mov     r12, r9                      ; height
-    xor     r13d, r13d                   ; yy = 0
-.eg_row:
-    mov     rax, r13
-    add     rax, 80                      ; y = 80
-    cmp     rax, r12
-    jae     .skip_early_green
-    mov     rbx, rax
-    imul    rbx, r10                     ; row = y * stride
-    xor     r14d, r14d                   ; xx = 0
-.eg_col:
-    cmp     r14, 64
-    jae     .eg_next
-    cmp     r14, r11
-    jae     .eg_next
-    mov     rsi, rbx
-    add     rsi, r14
-    shl     rsi, 2
-    mov     dword [rdx + rsi], 0x0000FF00
-    inc     r14
-    jmp     .eg_col
-.eg_next:
-    inc     r13
-    cmp     r13, 32
-    jb      .eg_row
-.skip_early_green:
-
     lea     rsp, [rel kernel_stack_top]
     and     rsp, -16
-    test    rdx, rdx
-    jz      .skip_early_yellow
-    mov     r10, rcx                     ; stride
-    mov     r11, r8                      ; width
-    mov     r12, r9                      ; height
-    xor     r13d, r13d                   ; yy = 0
-.ey_row:
-    mov     rax, r13
-    add     rax, 120                     ; y = 120
-    cmp     rax, r12
-    jae     .skip_early_yellow
-    mov     rbx, rax
-    imul    rbx, r10                     ; row = y * stride
-    xor     r14d, r14d                   ; xx = 0
-.ey_col:
-    cmp     r14, 64
-    jae     .ey_next
-    cmp     r14, r11
-    jae     .ey_next
-    mov     rsi, rbx
-    add     rsi, r14
-    shl     rsi, 2
-    mov     dword [rdx + rsi], 0x00FFFF00
-    inc     r14
-    jmp     .ey_col
-.ey_next:
-    inc     r13
-    cmp     r13, 32
-    jb      .ey_row
-.skip_early_yellow:
     mov     [rel uefi_st], rdi
     mov     [rel uefi_xhci_base], rsi
     mov     [rel uefi_fb_base], rdx
@@ -197,37 +136,6 @@ uefi_entry:
     mov     rdi, [rel uefi_fb_base]
     call    rt_map_fb
 %endif
-    mov     rdx, [rel uefi_fb_base]
-    test    rdx, rdx
-    jz      .skip_early_blue
-    mov     r10, [rel uefi_fb_stride]
-    mov     r11, [rel uefi_fb_width]
-    mov     r12, [rel uefi_fb_height]
-    xor     r13d, r13d                   ; yy = 0
-.eb_row:
-    mov     rax, r13
-    add     rax, 160                     ; y = 160
-    cmp     rax, r12
-    jae     .skip_early_blue
-    mov     rbx, rax
-    imul    rbx, r10                     ; row = y * stride
-    xor     r14d, r14d                   ; xx = 0
-.eb_col:
-    cmp     r14, 64
-    jae     .eb_next
-    cmp     r14, r11
-    jae     .eb_next
-    mov     rsi, rbx
-    add     rsi, r14
-    shl     rsi, 2
-    mov     dword [rdx + rsi], 0x000000FF
-    inc     r14
-    jmp     .eb_col
-.eb_next:
-    inc     r13
-    cmp     r13, 32
-    jb      .eb_row
-.skip_early_blue:
 %if UEFI_HANG_IN_ENTRY
 .hang_entry:
     jmp     .hang_entry

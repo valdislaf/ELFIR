@@ -527,15 +527,6 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
         fb_height = (UINT64)gop->Mode->Info->VerticalResolution;
         Print(L"UEFI: GOP fb=%lx stride=%lu %lux%lu\n",
               fb_base, fb_stride, fb_width, fb_height);
-        {
-            UINT32 *fb = (UINT32 *)(UINTN)fb_base;
-            UINTN x, y;
-            for (y = 0; y < 32 && y < fb_height; ++y) {
-                for (x = 0; x < 64 && x < fb_width; ++x) {
-                    fb[y * fb_stride + x] = 0x00FFFFFF;
-                }
-            }
-        }
     } else {
         Print(L"UEFI: GOP not available\n");
     }
@@ -567,15 +558,6 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
         return status;
     }
 
-    if (fb_base != 0 && fb_stride != 0) {
-        UINT32 *fb = (UINT32 *)(UINTN)fb_base;
-        UINTN x, y;
-        for (y = 120; y < 152 && y < fb_height; ++y) {
-            for (x = 0; x < 64 && x < fb_width; ++x) {
-                fb[y * fb_stride + x] = 0x00FF00FF;
-            }
-        }
-    }
     com1_init_min();
     outb(0x3F8, 'B');
 

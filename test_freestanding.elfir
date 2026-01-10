@@ -902,12 +902,17 @@ fn _start() {
     u64 fb_width = uefi_get_fb_width();
     u64 fb_height = uefi_get_fb_height();
     if (fb_base != u64(0)) {
-        ptr<u32> fb0 = ptr<u32>(fb_base);
-        fb_fill_rect(fb0, i64(fb_stride), i64(fb_width), i64(fb_height),
-                     0, 200, 64, 32, u32(0x00FF0000));
+        ptr<u32> fbe = ptr<u32>(fb_base);
+        fb_fill_rect(fbe, i64(fb_stride), i64(fb_width), i64(fb_height),
+                     400, 100, 48, 16, u32(0x00FF0000));
     }
     i64 uefi = uefi_present();
     i64 uefi_env = uefi_has_st();
+    i64 stop0 = 1;
+    ptr<i64> stop0p = &stop0;
+    while (volatile_load(stop0p) == i64(1)) {
+        asm0("nop");
+    }
     if (!uefi_env) {
         u16 com1 = u16(0x3F8);
         serial_init(com1);
@@ -933,12 +938,6 @@ fn _start() {
         volatile_store(vga + base + 6, u16(0x4F) | attr);
         volatile_store(vga + base + 7, u16(0x4B) | attr);
     }
-    i64 stop1 = 1;
-    ptr<i64> stop1p = &stop1;
-    while (volatile_load(stop1p) == i64(1)) {
-        asm0("nop");
-    }
-
     if (!uefi_env) {
         u16 com1b = u16(0x3F8);
         serial_write_kernel_init_ok(com1b);
@@ -1017,12 +1016,13 @@ fn _start() {
         ptr<i64> fyp = &fy;
         ptr<u32> fb = ptr<u32>(fb_base);
 
-        fb_fill_rect(fb, i64(fb_stride), i64(fb_width), i64(fb_height),
-                     0, 40, 64, 32, u32(0x00FF0000));
-
         u64 xhci_base = uefi_get_xhci_base();
         fb_write_xhci_base_label(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp);
         fb_write_hex_u64(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp, xhci_base);
+        i64 mark_x1 = (*fxp + 10) * 8;
+        i64 mark_y1 = *fyp * 8;
+        fb_fill_rect(fb, i64(fb_stride), i64(fb_width), i64(fb_height),
+                     mark_x1, mark_y1, 16, 8, u32(0x00FF8800));
         fb_putc(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp, u8(0x0A));
 
         ptr<u32> cap_reg = ptr<u32>(xhci_base);
@@ -1035,6 +1035,10 @@ fn _start() {
         fb_putc(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp, u8(0x20));
         fb_write_hciver_label(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp);
         fb_write_hex_u64(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp, u64(hci_ver));
+        i64 mark_x2 = (*fxp + 10) * 8;
+        i64 mark_y2 = *fyp * 8;
+        fb_fill_rect(fb, i64(fb_stride), i64(fb_width), i64(fb_height),
+                     mark_x2, mark_y2, 16, 8, u32(0x0000FF00));
         fb_putc(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp, u8(0x0A));
 
         i64 fb_hold = 1;
