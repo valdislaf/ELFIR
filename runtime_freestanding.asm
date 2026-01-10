@@ -20,6 +20,12 @@ global rt_kbd_head_ptr
 global rt_kbd_tail_ptr
 global rt_kbd_buf_ptr
 global rt_map_fb
+global rt_xhci_dcbaa
+global rt_xhci_cmd_ring
+global rt_xhci_evt_ring
+global rt_xhci_erst
+global rt_xhci_scratch_array
+global rt_xhci_scratch_bufs
 global uefi_present:weak
 global uefi_read_key:weak
 global uefi_print:weak
@@ -62,6 +68,18 @@ alignb 4096
 rt_pd_low: resq 512
 alignb 4096
 rt_pd_fb: resq 512
+alignb 64
+rt_xhci_dcbaa_mem: resq 256
+alignb 64
+rt_xhci_cmd_ring_mem: resb 4096
+alignb 64
+rt_xhci_evt_ring_mem: resb 4096
+alignb 64
+rt_xhci_erst_mem: resb 16
+alignb 64
+rt_xhci_scratch_array_mem: resq 32
+alignb 4096
+rt_xhci_scratch_bufs_mem: resb 4096 * 32
 alignb 8
 rt_str_heap_pos: resq 1
 alignb 16
@@ -219,6 +237,30 @@ rt_kbd_tail_ptr:
 
 rt_kbd_buf_ptr:
     lea     rax, [rel rt_kbd_buf]
+    ret
+
+rt_xhci_dcbaa:
+    lea     rax, [rel rt_xhci_dcbaa_mem]
+    ret
+
+rt_xhci_cmd_ring:
+    lea     rax, [rel rt_xhci_cmd_ring_mem]
+    ret
+
+rt_xhci_evt_ring:
+    lea     rax, [rel rt_xhci_evt_ring_mem]
+    ret
+
+rt_xhci_erst:
+    lea     rax, [rel rt_xhci_erst_mem]
+    ret
+
+rt_xhci_scratch_array:
+    lea     rax, [rel rt_xhci_scratch_array_mem]
+    ret
+
+rt_xhci_scratch_bufs:
+    lea     rax, [rel rt_xhci_scratch_bufs_mem]
     ret
 
 ; Map low 1GiB and framebuffer 1GiB region using 2MiB pages.
