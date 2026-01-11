@@ -31,6 +31,9 @@ global rt_xhci_dev_ctx
 global rt_xhci_ep0_ring
 global rt_xhci_kbd_ring
 global rt_usb_buf_ptr
+global rt_usb_irq_ptr
+global rt_xhci_kbd_buf
+global rt_wbinvd
 global uefi_present:weak
 global uefi_read_key:weak
 global uefi_print:weak
@@ -38,6 +41,7 @@ global uefi_clear:weak
 global uefi_set_cursor_pos:weak
 extern irq_timer_tick
 extern irq_kbd_push
+extern irq_xhci_evt
 global rt_i8042_init
 
 %define COM1 0x3F8
@@ -95,6 +99,8 @@ alignb 64
 rt_xhci_ep0_ring_mem: resb 4096
 alignb 64
 rt_xhci_kbd_ring_mem: resb 4096
+alignb 4096
+rt_xhci_kbd_buf_mem: resb 4096
 alignb 8
 rt_str_heap_pos: resq 1
 alignb 16
@@ -102,6 +108,8 @@ rt_str_heap: resb 65536
 rt_str_heap_end:
 alignb 16
 rt_usb_buf: resb 512
+alignb 8
+rt_usb_irq_flag: resb 8
 
 alignb 16
 idt_table: resb 256 * 16
@@ -386,6 +394,18 @@ rt_usb_buf_ptr:
     lea     rax, [rel rt_usb_buf]
     ret
 
+rt_usb_irq_ptr:
+    lea     rax, [rel rt_usb_irq_flag]
+    ret
+
+rt_xhci_kbd_buf:
+    lea     rax, [rel rt_xhci_kbd_buf_mem]
+    ret
+
+rt_wbinvd:
+    wbinvd
+    ret
+
 ; Map low 1GiB and framebuffer 1GiB region using 2MiB pages.
 ; rdi = framebuffer physical base
 rt_map_fb:
@@ -659,6 +679,9 @@ idt_init:
     mov     rdi, 33
     lea     rsi, [rel irq1_stub]
     call    idt_set_entry
+    mov     rdi, 64
+    lea     rsi, [rel irq_xhci_stub]
+    call    idt_set_entry
 
     lidt    [rel idt_desc]
     pop     rbx
@@ -897,6 +920,56 @@ irq1_stub:
 .irq1_restore_done:
     mov     al, 0x20
     out     0x20, al
+    pop     r15
+    pop     r14
+    pop     r13
+    pop     r12
+    pop     r11
+    pop     r10
+    pop     r9
+    pop     r8
+    pop     rdi
+    pop     rsi
+    pop     rbp
+    pop     rbx
+    pop     rdx
+    pop     rcx
+    pop     rax
+    iretq
+
+irq_xhci_stub:
+    push    rax
+    push    rcx
+    push    rdx
+    push    rbx
+    push    rbp
+    push    rsi
+    push    rdi
+    push    r8
+    push    r9
+    push    r10
+    push    r11
+    push    r12
+    push    r13
+    push    r14
+    push    r15
+    mov     rbx, rsp
+    and     rbx, 0xF
+    cmp     rbx, 0
+    jne     .irqx_aligned
+    sub     rsp, 8
+    mov     rbx, 1
+    jmp     .irqx_align_done
+.irqx_aligned:
+    xor     rbx, rbx
+.irqx_align_done:
+    call    irq_xhci_evt
+    test    rbx, rbx
+    jz      .irqx_restore_done
+    add     rsp, 8
+.irqx_restore_done:
+    mov     rax, 0xFEE000B0
+    mov     dword [rax], 0
     pop     r15
     pop     r14
     pop     r13

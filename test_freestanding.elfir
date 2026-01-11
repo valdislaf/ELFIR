@@ -45,7 +45,10 @@ extern fn ptr<u8> rt_xhci_input_ctx();
 extern fn ptr<u8> rt_xhci_dev_ctx();
 extern fn ptr<u8> rt_xhci_ep0_ring();
 extern fn ptr<u8> rt_xhci_kbd_ring();
+extern fn ptr<u8> rt_xhci_kbd_buf();
 extern fn ptr<u8> rt_usb_buf_ptr();
+extern fn ptr<u64> rt_usb_irq_ptr();
+extern fn rt_wbinvd();
 
 fn serial_write_byte(u16 port, u8 b) {
     if (0) { ret; }
@@ -205,7 +208,7 @@ fn u64 fb_glyph(u8 ch) {
 }
 
 fn fb_putc(ptr<u32> fb, i64 stride, i64 width, i64 height, ptr<i64> xp, ptr<i64> yp, u8 ch) {
-    i64 scale = 2;
+    i64 scale = 1;
     i64 line_step = 10;
     if (ch == u8(0x0A)) {
         *xp = 0;
@@ -801,6 +804,31 @@ fn pci_flr(u8 bus, u8 dev, u8 func) {
         wait -= 1;
     }
 }
+fn i64 pci_enable_msi(u8 bus, u8 dev, u8 func, u8 vector) {
+    u8 cap = pci_find_cap(bus, dev, func, u8(0x05));
+    if (cap == u8(0)) { ret 0; }
+    u32 hdr = pci_read32(bus, dev, func, cap);
+    u32 msg_ctl = (hdr >> u32(16)) & u32(0xFFFF);
+    u32 is64 = (msg_ctl >> u32(7)) & u32(1);
+    u32 addr_lo = u32(0xFEE00000);
+    u32 addr_hi = u32(0);
+    pci_write32(bus, dev, func, cap + u8(0x04), addr_lo);
+    if (is64 != u32(0)) {
+        pci_write32(bus, dev, func, cap + u8(0x08), addr_hi);
+        pci_write32(bus, dev, func, cap + u8(0x0C), u32(vector));
+    } else {
+        pci_write32(bus, dev, func, cap + u8(0x08), u32(vector));
+    }
+    msg_ctl = msg_ctl | u32(1);
+    u32 hdr2 = (hdr & u32(0x0000FFFF)) | (msg_ctl << u32(16));
+    pci_write32(bus, dev, func, cap, hdr2);
+
+    u32 cmd = pci_read32(bus, dev, func, u8(0x04));
+    cmd = cmd | u32(1 << 2);
+    cmd = cmd | u32(1 << 10);
+    pci_write32(bus, dev, func, u8(0x04), cmd);
+    ret 1;
+}
 
 fn u64 pci_find_xhci_base(ptr<u8> bus_out, ptr<u8> dev_out, ptr<u8> fn_out) {
     i64 bus = 0;
@@ -874,7 +902,7 @@ fn i64 xhci_ctrl_xfer(ptr<u8> ring, ptr<i64> idxp, ptr<u32> cyclep,
                       ptr<i64> fb_xp, ptr<i64> fb_yp) {
     u32 d0 = u32(setup & u64(0xFFFFFFFF));
     u32 d1 = u32((setup >> u64(32)) & u64(0xFFFFFFFF));
-    u32 d2 = data_len;
+    u32 d2 = u32(8);
     u32 d3 = u32(0);
     u32 trt = u32(0);
     if (data_len != u32(0)) {
@@ -921,7 +949,7 @@ fn i64 xhci_ctrl_xfer(ptr<u8> ring, ptr<i64> idxp, ptr<u32> cyclep,
             u64 erdp_val = u64(evt_ring) + u64(*evt_idxp) * u64(16);
             volatile_store(erdp_reg, erdp_val | u64(0x8));
             if (ev_type == u32(32)) {
-                if (fb_out != ptr<u32>(0)) {
+                if (0 && fb_out != ptr<u32>(0)) {
                     fb_putc(fb_out, fb_stride, fb_width, fb_height, fb_xp, fb_yp, u8(0x58)); // X
                     fb_putc(fb_out, fb_stride, fb_width, fb_height, fb_xp, fb_yp, u8(0x43)); // C
                     fb_putc(fb_out, fb_stride, fb_width, fb_height, fb_xp, fb_yp, u8(0x3D)); // =
@@ -945,6 +973,11 @@ fn i64 xhci_ctrl_xfer(ptr<u8> ring, ptr<i64> idxp, ptr<u32> cyclep,
             }
         }
         wait -= 1;
+    }
+    if (0 && fb_out != ptr<u32>(0)) {
+        fb_putc(fb_out, fb_stride, fb_width, fb_height, fb_xp, fb_yp, u8(0x45)); // E
+        fb_putc(fb_out, fb_stride, fb_width, fb_height, fb_xp, fb_yp, u8(0x54)); // T
+        fb_putc(fb_out, fb_stride, fb_width, fb_height, fb_xp, fb_yp, u8(0x0A));
     }
     ret 0;
 }
@@ -1036,7 +1069,7 @@ fn fb_fill_rect(ptr<u32> fb, i64 stride, i64 width, i64 height, i64 x, i64 y, i6
 }
 
 fn fb_mark_line(ptr<u32> fb, i64 stride, i64 width, i64 height, i64 line, u32 color) {
-    i64 scale = 2;
+    i64 scale = 1;
     i64 line_step = 10;
     i64 cols = width / (8 * scale);
     if (cols <= 4) { ret; }
@@ -1105,6 +1138,28 @@ fn irq_kbd_push(u64 sc) {
     *(buf + u64(head)) = u8(sc);
     volatile_store(headp, next);
     ret;
+}
+
+fn irq_xhci_evt() {
+    ptr<u64> flagp = rt_usb_irq_ptr();
+    u64 v = volatile_load(flagp);
+    volatile_store(flagp, v + u64(1));
+}
+
+fn dbg_mark(ptr<u32> fb_out, i64 fb_out_stride, i64 fb_out_width, i64 fb_out_height,
+            ptr<i64> fb_out_xp, ptr<i64> fb_out_yp, u8 idx) {
+    if (fb_out == ptr<u32>(0)) { ret; }
+    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x49)); // I
+    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30) + idx);
+    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x20));
+}
+
+fn dbg_mark2(ptr<u32> fb_out, i64 fb_out_stride, i64 fb_out_width, i64 fb_out_height,
+             ptr<i64> fb_out_xp, ptr<i64> fb_out_yp, u8 idx) {
+    if (fb_out == ptr<u32>(0)) { ret; }
+    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x4A)); // J
+    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30) + idx);
+    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x20));
 }
 
 fn panic(str msg) {
@@ -1824,16 +1879,49 @@ fn _start() {
     i64 usb_pending = 0;
     u32 usb_slot_id = u32(0);
     u32 usb_ep_id = u32(0);
+    u32 ep_ctx_index = u32(0);
+    u32 usb_ep_addr = u32(0);
+    u32 usb_ep_mps = u32(8);
+    u32 usb_ep_interval = u32(10);
+    u32 usb_if_num = u32(0);
+    u32 usb_if_alt = u32(0);
+    u32 usb_db_idx = u32(0);
+    u64 usb_evt_ring_addr = u64(0);
+    u64 usb_erst_addr = u64(0);
     ptr<u8> usb_evt_ring = ptr<u8>(0);
     ptr<u64> usb_erdp_reg = ptr<u64>(0);
     ptr<u32> usb_db_reg = ptr<u32>(0);
     ptr<u8> usb_kbd_ring = ptr<u8>(0);
+    ptr<u32> usb_iman_reg = ptr<u32>(0);
+    ptr<u32> usb_imod_reg = ptr<u32>(0);
+    ptr<u32> usb_erstsz_reg = ptr<u32>(0);
+    ptr<u64> usb_erstba_reg = ptr<u64>(0);
     i64 usb_kbd_idx = 0;
+    i64 usb_kbd_last_idx = 0;
     u32 usb_kbd_cycle = u32(1);
     i64 usb_evt_idx = 0;
     u32 usb_evt_cycle = u32(1);
     ptr<u8> usb_buf = rt_usb_buf_ptr();
-    i64 usb_dbg_stage = 0;
+    ptr<u8> usb_scratch_bufs = rt_xhci_scratch_bufs();
+    ptr<u8> usb_kbd_buf = usb_scratch_bufs + i64(4096 * 31);
+    ptr<u64> usb_irq_flag = rt_usb_irq_ptr();
+    i64 usb_irq_mode = 0;
+    u64 usb_irq_seen = u64(0);
+    i64 usb_irq_printed = 0;
+    i64 usb_dbg_stage = 1;
+    i64 usb_dbg_evt = 2;
+    i64 usb_dbg_enq = 1;
+    i64 usb_dbg_tevt = 1;
+    i64 usb_dbg_epctx = 1;
+    i64 usb_dbg_epstate = 1;
+    i64 usb_noevt = 0;
+    i64 usb_evt_dumped = 0;
+    i64 usb_evt_log = 0;
+    i64 usb_mark_enq = 0;
+    i64 usb_mark_evt = 0;
+    i64 usb_mark_tevt = 0;
+    i64 usb_mark_ctx = 0;
+    i64 usb_mark_d3 = 0;
 
     if (fb_base != u64(0)) {
         fb_out = ptr<u32>(fb_base);
@@ -1864,25 +1952,39 @@ fn _start() {
 
         if (1) {
         u64 xhci_base = uefi_get_xhci_base();
+        dbg_mark(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0));
         u8 xbus = u8(0);
         u8 xdev = u8(0);
         u8 xfn = u8(0);
         u64 xhci_pci_base = pci_find_xhci_base(&xbus, &xdev, &xfn);
+        dbg_mark(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(1));
         if (xhci_pci_base != u64(0)) {
             xhci_base = xhci_pci_base;
             pci_pm_set_d0(xbus, xdev, xfn);
+            dbg_mark(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(2));
             pci_flr(xbus, xdev, xfn);
+            dbg_mark(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(3));
             u32 cmdreg = pci_read32(xbus, xdev, xfn, u8(0x04));
             cmdreg = cmdreg | u32(1 << 1) | u32(1 << 2);
             pci_write32(xbus, xdev, xfn, u8(0x04), cmdreg);
-            if (fb_out != ptr<u32>(0)) {
+            dbg_mark(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(4));
+            i64 msi_ok = pci_enable_msi(xbus, xdev, xfn, u8(0x40));
+            if (msi_ok != 0) {
+                usb_irq_mode = 0;
+                volatile_store(usb_irq_flag, u64(0));
+                asm0("sti");
+                dbg_mark(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(5));
+            } else {
+                dbg_mark(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(9));
+            }
+            if (0 && fb_out != ptr<u32>(0)) {
                 fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x55)); // U
                 fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x50)); // P
                 fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x4C)); // L
                 fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
             }
         }
-        if (fb_out != ptr<u32>(0)) {
+        if (0 && fb_out != ptr<u32>(0)) {
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x55)); // U
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30)); // 0
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
@@ -1899,6 +2001,7 @@ fn _start() {
         u32 cap0 = volatile_load(cap_reg);
         u8 caplen = u8(cap0 & u32(0xFF));
         u16 hci_ver = u16((cap0 >> u32(16)) & u32(0xFFFF));
+        dbg_mark(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(6));
 
         if (0) {
             fb_write_caplen_label(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp);
@@ -1925,6 +2028,7 @@ fn _start() {
         u32 rtsoff = volatile_load(rtsoff_reg);
         u8 max_ports = u8((hcs1 >> u32(24)) & u32(0xFF));
         u8 max_slots = u8(hcs1 & u32(0xFF));
+        dbg_mark(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(7));
 
         if (0) {
             fb_write_hcs1_label(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp);
@@ -2198,9 +2302,18 @@ fn _start() {
 
         volatile_store(imod_reg, u32(0));
         volatile_store(erstsz_reg, u32(1));
-        volatile_store(erstba_reg, u64(erst));
-        volatile_store(erdp_reg, u64(evt_ring));
-        volatile_store(iman_reg, u32(0x00000002));
+        u64 erst_addr = u64(erst) & ~u64(0x3F);
+        u64 erdp_addr = u64(evt_ring) & ~u64(0xF);
+        volatile_store(erstba_reg, erst_addr);
+        volatile_store(erdp_reg, erdp_addr | u64(0x8));
+        volatile_store(iman_reg, u32(0x00000003));
+
+        usb_iman_reg = iman_reg;
+        usb_imod_reg = imod_reg;
+        usb_erstsz_reg = erstsz_reg;
+        usb_erstba_reg = erstba_reg;
+        usb_evt_ring_addr = erdp_addr;
+        usb_erst_addr = erst_addr;
 
         u32 evt_cycle = u32(1);
         i64 evt_idx = 0;
@@ -2267,7 +2380,7 @@ fn _start() {
             }
             wait_cmd -= 1;
         }
-        if (got_cmd && fb_out != ptr<u32>(0)) {
+        if (0 && got_cmd && fb_out != ptr<u32>(0)) {
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x55)); // U
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x53)); // S
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
@@ -2296,7 +2409,7 @@ fn _start() {
             u64 portsc_addr2 = op_base2 + u64(0x400) + u64(pr - 1) * u64(0x10);
             ptr<u32> portsc_reg2 = ptr<u32>(portsc_addr2);
             u32 ps = volatile_load(portsc_reg2);
-            if (pr <= 4 && fb_out != ptr<u32>(0)) {
+            if (0 && pr <= 4 && fb_out != ptr<u32>(0)) {
                 fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x50)); // P
                 fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30) + u8(pr));
                 fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D)); // =
@@ -2319,11 +2432,11 @@ fn _start() {
             u32 ped = (ps_done >> u32(1)) & u32(1);
             u32 pls = (ps_done >> u32(5)) & u32(0xF);
             u32 spd = (ps_done >> u32(10)) & u32(0xF);
-            if (ccs != u32(0) && first_port == 0) {
+            if (ccs != u32(0) && ped != u32(0) && first_port == 0) {
                 first_port = pr;
                 first_ps = ps_done;
             }
-            if (ccs != u32(0) && sel_port == 0) {
+            if (ccs != u32(0) && ped != u32(0) && sel_port == 0) {
                 sel_port = pr;
                 sel_spd = spd;
             }
@@ -2346,7 +2459,7 @@ fn _start() {
             }
             pr += 1;
         }
-        if (first_port != 0 && fb_out != ptr<u32>(0)) {
+        if (0 && first_port != 0 && fb_out != ptr<u32>(0)) {
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x55)); // U
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x20));
@@ -2359,6 +2472,30 @@ fn _start() {
         }
 
         if (sel_port == 0) {
+            i64 prr = 1;
+            while (prr <= i64(max_ports)) {
+                u64 portsc_addr_r = op_base2 + u64(0x400) + u64(prr - 1) * u64(0x10);
+                ptr<u32> portsc_reg_r = ptr<u32>(portsc_addr_r);
+                u32 ps_r = volatile_load(portsc_reg_r);
+                u32 ccs_r = ps_r & u32(1);
+                u32 ped_r = (ps_r >> u32(1)) & u32(1);
+                if (ccs_r != u32(0) && ped_r == u32(0)) {
+                    u32 psr2 = ps_r | u32(0x10) | rw1c_mask;
+                    volatile_store(portsc_reg_r, psr2);
+                    i64 wpr = 400000;
+                    while (wpr > 0) {
+                        if ((volatile_load(portsc_reg_r) & u32(0x10)) == u32(0)) { break; }
+                        wpr -= 1;
+                    }
+                    i64 wped = 400000;
+                    while (wped > 0) {
+                        u32 ps_ped = volatile_load(portsc_reg_r);
+                        if (((ps_ped >> u32(1)) & u32(1)) != u32(0)) { break; }
+                        wped -= 1;
+                    }
+                }
+                prr += 1;
+            }
             i64 scan_retry = 0;
             while (sel_port == 0 && scan_retry < 20) {
                 i64 settle2 = 500000;
@@ -2369,8 +2506,9 @@ fn _start() {
                     ptr<u32> portsc_reg_retry = ptr<u32>(portsc_addr_retry);
                     u32 ps_retry = volatile_load(portsc_reg_retry);
                     u32 ccs_retry = ps_retry & u32(1);
+                    u32 ped_retry = (ps_retry >> u32(1)) & u32(1);
                     u32 spd_retry = (ps_retry >> u32(10)) & u32(0xF);
-                    if (ccs_retry != u32(0) && sel_port == 0) {
+                    if (ccs_retry != u32(0) && ped_retry != u32(0) && sel_port == 0) {
                         sel_port = pr2;
                         sel_spd = spd_retry;
                     }
@@ -2378,19 +2516,19 @@ fn _start() {
                 }
                 scan_retry += 1;
             }
-            if (sel_port != 0 && fb_out != ptr<u32>(0)) {
+            if (0 && sel_port != 0 && fb_out != ptr<u32>(0)) {
                 fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x55)); // U
                 fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x46)); // F
                 fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
             }
         }
 
-        if (sel_port == 0 && fb_out != ptr<u32>(0)) {
+        if (0 && sel_port == 0 && fb_out != ptr<u32>(0)) {
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x55)); // U
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x4E)); // N
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
         }
-        if (sel_port != 0 && fb_out != ptr<u32>(0)) {
+        if (0 && sel_port != 0 && fb_out != ptr<u32>(0)) {
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x55)); // U
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x50)); // P
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
@@ -2417,9 +2555,12 @@ fn _start() {
             *(slot32 + 2) = u32(0);
             *(slot32 + 3) = u32(0);
 
+            u32 ep0_mps = u32(8);
+            if (sel_spd == u32(3)) { ep0_mps = u32(64); }
+            if (sel_spd == u32(4) || sel_spd == u32(5)) { ep0_mps = u32(512); }
             ptr<u32> ep0_ctx = ptr<u32>(u64(input_ctx) + u64(ctx_sz) * u64(2));
             u32 ep0_d0 = u32(0);
-            u32 ep0_d1 = (u32(3) << u32(1)) | (u32(4) << u32(3)) | (u32(8) << u32(16));
+            u32 ep0_d1 = (u32(3) << u32(1)) | (u32(4) << u32(3)) | (ep0_mps << u32(16));
             u64 tr_deq = u64(ep0_ring);
             u32 ep0_d2 = u32(tr_deq & u64(0xFFFFFFF0)) | u32(1);
             u32 ep0_d3 = u32((tr_deq >> u64(32)) & u64(0xFFFFFFFF));
@@ -2446,34 +2587,170 @@ fn _start() {
                     volatile_store(erdp_reg, erdp_val2 | u64(0x8));
                     if (ev_type2 == u32(33) && ev_slot2 == slot_id) {
                         got_addr = 1;
-                        fb_write_addr_label(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp);
-                        fb_write_hex_u64(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp, u64(ev_ccode2));
-                        fb_putc(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp, u8(0x0A));
+                        if (0) {
+                            fb_write_addr_label(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp);
+                            fb_write_hex_u64(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp, u64(ev_ccode2));
+                            fb_putc(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp, u8(0x0A));
+                        }
                     }
                 }
                 wait_addr -= 1;
             }
 
             if (got_addr) {
-                if (fb_out != ptr<u32>(0)) {
+                if (0 && fb_out != ptr<u32>(0)) {
                     fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x55)); // U
                     fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x41)); // A
                     fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
                 }
                 ptr<u32> db_slot = ptr<u32>(dboff_base + u64(slot_id) * u64(4));
 
+                u32 cfg_val = u32(1);
+                if (got_addr) {
+                    u64 setup_gd = u64(0);
+                    setup_gd = setup_gd | u64(0x80);
+                    setup_gd = setup_gd | (u64(0x06) << u64(8));
+                    setup_gd = setup_gd | (u64(0x0200) << u64(16));
+                    setup_gd = setup_gd | (u64(0x0000) << u64(32));
+                    setup_gd = setup_gd | (u64(0x0009) << u64(48));
+                if (0 && fb_out != ptr<u32>(0)) {
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x47)); // G
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30)); // 0
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                }
+                    if (!xhci_ctrl_xfer(ep0_ring, &ep0_idx, &ep0_cycle,
+                                        evt_ring, &evt_idx, &evt_cycle, erdp_reg,
+                                        db_slot, setup_gd, usb_buf, u32(9), 1,
+                                        fb_out, fb_out_stride, fb_out_width, fb_out_height,
+                                        fb_out_xp, fb_out_yp)) {
+                        got_addr = 0;
+                    }
+                    if (0 && got_addr && fb_out != ptr<u32>(0)) {
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x47)); // G
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x31)); // 1
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                    }
+                    if (got_addr) {
+                        cfg_val = u32(*(usb_buf + 5));
+                        if (cfg_val == u32(0)) { cfg_val = u32(1); }
+                    }
+                }
+                if (got_addr) {
+                    u32 total_len = u32(*(usb_buf + 2)) | (u32(*(usb_buf + 3)) << u32(8));
+                    if (total_len < u32(9)) { total_len = u32(9); }
+                    if (total_len > u32(512)) { total_len = u32(512); }
+                    u32 req_len = total_len;
+                    if (req_len < u32(9)) { req_len = u32(128); }
+                    if (req_len > u32(256)) { req_len = u32(256); }
+                    u64 setup_gd2 = u64(0);
+                    setup_gd2 = setup_gd2 | u64(0x80);
+                    setup_gd2 = setup_gd2 | (u64(0x06) << u64(8));
+                    setup_gd2 = setup_gd2 | (u64(0x0200) << u64(16));
+                    setup_gd2 = setup_gd2 | (u64(0x0000) << u64(32));
+                    setup_gd2 = setup_gd2 | (u64(req_len) << u64(48));
+                    if (xhci_ctrl_xfer(ep0_ring, &ep0_idx, &ep0_cycle,
+                                       evt_ring, &evt_idx, &evt_cycle, erdp_reg,
+                                       db_slot, setup_gd2, usb_buf, req_len, 1,
+                                       fb_out, fb_out_stride, fb_out_width, fb_out_height,
+                                       fb_out_xp, fb_out_yp)) {
+                        if (0 && fb_out != ptr<u32>(0)) {
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x47)); // G
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x32)); // 2
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                        }
+                        i64 off = 9;
+                        i64 cur_class = -1;
+                        i64 cur_sub = -1;
+                        i64 cur_proto = -1;
+                        i64 cur_if_num = -1;
+                        i64 cur_if_alt = -1;
+                        i64 found_ep = 0;
+                        u32 any_ep_addr = u32(0);
+                        u32 any_ep_mps = u32(0);
+                        u32 any_ep_interval = u32(0);
+                        while (off + 1 < i64(req_len) && found_ep == 0) {
+                            u8 dlen = *(usb_buf + off);
+                            u8 dtype = *(usb_buf + off + 1);
+                            if (dlen == u8(0)) { break; }
+                            if (off + i64(dlen) > i64(req_len)) { break; }
+                            if (dtype == u8(4) && dlen >= u8(9)) {
+                                cur_if_num = i64(*(usb_buf + off + 2));
+                                cur_if_alt = i64(*(usb_buf + off + 3));
+                                cur_class = i64(*(usb_buf + off + 5));
+                                cur_sub = i64(*(usb_buf + off + 6));
+                                cur_proto = i64(*(usb_buf + off + 7));
+                            }
+                            if (dtype == u8(5) && dlen >= u8(7)) {
+                                u8 ep_addr = *(usb_buf + off + 2);
+                                u8 ep_attr = *(usb_buf + off + 3);
+                                u16 ep_mps_u16 = u16(*(usb_buf + off + 4)) | (u16(*(usb_buf + off + 5)) << u16(8));
+                                u8 ep_intv_u8 = *(usb_buf + off + 6);
+                                if ((ep_addr & u8(0x80)) != u8(0) && (ep_attr & u8(0x3)) == u8(3)) {
+                                    if (any_ep_addr == u32(0)) {
+                                        any_ep_addr = u32(ep_addr);
+                                        any_ep_mps = u32(ep_mps_u16);
+                                        any_ep_interval = u32(ep_intv_u8);
+                                    }
+                                    if (cur_class == 3 && cur_sub == 1 && cur_proto == 1) {
+                                        usb_ep_addr = u32(ep_addr);
+                                        usb_ep_mps = u32(ep_mps_u16);
+                                        usb_ep_interval = u32(ep_intv_u8);
+                                        if (cur_if_num >= 0) { usb_if_num = u32(cur_if_num); }
+                                        if (cur_if_alt >= 0) { usb_if_alt = u32(cur_if_alt); }
+                                        found_ep = 1;
+                                    }
+                                }
+                            }
+                            off += i64(dlen);
+                        }
+                            if (usb_ep_addr == u32(0) && any_ep_addr != u32(0)) {
+                                usb_ep_addr = any_ep_addr;
+                                usb_ep_mps = any_ep_mps;
+                                usb_ep_interval = any_ep_interval;
+                                if (0 && fb_out != ptr<u32>(0)) {
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x46)); // F
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                                }
+                            }
+                    }
+                }
                 u64 setup_cfg = u64(0);
                 setup_cfg = setup_cfg | u64(0x00);
                 setup_cfg = setup_cfg | (u64(0x09) << u64(8));
-                setup_cfg = setup_cfg | (u64(0x0001) << u64(16));
+                setup_cfg = setup_cfg | (u64(cfg_val) << u64(16));
                 setup_cfg = setup_cfg | (u64(0x0000) << u64(32));
                 setup_cfg = setup_cfg | (u64(0x0000) << u64(48));
-                if (!xhci_ctrl_xfer(ep0_ring, &ep0_idx, &ep0_cycle,
-                                    evt_ring, &evt_idx, &evt_cycle, erdp_reg,
-                                    db_slot, setup_cfg, usb_buf, u32(0), 0,
-                                    fb_out, fb_out_stride, fb_out_width, fb_out_height,
-                                    fb_out_xp, fb_out_yp)) {
+                if (0 && fb_out != ptr<u32>(0)) {
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30)); // 0
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                }
+                if (got_addr && !xhci_ctrl_xfer(ep0_ring, &ep0_idx, &ep0_cycle,
+                                               evt_ring, &evt_idx, &evt_cycle, erdp_reg,
+                                               db_slot, setup_cfg, usb_buf, u32(0), 0,
+                                               fb_out, fb_out_stride, fb_out_width, fb_out_height,
+                                               fb_out_xp, fb_out_yp)) {
                     got_addr = 0;
+                }
+                if (got_addr && usb_if_alt != u32(0)) {
+                    u64 setup_setif = u64(0);
+                    setup_setif = setup_setif | u64(0x01);
+                    setup_setif = setup_setif | (u64(0x0B) << u64(8));
+                    setup_setif = setup_setif | (u64(usb_if_alt) << u64(16));
+                    setup_setif = setup_setif | (u64(usb_if_num) << u64(32));
+                    setup_setif = setup_setif | (u64(0x0000) << u64(48));
+                    i64 setif_ok = xhci_ctrl_xfer(ep0_ring, &ep0_idx, &ep0_cycle,
+                                                  evt_ring, &evt_idx, &evt_cycle, erdp_reg,
+                                                  db_slot, setup_setif, usb_buf, u32(0), 0,
+                                                  fb_out, fb_out_stride, fb_out_width, fb_out_height,
+                                                  fb_out_xp, fb_out_yp);
+                    setif_ok = setif_ok;
+                }
+                if (0 && got_addr && fb_out != ptr<u32>(0)) {
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x31)); // 1
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
                 }
                 if (!got_addr && fb_out != ptr<u32>(0) && usb_dbg_stage == 0) {
                     usb_dbg_stage = 1;
@@ -2484,16 +2761,25 @@ fn _start() {
                 u64 setup_proto = u64(0);
                 setup_proto = setup_proto | u64(0x21);
                 setup_proto = setup_proto | (u64(0x0B) << u64(8));
-                setup_proto = setup_proto | (u64(0x0000) << u64(16));
+                setup_proto = setup_proto | (u64(usb_if_num) << u64(16));
                 setup_proto = setup_proto | (u64(0x0000) << u64(32));
                 setup_proto = setup_proto | (u64(0x0000) << u64(48));
                 if (got_addr) {
-                    if (!xhci_ctrl_xfer(ep0_ring, &ep0_idx, &ep0_cycle,
-                                        evt_ring, &evt_idx, &evt_cycle, erdp_reg,
-                                        db_slot, setup_proto, usb_buf, u32(0), 0,
-                                        fb_out, fb_out_stride, fb_out_width, fb_out_height,
-                                        fb_out_xp, fb_out_yp)) {
-                        got_addr = 0;
+                    if (0 && fb_out != ptr<u32>(0)) {
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x50)); // P
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30)); // 0
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                    }
+                    if (xhci_ctrl_xfer(ep0_ring, &ep0_idx, &ep0_cycle,
+                                       evt_ring, &evt_idx, &evt_cycle, erdp_reg,
+                                       db_slot, setup_proto, usb_buf, u32(0), 0,
+                                       fb_out, fb_out_stride, fb_out_width, fb_out_height,
+                                       fb_out_xp, fb_out_yp)) {
+                        if (0 && fb_out != ptr<u32>(0)) {
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x50)); // P
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x31)); // 1
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                        }
                     }
                     if (!got_addr && fb_out != ptr<u32>(0) && usb_dbg_stage == 0) {
                         usb_dbg_stage = 1;
@@ -2505,16 +2791,25 @@ fn _start() {
                 u64 setup_idle = u64(0);
                 setup_idle = setup_idle | u64(0x21);
                 setup_idle = setup_idle | (u64(0x0A) << u64(8));
-                setup_idle = setup_idle | (u64(0x0000) << u64(16));
+                setup_idle = setup_idle | (u64(usb_if_num) << u64(16));
                 setup_idle = setup_idle | (u64(0x0000) << u64(32));
                 setup_idle = setup_idle | (u64(0x0000) << u64(48));
                 if (got_addr) {
-                    if (!xhci_ctrl_xfer(ep0_ring, &ep0_idx, &ep0_cycle,
-                                        evt_ring, &evt_idx, &evt_cycle, erdp_reg,
-                                        db_slot, setup_idle, usb_buf, u32(0), 0,
-                                        fb_out, fb_out_stride, fb_out_width, fb_out_height,
-                                        fb_out_xp, fb_out_yp)) {
-                        got_addr = 0;
+                    if (0 && fb_out != ptr<u32>(0)) {
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x49)); // I
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30)); // 0
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                    }
+                    if (xhci_ctrl_xfer(ep0_ring, &ep0_idx, &ep0_cycle,
+                                       evt_ring, &evt_idx, &evt_cycle, erdp_reg,
+                                       db_slot, setup_idle, usb_buf, u32(0), 0,
+                                       fb_out, fb_out_stride, fb_out_width, fb_out_height,
+                                       fb_out_xp, fb_out_yp)) {
+                        if (0 && fb_out != ptr<u32>(0)) {
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x49)); // I
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x31)); // 1
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                        }
                     }
                     if (!got_addr && fb_out != ptr<u32>(0) && usb_dbg_stage == 0) {
                         usb_dbg_stage = 1;
@@ -2532,7 +2827,6 @@ fn _start() {
                     }
                     ptr<u32> ic2 = ptr<u32>(u64(input_ctx));
                     *(ic2 + 0) = u32(0);
-                    *(ic2 + 1) = u32((u32(1) << u32(0)) | (u32(1) << u32(3)));
 
                     ptr<u8> slot_src = ptr<u8>(u64(dev_ctx));
                     ptr<u8> slot_dst = ptr<u8>(u64(input_ctx) + u64(ctx_sz));
@@ -2541,27 +2835,76 @@ fn _start() {
                         *(slot_dst + slot_copy) = *(slot_src + slot_copy);
                         slot_copy += 1;
                     }
+                    if (usb_ep_addr != u32(0)) {
+                        u32 ep_num = usb_ep_addr & u32(0x0F);
+                        u32 ep_dir = u32(0);
+                        if ((usb_ep_addr & u32(0x80)) != u32(0)) { ep_dir = u32(1); }
+                        usb_ep_id = ep_num * u32(2) + ep_dir;
+                    } else {
+                        usb_ep_id = u32(1);
+                    }
+
+                    ep_ctx_index = usb_ep_id + u32(1);
                     ptr<u32> slot_cfg = ptr<u32>(u64(input_ctx) + u64(ctx_sz));
-                    u32 slot_cfg_d0 = (sel_spd << u32(20)) | (u32(3) << u32(27));
+                    u32 ce = usb_ep_id;
+                    if (ce < u32(1)) { ce = u32(1); }
+                    u32 slot_cfg_d0 = (sel_spd << u32(20)) | (ce << u32(27));
                     *(slot_cfg + 0) = slot_cfg_d0;
                     *(slot_cfg + 1) = (u32(sel_port) & u32(0xFF)) << u32(16);
+                    u32 add_flags = u32(1) << u32(0);
+                    add_flags = add_flags | (u32(1) << u32(usb_ep_id));
+                    *(ic2 + 1) = add_flags;
+                    if (0 && fb_out != ptr<u32>(0)) {
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x41)); // A
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x46)); // F
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                        fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(add_flags));
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x20));
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                        fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(ce));
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x20));
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x44)); // D
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x42)); // B
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                        fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(usb_ep_id));
+                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                    }
 
                     usb_kbd_ring = rt_xhci_kbd_ring();
                     usb_kbd_cycle = u32(1);
+                    xhci_zero(usb_kbd_ring, 4096);
                     xhci_ring_init(usb_kbd_ring, usb_kbd_cycle);
                     usb_kbd_idx = 0;
-
-                    usb_ep_id = u32(3);
-                    ptr<u32> ep1_ctx = ptr<u32>(u64(input_ctx) + u64(ctx_sz) * u64(usb_ep_id));
-                    u32 ep1_d0 = u32(10) << u32(16);
-                    u32 ep1_d1 = (u32(3) << u32(1)) | (u32(7) << u32(3)) | (u32(8) << u32(16));
+                    ptr<u32> ep1_ctx = ptr<u32>(u64(input_ctx) + u64(ctx_sz) * u64(ep_ctx_index));
+                    u32 ep_intv = usb_ep_interval;
+                    if (ep_intv == u32(0)) { ep_intv = u32(1); }
+                    if (sel_spd >= u32(3)) {
+                        if (ep_intv > u32(0)) { ep_intv -= u32(1); }
+                        if (ep_intv == u32(0)) { ep_intv = u32(1); }
+                    }
+                    u32 ep_mps = usb_ep_mps;
+                    if (ep_mps == u32(0)) { ep_mps = u32(8); }
+                    u32 avg_trb = u32(8);
+                    u32 ep_esit = ep_mps;
+                    if (ep_esit > u32(65535)) { ep_esit = u32(65535); }
+                    u32 ep1_d0 = (ep_intv << u32(16));
+                    u32 ep_type = u32(3);
+                    if ((usb_ep_addr & u32(0x80)) != u32(0)) { ep_type = u32(7); }
+                    u32 ep1_d1 = (u32(3) << u32(1)) | (ep_type << u32(3)) | (ep_mps << u32(16));
                     u64 ep1_tr = u64(usb_kbd_ring);
                     u32 ep1_d2 = u32(ep1_tr & u64(0xFFFFFFF0)) | u32(1);
                     u32 ep1_d3 = u32((ep1_tr >> u64(32)) & u64(0xFFFFFFFF));
+                    u32 ep1_d4 = (avg_trb & u32(0xFFFF)) | (ep_esit << u32(16));
                     *(ep1_ctx + 0) = ep1_d0;
                     *(ep1_ctx + 1) = ep1_d1;
                     *(ep1_ctx + 2) = ep1_d2;
                     *(ep1_ctx + 3) = ep1_d3;
+                    *(ep1_ctx + 4) = ep1_d4;
+                    *(ep1_ctx + 5) = u32(0);
+                    *(ep1_ctx + 6) = u32(0);
+                    *(ep1_ctx + 7) = u32(0);
 
                     u32 cfg_d0 = u32(u64(input_ctx) & u64(0xFFFFFFFF));
                     u32 cfg_d1 = u32((u64(input_ctx) >> u64(32)) & u64(0xFFFFFFFF));
@@ -2595,19 +2938,122 @@ fn _start() {
                     }
 
                     if (got_cfg) {
-                        if (fb_out != ptr<u32>(0)) {
+                        if (0 && fb_out != ptr<u32>(0)) {
                             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x55)); // U
                             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x32)); // 2
                             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
                         }
                         usb_ready = 1;
+                        if (fb_out != ptr<u32>(0)) {
+                            dbg_mark(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(8));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                        }
+                        if (usb_mark_ctx == 0 && fb_out != ptr<u32>(0)) {
+                            usb_mark_ctx = 1;
+                            i64 ctx_sz4 = xhci_ctx_size(hcc1);
+                            ptr<u32> dc_ep4 = ptr<u32>(u64(dev_ctx) + u64(ctx_sz4) * u64(usb_ep_id));
+                            u64 tr_ptr4 = (u64(*(dc_ep4 + 3)) << u64(32)) | u64(*(dc_ep4 + 2) & u32(0xFFFFFFF0));
+                            if (tr_ptr4 == u64(usb_kbd_ring)) {
+                                dbg_mark2(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(4));
+                            } else {
+                                dbg_mark2(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(5));
+                            }
+                            u32 ep_state4 = *(dc_ep4 + 0) & u32(0x7);
+                            if (ep_state4 == u32(1)) {
+                                dbg_mark2(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(6));
+                            } else {
+                                dbg_mark2(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(7));
+                            }
+                        }
                         usb_slot_id = slot_id;
-                        usb_ep_id = u32(3);
+                        if (usb_ep_id == u32(0)) { usb_ep_id = u32(3); }
                         usb_evt_ring = evt_ring;
                         usb_erdp_reg = erdp_reg;
                         usb_db_reg = db_slot;
+                        usb_db_idx = slot_id;
                         usb_evt_idx = evt_idx;
                         usb_evt_cycle = evt_cycle;
+                        u64 erdp_init = u64(usb_evt_ring) + u64(usb_evt_idx) * u64(16);
+                        volatile_store(usb_erdp_reg, erdp_init | u64(0x8));
+                        if (usb_iman_reg != ptr<u32>(0)) {
+                            u32 iman_now2 = volatile_load(usb_iman_reg);
+                            volatile_store(usb_iman_reg, iman_now2 | u32(1));
+                        }
+                        if (usb_dbg_epstate == 0 && fb_out != ptr<u32>(0)) {
+                            usb_dbg_epstate = 1;
+                            i64 ctx_sz3 = xhci_ctx_size(hcc1);
+                            ptr<u32> dc_ep3 = ptr<u32>(u64(dev_ctx) + u64(ctx_sz3) * u64(usb_ep_id));
+                            u32 ep_state = *(dc_ep3 + 0) & u32(0x7);
+                            u64 tr_ptr = (u64(*(dc_ep3 + 3)) << u64(32)) | u64(*(dc_ep3 + 2) & u32(0xFFFFFFF0));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x53)); // S
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(ep_state));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x54)); // T
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x52)); // R
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(tr_ptr));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                        }
+                        if (0 && usb_dbg_epctx == 0 && fb_out != ptr<u32>(0)) {
+                            usb_dbg_epctx = 1;
+                            i64 ctx_sz2 = xhci_ctx_size(hcc1);
+                            ptr<u32> dc_ep2 = ptr<u32>(u64(dev_ctx) + u64(ctx_sz2) * u64(usb_ep_id));
+                            ptr<u32> dc_ep0 = ptr<u32>(u64(dev_ctx) + u64(ctx_sz2) * u64(1));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x48)); // H
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x31)); // 1
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(hcc1));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x53)); // S
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x5A)); // Z
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(ctx_sz2));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x44)); // D
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30)); // 0
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(dc_ep2 + 0)));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x44)); // D
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x31)); // 1
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(dc_ep2 + 1)));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x44)); // D
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x32)); // 2
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(dc_ep2 + 2)));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x44)); // D
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x33)); // 3
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(dc_ep2 + 3)));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30)); // 0
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(dc_ep0 + 0)));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x31)); // 1
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(dc_ep0 + 1)));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x32)); // 2
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(dc_ep0 + 2)));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x33)); // 3
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(dc_ep0 + 3)));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                        }
                         i64 zb = 0;
                         while (zb < 16) {
                             *(usb_buf + zb) = u8(0);
@@ -2616,6 +3062,177 @@ fn _start() {
                         if (fb_out != ptr<u32>(0)) {
                             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x55)); // U
                             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x52)); // R
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x50)); // P
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(usb_ep_id));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x58)); // X
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(ep_ctx_index));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x41)); // A
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(usb_ep_addr));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x4D)); // M
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x50)); // P
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x53)); // S
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(usb_ep_mps));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x49)); // I
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x4E)); // N
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x54)); // T
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(usb_ep_interval));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x49)); // I
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x46)); // F
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(usb_if_num));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x41)); // A
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x4C)); // L
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(usb_if_alt));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x44)); // D
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x42)); // B
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x49)); // I
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(usb_db_idx));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x44)); // D
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x42)); // B
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x50)); // P
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(usb_db_reg));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x44)); // D
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x42)); // D
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(usb_ep_id));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            ptr<u32> ic_ep = ptr<u32>(u64(input_ctx) + u64(ctx_sz) * u64(ep_ctx_index));
+                            ptr<u32> dc_ep = ptr<u32>(u64(dev_ctx) + u64(ctx_sz) * u64(usb_ep_id));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x49)); // I
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30)); // 0
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(ic_ep + 0)));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x49)); // I
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x31)); // 1
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(ic_ep + 1)));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x49)); // I
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x32)); // 2
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(ic_ep + 2)));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x49)); // I
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x33)); // 3
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(ic_ep + 3)));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x44)); // D
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30)); // 0
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(dc_ep + 0)));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x44)); // D
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x31)); // 1
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(dc_ep + 1)));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x44)); // D
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x32)); // 2
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(dc_ep + 2)));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x44)); // D
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x33)); // 3
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(dc_ep + 3)));
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x56)); // V
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x52)); // R
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, usb_evt_ring_addr);
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x52)); // R
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x53)); // S
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x54)); // T
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                            fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, usb_erst_addr);
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+
+                            if (usb_iman_reg != ptr<u32>(0)) {
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x49)); // I
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x4D)); // M
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x41)); // A
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x4E)); // N
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                                fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(volatile_load(usb_iman_reg)));
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            }
+                            if (usb_imod_reg != ptr<u32>(0)) {
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x49)); // I
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x4D)); // M
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x4F)); // O
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x44)); // D
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                                fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(volatile_load(usb_imod_reg)));
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            }
+                            if (usb_erstsz_reg != ptr<u32>(0)) {
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x52)); // R
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x53)); // S
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                                fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(volatile_load(usb_erstsz_reg)));
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            }
+                            if (usb_erstba_reg != ptr<u64>(0)) {
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x42)); // B
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x41)); // A
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                                fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(volatile_load(usb_erstba_reg)));
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            }
+                            if (usb_erdp_reg != ptr<u64>(0)) {
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x44)); // D
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x50)); // P
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                                fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(volatile_load(usb_erdp_reg)));
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            }
                         }
                     }
                 }
@@ -2728,7 +3345,7 @@ fn _start() {
     line_col = *colp;
     serial_write_byte(com1, u8(0x3E));
     serial_write_byte(com1, u8(0x20));
-    if (fb_out != ptr<u32>(0)) {
+    if (0 && fb_out != ptr<u32>(0)) {
         fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x52)); // R
         fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
         fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x41)); // A
@@ -2737,12 +3354,14 @@ fn _start() {
         fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A)); // \n
     }
     if (fb_base != u64(0)) {
-        ptr<u32> fb_dbg5 = ptr<u32>(fb_base);
-        i64 dx5 = 0;
-        i64 dy5 = 5;
-        ptr<i64> dx5p = &dx5;
-        ptr<i64> dy5p = &dy5;
-        fb_putc(fb_dbg5, i64(fb_stride), i64(fb_width), i64(fb_height), dx5p, dy5p, u8(0x35)); // 5
+        if (0) {
+            ptr<u32> fb_dbg5 = ptr<u32>(fb_base);
+            i64 dx5 = 0;
+            i64 dy5 = 5;
+            ptr<i64> dx5p = &dx5;
+            ptr<i64> dy5p = &dy5;
+            fb_putc(fb_dbg5, i64(fb_stride), i64(fb_width), i64(fb_height), dx5p, dy5p, u8(0x35)); // 5
+        }
     }
 
     i64 one = 1;
@@ -2768,19 +3387,19 @@ fn _start() {
                             hist_nav = hist_head - 1;
                             if (hist_nav < 0) { hist_nav += 8; }
                         } else {
-                        i64 uefi_oldest = hist_head - hist_count;
-                        while (uefi_oldest < 0) { uefi_oldest += 8; }
-                        if (hist_nav != uefi_oldest) {
-                            hist_nav = hist_nav - 1;
-                            if (hist_nav < 0) { hist_nav += 8; }
+                            i64 uefi_oldest = hist_head - hist_count;
+                            while (uefi_oldest < 0) { uefi_oldest += 8; }
+                            if (hist_nav != uefi_oldest) {
+                                hist_nav = hist_nav - 1;
+                                if (hist_nav < 0) { hist_nav += 8; }
+                            }
                         }
-                    }
-                    ptr<u8> uefi_src = hist_entry_ptr(hist_base, hist_nav);
-                    len = hist_get_len(hist_len_base, hist_nav);
-                    line_copy(line, uefi_src, len);
-                    cur = len;
-                    line_redraw(vga, rowp, colp, attr, line_row, line_col, line, len, prev_len, cur);
-                    prev_len = len;
+                        ptr<u8> uefi_src = hist_entry_ptr(hist_base, hist_nav);
+                        len = hist_get_len(hist_len_base, hist_nav);
+                        line_copy(line, uefi_src, len);
+                        cur = len;
+                        line_redraw(vga, rowp, colp, attr, line_row, line_col, line, len, prev_len, cur);
+                        prev_len = len;
                     }
                 } else {
                     if (uefi_sc == u16(2)) {
@@ -2894,32 +3513,314 @@ fn _start() {
 
         if (usb_ready) {
             if (!usb_pending) {
-                u64 rep_addr = u64(usb_buf);
+                i64 bi = 0;
+                while (bi < 8) {
+                    *(usb_kbd_buf + bi) = u8(0xAA);
+                    bi += 1;
+                }
+                u64 rep_addr = u64(usb_kbd_buf);
                 u32 nd0 = u32(rep_addr & u64(0xFFFFFFFF));
                 u32 nd1 = u32((rep_addr >> u64(32)) & u64(0xFFFFFFFF));
                 u32 nd2 = u32(8);
                 u32 nd3 = u32(0);
+                nd3 = nd3 | u32(1 << 2); // ISP
                 nd3 = nd3 | u32(1 << 5);
                 nd3 = nd3 | u32(1 << 10);
+                usb_kbd_last_idx = usb_kbd_idx;
+                if (usb_mark_enq == 0) {
+                    usb_mark_enq = 1;
+                    dbg_mark2(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0));
+                }
                 xhci_xfer_enqueue(usb_kbd_ring, &usb_kbd_idx, &usb_kbd_cycle, nd0, nd1, nd2, nd3);
                 *usb_db_reg = usb_ep_id;
+                if (usb_mark_enq == 1) {
+                    usb_mark_enq = 2;
+                    dbg_mark2(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(1));
+                }
                 usb_pending = 1;
+                if (usb_dbg_evt == 0) {
+                    usb_dbg_evt = 1;
+                }
+                if (0 && usb_dbg_enq == 0 && fb_out != ptr<u32>(0)) {
+                    usb_dbg_enq = 1;
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x4E)); // N
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x51)); // Q
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x50)); // P
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(usb_ep_id));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x4B)); // K
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x42)); // B
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x44)); // D
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(usb_kbd_ring));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x42)); // B
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x55)); // U
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x46)); // F
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(rep_addr));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x49)); // I
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x44)); // D
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x58)); // X
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(usb_kbd_last_idx));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                    ptr<u32> trb32 = ptr<u32>(u64(usb_kbd_ring));
+                    ptr<u32> tbase = trb32 + usb_kbd_last_idx * 4;
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x54)); // T
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30)); // 0
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(tbase + 0)));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x54)); // T
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x31)); // 1
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(tbase + 1)));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x54)); // T
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x32)); // 2
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(tbase + 2)));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x54)); // T
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x33)); // 3
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(tbase + 3)));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                }
+            }
+            if (0 && usb_evt_dumped == 0 && fb_out != ptr<u32>(0)) {
+                ptr<u32> er32 = ptr<u32>(u64(usb_evt_ring));
+                u32 d0r = *(er32 + usb_evt_idx * 4 + 0);
+                u32 d1r = *(er32 + usb_evt_idx * 4 + 1);
+                u32 d2r = *(er32 + usb_evt_idx * 4 + 2);
+                u32 d3r = *(er32 + usb_evt_idx * 4 + 3);
+                usb_evt_dumped = 1;
+                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x52)); // R
+                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30)); // 0
+                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(d0r));
+                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+
+                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x52)); // R
+                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x31)); // 1
+                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(d1r));
+                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+
+                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x52)); // R
+                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x32)); // 2
+                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(d2r));
+                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+
+                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x52)); // R
+                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x33)); // 3
+                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(d3r));
+                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
             }
             u32 ev_d0u = u32(0);
             u32 ev_d1u = u32(0);
             u32 ev_d2u = u32(0);
             u32 ev_d3u = u32(0);
-            if (xhci_evt_poll(usb_evt_ring, &usb_evt_idx, &usb_evt_cycle, &ev_d0u, &ev_d1u, &ev_d2u, &ev_d3u)) {
+            i64 evt_ready = 1;
+            if (usb_irq_mode) {
+                u64 irq_cnt = volatile_load(usb_irq_flag);
+                if (irq_cnt == usb_irq_seen) {
+                    evt_ready = 0;
+                } else {
+                    usb_irq_seen = irq_cnt;
+                }
+            }
+            if (evt_ready) {
+                if (usb_mark_evt == 0) {
+                    usb_mark_evt = 1;
+                    dbg_mark2(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(2));
+                }
+                if (usb_mark_d3 == 0) {
+                    usb_mark_d3 = 1;
+                    ptr<u32> ev32 = ptr<u32>(u64(usb_evt_ring));
+                    u32 d3raw = *(ev32 + usb_evt_idx * 4 + 3);
+                    if (d3raw == u32(0)) {
+                        dbg_mark2(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(9));
+                    } else {
+                        u32 cyc = usb_evt_cycle & u32(1);
+                        if ((d3raw & u32(1)) != cyc) {
+                            dbg_mark2(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(8));
+                        }
+                    }
+                }
+                while (xhci_evt_poll(usb_evt_ring, &usb_evt_idx, &usb_evt_cycle, &ev_d0u, &ev_d1u, &ev_d2u, &ev_d3u)) {
                 u32 ev_typeu = (ev_d3u >> u32(10)) & u32(0x3F);
                 u32 ccodeu = (ev_d2u >> u32(24)) & u32(0xFF);
                 u32 ev_epu = (ev_d3u >> u32(16)) & u32(0x1F);
+                u32 tr_len = ev_d2u & u32(0x00FFFFFF);
                 u64 erdp_valu = u64(usb_evt_ring) + u64(usb_evt_idx) * u64(16);
                 volatile_store(usb_erdp_reg, erdp_valu | u64(0x8));
+                if (usb_iman_reg != ptr<u32>(0)) {
+                    u32 iman_now = volatile_load(usb_iman_reg);
+                    volatile_store(usb_iman_reg, iman_now | u32(1));
+                }
+                if (0 && usb_evt_log == 0 && fb_out != ptr<u32>(0)) {
+                    usb_evt_log = 1;
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x56)); // V
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(ev_typeu));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x20));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(ccodeu));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x20));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x50)); // P
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(ev_epu));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x52)); // R
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30)); // 0
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(ev_d0u));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x52)); // R
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x31)); // 1
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(ev_d1u));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x52)); // R
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x32)); // 2
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(ev_d2u));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x52)); // R
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x33)); // 3
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(ev_d3u));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                }
+                if (ev_typeu == u32(32) && usb_dbg_tevt == 0 && fb_out != ptr<u32>(0)) {
+                    usb_dbg_tevt = 1;
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x54)); // T
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x50)); // P
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(ev_epu));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x20));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(ccodeu));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x20));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x54)); // T
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x4C)); // L
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(tr_len));
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                }
                 if (ev_typeu == u32(32) && ev_epu == usb_ep_id) {
+                    if (usb_mark_tevt == 0) {
+                        usb_mark_tevt = 1;
+                        dbg_mark2(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(3));
+                    }
                     usb_pending = 0;
                     if (ccodeu == u32(1)) {
-                        ptr<u8> rep = usb_buf;
-                        ptr<u8> prev = usb_buf + 8;
+                        rt_wbinvd();
+                        ptr<u8> rep = usb_kbd_buf;
+                        ptr<u8> prev = usb_kbd_buf + 8;
+                        i64 dma_missing = 1;
+                        i64 bj = 0;
+                        while (bj < 8) {
+                            if (*(rep + bj) != u8(0xAA)) { dma_missing = 0; }
+                            bj += 1;
+                        }
+                        if (fb_out != ptr<u32>(0)) {
+                            if (usb_irq_printed == 0 && usb_irq_seen != u64(0)) {
+                                usb_irq_printed = 1;
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x49)); // I
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x52)); // R
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x51)); // Q
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                                fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(usb_irq_seen));
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            }
+                            if (dma_missing != 0) {
+                                if (usb_dbg_evt == 1) {
+                                    usb_dbg_evt = 2;
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x44)); // D
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x4D)); // M
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x41)); // A
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(ccodeu));
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x54)); // T
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x4C)); // L
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(tr_len));
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x42)); // B
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x55)); // U
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x46)); // F
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(usb_kbd_buf));
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x4B)); // K
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x42)); // B
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x44)); // D
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(usb_kbd_ring));
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x56)); // V
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x54)); // T
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(usb_evt_ring));
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                                    u64 ev_ptr = u64(ev_d0u) | (u64(ev_d1u) << u64(32));
+                                    u64 trb_ptr = u64(usb_kbd_ring) + u64(usb_kbd_last_idx) * u64(16);
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x54)); // T
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x52)); // R
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x42)); // B
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(trb_ptr));
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x56)); // V
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x50)); // P
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(ev_ptr));
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                                    bj = 0;
+                                    while (bj < 8) {
+                                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x42)); // B
+                                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30) + u8(bj));
+                                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                                        fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(rep + bj)));
+                                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                                        bj += 1;
+                                    }
+                                }
+                            } else {
+                                bj = 0;
+                                while (bj < 8) {
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x42)); // B
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30) + u8(bj));
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
+                                    fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(rep + bj)));
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                                    bj += 1;
+                                }
+                            }
+                        }
                         u8 mods = *(rep + 0);
                         i64 sh = 0;
                         if ((mods & u8(0x22)) != u8(0)) { sh = 1; }
@@ -2945,6 +3846,17 @@ fn _start() {
                             ci += 1;
                         }
                     }
+                }
+            }
+            usb_noevt = 0;
+        } else {
+            if (usb_dbg_evt == 1) {
+                usb_noevt += 1;
+                if (0 && usb_noevt > 2000000 && fb_out != ptr<u32>(0)) {
+                    usb_dbg_evt = 3;
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x4E)); // N
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
+                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
                 }
             }
         }
@@ -3119,4 +4031,5 @@ fn _start() {
         line_redraw(vga, rowp, colp, attr, line_row, line_col, line, len, prev_len, cur);
         prev_len = len;
     }
+}
 }
