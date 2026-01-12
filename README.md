@@ -154,6 +154,13 @@ qemu-system-x86_64 -m 512M -machine q35 -bios /usr/share/OVMF/OVMF_CODE.fd -cdro
 
 Notes:
  - Use `-machine q35` and `-device qemu-xhci` to provide an xHCI controller; the default machine may only expose EHCI/legacy USB.
+ - If you use `qemu-xhci-device-usb-kbd.sh`, ensure it is executable and has Unix line endings:
+
+```bash
+chmod +x qemu-xhci-device-usb-kbd.sh
+sed -i 's/\r$//' qemu-xhci-device-usb-kbd.sh
+./qemu-xhci-device-usb-kbd.sh
+```
 
 Run the UEFI ISO in QEMU with a writable OVMF NVRAM file:
 
