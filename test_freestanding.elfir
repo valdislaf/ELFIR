@@ -734,6 +734,22 @@ fn xhci_ring_init(ptr<u8> ring, u32 cycle) {
     ret;
 }
 
+fn xhci_ring_doorbell(ptr<u32> db_reg, u32 target) {
+    rt_wbinvd();
+    volatile_store(db_reg, target);
+}
+
+fn xhci_queue_noop(ptr<u8> ring, ptr<i64> idxp, ptr<u32> cyclep, ptr<u32> db_reg, u32 ep_id) {
+    u32 d0 = u32(0);
+    u32 d1 = u32(0);
+    u32 d2 = u32(0);
+    u32 d3 = u32(0);
+    d3 = d3 | u32(1 << 5);     // IOC
+    d3 = d3 | u32(23 << 10);   // No-Op TRB
+    xhci_xfer_enqueue(ring, idxp, cyclep, d0, d1, d2, d3);
+    xhci_ring_doorbell(db_reg, ep_id);
+}
+
 fn i64 xhci_ctx_size(u32 hcc1) {
     if (((hcc1 >> u32(2)) & u32(1)) != u32(0)) {
         ret 64;
@@ -936,7 +952,7 @@ fn i64 xhci_ctrl_xfer(ptr<u8> ring, ptr<i64> idxp, ptr<u32> cyclep,
     sd3 = sd3 | u32(4 << 10);
     xhci_xfer_enqueue(ring, idxp, cyclep, u32(0), u32(0), u32(0), sd3);
 
-    *doorbell = u32(1);
+    xhci_ring_doorbell(doorbell, u32(1));
     i64 wait = 2000000;
     while (wait > 0) {
         u32 ev_d0 = u32(0);
@@ -1891,6 +1907,7 @@ fn _start() {
     ptr<u8> usb_evt_ring = ptr<u8>(0);
     ptr<u64> usb_erdp_reg = ptr<u64>(0);
     ptr<u32> usb_db_reg = ptr<u32>(0);
+    i64 usb_noop_done = 0;
     ptr<u8> usb_kbd_ring = ptr<u8>(0);
     ptr<u32> usb_iman_reg = ptr<u32>(0);
     ptr<u32> usb_imod_reg = ptr<u32>(0);
@@ -3512,6 +3529,13 @@ fn _start() {
         }
 
         if (usb_ready) {
+            if (usb_noop_done == 0) {
+                xhci_queue_noop(usb_kbd_ring, &usb_kbd_idx, &usb_kbd_cycle, usb_db_reg, usb_ep_id);
+                usb_noop_done = 1;
+                if (fb_out != ptr<u32>(0)) {
+                    dbg_mark2(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(5));
+                }
+            }
             if (!usb_pending) {
                 i64 bi = 0;
                 while (bi < 8) {
@@ -3532,7 +3556,7 @@ fn _start() {
                     dbg_mark2(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0));
                 }
                 xhci_xfer_enqueue(usb_kbd_ring, &usb_kbd_idx, &usb_kbd_cycle, nd0, nd1, nd2, nd3);
-                *usb_db_reg = usb_ep_id;
+                xhci_ring_doorbell(usb_db_reg, usb_ep_id);
                 if (usb_mark_enq == 1) {
                     usb_mark_enq = 2;
                     dbg_mark2(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(1));

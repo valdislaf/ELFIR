@@ -146,6 +146,25 @@ make uefi-iso
 
 This produces `elfir_uefi.iso` from the `uefi_usb/` layout. Requires `xorriso`, `dosfstools` (mkfs.fat), and `mtools` (mcopy/mmd).
 
+Run the UEFI ISO in QEMU (xHCI + USB keyboard):
+
+```bash
+qemu-system-x86_64 -m 512M -machine q35 -bios /usr/share/OVMF/OVMF_CODE.fd -cdrom elfir_uefi.iso -serial stdio -no-reboot -no-shutdown -device qemu-xhci -device usb-kbd
+```
+
+Notes:
+ - Use `-machine q35` and `-device qemu-xhci` to provide an xHCI controller; the default machine may only expose EHCI/legacy USB.
+
+Run the UEFI ISO in QEMU with a writable OVMF NVRAM file:
+
+```bash
+cp /usr/share/OVMF/OVMF_VARS.fd /tmp/OVMF_VARS.fd
+qemu-system-x86_64 -m 512M -machine q35 -bios /usr/share/OVMF/OVMF_CODE.fd -drive if=pflash,format=raw,file=/tmp/OVMF_VARS.fd -cdrom elfir_uefi.iso -serial stdio -no-reboot -no-shutdown -device qemu-xhci -device usb-kbd
+```
+
+Troubleshooting:
+ - `xHCI controller not found`: QEMU was started without `-machine q35` and `-device qemu-xhci` (or no xHCI device is present).
+
 Expected output:
 
 ```
