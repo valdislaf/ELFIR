@@ -1,14 +1,11 @@
-.git/
-
-# build artifacts
+out_freestanding.asm
+kernel_uefi.elf
+uefi_usb/kernel_uefi.elf
 *.o
-
-# windows binaries
 *.exe
-
-iso/
 *.iso
 *.img
-*.jpg
-*.png
-
+iso/
+uefi_usb/uefi_esp.img
+PromptGPT.txt
+PromptGoogle.txt
