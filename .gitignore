@@ -1,11 +1,10 @@
 out_freestanding.asm
 kernel_uefi.elf
-uefi_usb/kernel_uefi.elf
+uefi_usb/
 *.o
 *.exe
 *.iso
 *.img
 iso/
-uefi_usb/uefi_esp.img
 PromptGPT.txt
 PromptGoogle.txt
