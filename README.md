@@ -193,7 +193,7 @@ fn main_d64() {
 
 ## ELFIR v0.1 Semantics
 
-- `auto` declares a variable (i64 in `main_i64`, d64 in `main_d64`). `auto` is not allowed in `main`.
+- `auto` declares a variable (i64 in `main_i64`, d64 in `main_d64`). `auto` is not allowed in `main` or in non-entry functions.
 - `i64/u8/u16/u32/u64 x = <expr>;`, `d64 x = <expr>;`, `str x = "..."`, and `ptr<T> x = <expr>;` declare typed variables (required in `main` for numeric).
 - Functions:
   - `fn i64/u8/u16/u32/u64 foo(...)`, `fn d64 foo(...)`, `fn str foo(...)`, `fn ptr<T> foo(...)` are typed functions.
@@ -203,8 +203,9 @@ fn main_d64() {
 - `print_i64(<expr>);` prints i64, `print_d64(<expr>);` prints d64, `print_hex(<expr>);` prints unsigned hex with `0x` prefix, `print_str(<str>);` prints a string.
 - `print(<expr or "str">, ...);` prints each argument in order (string literal/str var or integer/d64 expression).
 - `print_i64/print_d64/print_str` do not add a newline; use `\n` inside strings when needed.
-- `print_i64` is only allowed in `main`/`main_i64`; `print_d64` only in `main`/`main_d64`.
-- `print_hex` is allowed in `main`/`main_i64` and only accepts unsigned expressions.
+- `print_i64` is allowed in mixed/i64 code; `print_d64` in mixed/d64 code.
+- `print_hex` is allowed in mixed/i64 code and only accepts unsigned expressions.
+- Line (`//`) and block (`/* ... */`) comments are supported.
 - Function calls: `foo(a, b)` can be used in expressions; `foo(...);` is allowed for void functions.
 - `ret <expr>;` returns the expression value in `rax` (i64), `xmm0` (d64), or `rax`+`rdx` (str).
 - `ret;` returns from void functions.

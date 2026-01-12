@@ -6,7 +6,7 @@ There is no bytecode format; the compiler emits x86-64 NASM assembly.
 1) Lexical
 
 - Source is UTF-8 text; only ASCII keywords/symbols are used.
-- Whitespace is ignored. There are no comments in v0.
+- Whitespace is ignored. Line (`//`) and block (`/* ... */`) comments are supported.
 - Identifiers: `[A-Za-z_][A-Za-z0-9_]*`.
 - Keywords:
   fn, auto, ret, i64, d64, str, void, u8, u16, u32, u64, ptr, if, else, elseif,
@@ -116,6 +116,7 @@ Entry points:
 auto:
 - `auto` is i64 in `main_i64`, d64 in `main_d64`.
 - `auto` is not allowed in `main` or `_start`.
+- `auto` is not allowed in non-entry functions (use explicit types).
 
 Integer literals:
 - Decimal literals default to i64 unless context requires u*.
