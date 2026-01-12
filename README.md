@@ -67,6 +67,12 @@ Extra for running ISO in QEMU:
 sudo apt install -y qemu-system-x86
 ```
 
+Extra for UEFI loader builds:
+
+```bash
+sudo apt install -y gnu-efi
+```
+
 ## Quick Start
 
 1) Build the compiler
@@ -117,6 +123,47 @@ Freestanding build (kernel-style):
 ```bash
 make freestanding
 ```
+
+UEFI build (USB keyboard via firmware):
+
+```bash
+make uefi
+```
+
+Create a USB-ready folder structure:
+
+```bash
+make uefi-usb
+```
+
+Copy `uefi_usb/` contents to the root of a FAT32 USB stick. The loader is placed at `EFI/BOOT/BOOTX64.EFI` and the kernel at `kernel_uefi.elf`.
+
+Create a UEFI-bootable ISO (for Rufus or similar):
+
+```bash
+make uefi-iso
+```
+
+This produces `elfir_uefi.iso` from the `uefi_usb/` layout. Requires `xorriso`, `dosfstools` (mkfs.fat), and `mtools` (mcopy/mmd).
+
+Run the UEFI ISO in QEMU (xHCI + USB keyboard):
+
+```bash
+qemu-system-x86_64 -m 512M -machine q35 -bios /usr/share/OVMF/OVMF_CODE.fd -cdrom elfir_uefi.iso -serial stdio -no-reboot -no-shutdown -device qemu-xhci -device usb-kbd
+```
+
+Notes:
+ - Use `-machine q35` and `-device qemu-xhci` to provide an xHCI controller; the default machine may only expose EHCI/legacy USB.
+
+Run the UEFI ISO in QEMU with a writable OVMF NVRAM file:
+
+```bash
+cp /usr/share/OVMF/OVMF_VARS.fd /tmp/OVMF_VARS.fd
+qemu-system-x86_64 -m 512M -machine q35 -bios /usr/share/OVMF/OVMF_CODE.fd -drive if=pflash,format=raw,file=/tmp/OVMF_VARS.fd -cdrom elfir_uefi.iso -serial stdio -no-reboot -no-shutdown -device qemu-xhci -device usb-kbd
+```
+
+Troubleshooting:
+ - `xHCI controller not found`: QEMU was started without `-machine q35` and `-device qemu-xhci` (or no xHCI device is present).
 
 Expected output:
 

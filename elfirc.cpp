@@ -41,6 +41,7 @@ enum class TokKind {
     KwFor,
     KwBreak,
     KwContinue,
+    KwExtern,
 
     LParen, RParen,
     LBrace, RBrace,
@@ -125,6 +126,7 @@ public:
             else if (t.text == "for") t.kind = TokKind::KwFor;
             else if (t.text == "break") t.kind = TokKind::KwBreak;
             else if (t.text == "continue") t.kind = TokKind::KwContinue;
+            else if (t.text == "extern") t.kind = TokKind::KwExtern;
             else t.kind = TokKind::Ident;
             return t;
         }
@@ -522,6 +524,7 @@ struct Func {
     Type retType = Type::Void;
     std::vector<Param> params;
     std::vector<Stmt> body;
+    bool isExtern = false;
 };
 
 class Parser {
@@ -534,12 +537,48 @@ public:
     std::vector<Func> parseProgram() {
         std::vector<Func> funcs;
         while (cur_.kind != TokKind::End) {
-            funcs.push_back(parseFunction());
+            if (cur_.kind == TokKind::KwExtern) {
+                funcs.push_back(parseExternFunction());
+            } else {
+                funcs.push_back(parseFunction());
+            }
         }
         return funcs;
     }
 
 private:
+    Func parseExternFunction() {
+        expect(TokKind::KwExtern, "Expected 'extern'");
+        Type retType = Type::Void;
+        if (cur_.kind == TokKind::KwVoid) {
+            advance();
+            expect(TokKind::KwFn, "Expected 'fn' after 'extern void'");
+        } else {
+            expect(TokKind::KwFn, "Expected 'fn' after 'extern'");
+        }
+        if (isTypeStart(cur_.kind)) {
+            retType = parseType(true);
+        }
+        std::string fname = expectIdent("Expected function name after 'fn'");
+        expect(TokKind::LParen, "Expected '(' after function name");
+        std::vector<Param> params;
+        if (cur_.kind != TokKind::RParen) {
+            params.push_back(parseParam());
+            while (cur_.kind == TokKind::Comma) {
+                advance();
+                params.push_back(parseParam());
+            }
+        }
+        expect(TokKind::RParen, "Expected ')' after function parameters");
+        expect(TokKind::Semicolon, "Expected ';' after extern declaration");
+        Func f;
+        f.name = fname;
+        f.retType = retType;
+        f.params = std::move(params);
+        f.isExtern = true;
+        return f;
+    }
+
     Func parseFunction() {
         Type retType = Type::Void;
         if (cur_.kind == TokKind::KwVoid) {
@@ -3807,7 +3846,7 @@ static GenResult genFunctionAsm(const Func& f, Mode mode, Type retType,
     if (!hasRet && retType != Type::Void) {
         throw Error("Function '" + f.name + "' must contain 'ret <expr>;' in v0");
     }
-    if (!hasRet && retType == Type::Void) {
+    if (retType == Type::Void) {
         emitCleanupStrs(body, cg, labelId);
         body << "    leave\n";
         body << "    ret\n";
@@ -3838,11 +3877,12 @@ static std::string genOutAsm(const std::vector<Func>& funcs, const Func& entry, 
     const Type retType = isStart ? entry.retType : (isMainD64 ? Type::D64 : Type::I64);
 
     out << "global _start\n";
-    if (entry.name != "_start") {
-        out << "global " << entry.name << "\n\n";
-    } else {
-        out << "\n";
+    for (const auto& f : funcs) {
+        if (!f.isExtern && f.name != "_start") {
+            out << "global " << f.name << "\n";
+        }
     }
+    out << "\n";
 
     out << "extern rt_exit\n";
     out << "extern rt_print_i64\n";
@@ -3857,11 +3897,19 @@ static std::string genOutAsm(const std::vector<Func>& funcs, const Func& entry, 
     out << "extern rt_str_concat\n";
     out << "extern rt_str_copy\n";
     out << "extern rt_str_free\n";
+    for (const auto& f : funcs) {
+        if (f.isExtern) {
+            out << "extern " << f.name << "\n";
+        }
+    }
     out << "\n";
 
     std::vector<GenResult> gens;
     gens.reserve(funcs.size());
     for (const auto& f : funcs) {
+        if (f.isExtern) {
+            continue;
+        }
         Mode fMode = (f.name == entry.name) ? mode : Mode::Mixed;
         Type fRet = (f.name == entry.name) ? retType : f.retType;
         gens.push_back(genFunctionAsm(f, fMode, fRet, funcMap));
@@ -3986,6 +4034,9 @@ int main(int argc, char** argv) {
         Func& entry = funcs[entryIdx];
         if (!entry.params.empty()) {
             throw Error("Entrypoint '" + entry.name + "' cannot have parameters");
+        }
+        if (entry.isExtern) {
+            throw Error("Entrypoint '" + entry.name + "' cannot be extern");
         }
         if (kind == EntryKind::Start) {
             if (entry.retType != Type::Void) {

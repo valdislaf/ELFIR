@@ -16,6 +16,7 @@ mb2_header_end:
 section .text
 extern _start
 extern idt_init
+extern pic_init
 
 global mb2_entry
 mb2_entry:
@@ -49,6 +50,7 @@ long_mode_start:
     mov ss, ax
 
     call idt_init
+    call pic_init
     call _start
 
 .hang:

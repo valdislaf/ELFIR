@@ -1,0 +1,12 @@
+i64 stop0 = 1;
+    ptr<i64> stop0p = &stop0;
+    while (volatile_load(stop0p) == i64(1)) {
+        asm0("nop");
+    }
+	
+	
+	
+	
+
+		i64 stop0=1;ptr<i64>stop0p=&stop0;while(volatile_load(stop0p)==i64(1)){asm0("nop");}
+		

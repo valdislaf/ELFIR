@@ -1,0 +1,12 @@
+kernel: start
+kernel: init ok
+kernel: halt
+> helhello
+cmd: ?
+> help
+cmd: help
+> echo hello
+cmd: echo
+> test
+cmd: ?
+> 
