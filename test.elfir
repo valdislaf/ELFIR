@@ -36,6 +36,16 @@ fn assert_d64_eps(str name, d64 got, d64 exp, d64 tol) {
         print(name, "=false got=", got, " exp=", exp, "\n");
     }
 }
+
+struct Pair {
+    i64 a;
+    u8 b;
+    u16 c;
+}
+
+global i64 g_i = 7;
+global u64 g_u = 0x1234;
+global Pair g_p;
   
 fn main() {
 i64 x= 0;
@@ -182,18 +192,42 @@ i64 i= 0;
       assert_i64("cmp_u8_lt", u8(1) < u8(2), 1);
       assert_u64("hex_abcd", u64(0xABCD), 0xABCD);
 
+      print("\n-- struct/global tests --\n");
+      g_i += 1;
+      g_u = g_u + u64(1);
+      g_p.a = 10;
+      g_p.b = u8(0x12);
+      g_p.c = u16(0x3456);
+      assert_i64("g_i", g_i, 8);
+      assert_u64("g_u", g_u, 0x1235);
+      assert_i64("g_p.a", g_p.a, 10);
+      assert_u64("g_p.b", u64(g_p.b), 0x12);
+      assert_u64("g_p.c", u64(g_p.c), 0x3456);
+
+      Pair p;
+      p.a = 42;
+      p.b = u8(1);
+      p.c = u16(2);
+      assert_i64("p.a", p.a, 42);
+      assert_u64("p.b", u64(p.b), 1);
+      assert_u64("p.c", u64(p.c), 2);
+      ptr<Pair> pp = &p;
+      assert_i64("p_ptr_a", (*pp).a, 42);
+      (*pp).a = 43;
+      assert_i64("p_ptr_a2", p.a, 43);
+
       print("\n-- ptr tests --\n");
       u64 pa = 0;
-      ptr<u64> p = &pa;
-      *p = 11;
+      ptr<u64> p64 = &pa;
+      *p64 = 11;
       assert_u64("ptr_store_a", pa, 11);
-      ptr<u64> p2 = p + 1;
-      ptr<u64> p3 = ptr<u64>(u64(p) + u64(8));
+      ptr<u64> p2 = p64 + 1;
+      ptr<u64> p3 = ptr<u64>(u64(p64) + u64(8));
       assert_i64("ptr_add_eq", p2 == p3, 1);
-      ptr<u64> q = byte_add(p, 8);
+      ptr<u64> q = byte_add(p64, 8);
       assert_i64("ptr_byte_add_eq", q == p3, 1);
-      *p = 0;
-      ptr<u8> pu = ptr<u8>(u64(p));
+      *p64 = 0;
+      ptr<u8> pu = ptr<u8>(u64(p64));
       *pu = u8(0xEF);
       *(pu + 1) = u8(0xBE);
       assert_u64("ptr_u8_store", pa, 0xBEEF);

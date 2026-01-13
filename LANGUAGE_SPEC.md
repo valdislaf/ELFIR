@@ -10,7 +10,7 @@ There is no bytecode format; the compiler emits x86-64 NASM assembly.
 - Identifiers: `[A-Za-z_][A-Za-z0-9_]*`.
 - Keywords:
   fn, auto, ret, i64, d64, str, void, u8, u16, u32, u64, ptr, if, else, elseif,
-  while, for, break, continue, null, extern
+  while, for, break, continue, null, extern, struct, global
 - Builtin function names (not keywords):
   print, print_i64, print_d64, print_str, print_hex,
   sqrt, pow, min, max, abs, sin, cos, tan, pi,
@@ -33,7 +33,7 @@ Numeric:
 - Float: `d64` (IEEE-754 double).
 
 Pointers:
-- `ptr<T>` where `T` in {u8,u16,u32,u64,i64,d64}. Pointer size is 64-bit.
+- `ptr<T>` where `T` is a numeric type or a struct. Pointer size is 64-bit.
 - `null` is a literal used in pointer context.
 
 Strings:
@@ -45,9 +45,20 @@ Void:
 Sizes:
 - u8:1, u16:2, u32:4, u64/i64/d64:8 bytes.
 
+Structs:
+- `struct Name { <type> <field>; ... }`.
+- Fields cannot be `str` or `void`.
+- Field access uses `expr.field`. For pointers, use `(*p).field`.
+- Struct parameters/return values are not supported yet.
+
+Globals:
+- `global <type> <name>;` zero-initialized.
+- `global <type> <name> = <literal>;` literal is a number, or `null` for ptr.
+- Global `str` is not supported yet.
+
 3) Grammar (informal)
 
-program    := (function | extern_fn)*
+program    := (struct_def | global_decl | function | extern_fn)*
 function   := ("void" "fn" | "fn") [ret_type] ident "(" params? ")" "{" stmt* "}"
 extern_fn  := "extern" ("void" "fn" | "fn") [ret_type] ident "(" params? ")" ";"
 ret_type   := type
@@ -117,6 +128,9 @@ auto:
 - `auto` is i64 in `main_i64`, d64 in `main_d64`.
 - `auto` is not allowed in `main` or `_start`.
 - `auto` is not allowed in non-entry functions (use explicit types).
+
+assignment evaluation:
+- the right-hand side expression is evaluated first, then the left-hand side address is computed and written.
 
 Integer literals:
 - Decimal literals default to i64 unless context requires u*.
@@ -193,9 +207,10 @@ Registers:
 
 7) Limitations (v0)
 
-- No arrays or structs.
+- No arrays.
 - No comments.
-- No global variables.
 - No bounds checks or pointer safety.
 - No d64 in volatile_load/store.
+- Struct parameters/return values are not supported yet.
+- Global `str` variables are not supported yet.
 - Privileged instructions (in/out/cli/sti/hlt/lidt) are not safe in user-space.

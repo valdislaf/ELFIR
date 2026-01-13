@@ -8,3 +8,5 @@ uefi_usb/
 iso/
 PromptGPT.txt
 PromptGoogle.txt
+venv/
+.aider*
