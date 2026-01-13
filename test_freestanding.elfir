@@ -2157,6 +2157,34 @@ fn line_redraw(ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr, i64 line_ro
     }
 }
 
+fn line_redraw_serial(u16 com1, ptr<u8> buf, i64 len, i64 prev_len, i64 cur) {
+    serial_write_byte(com1, u8(0x0D));
+    serial_write_byte(com1, u8(0x3E));
+    serial_write_byte(com1, u8(0x20));
+    i64 i = 0;
+    while (i < len) {
+        serial_write_byte(com1, *(buf + i));
+        i += 1;
+    }
+    if (prev_len > len) {
+        i64 j = 0;
+        while (j < (prev_len - len)) {
+            serial_write_byte(com1, u8(0x20));
+            j += 1;
+        }
+        j = 0;
+        while (j < (prev_len - len)) {
+            serial_write_backspace(com1);
+            j += 1;
+        }
+    }
+    i64 back = len - cur;
+    while (back > 0) {
+        serial_write_backspace(com1);
+        back -= 1;
+    }
+}
+
 fn line_apply_char(u8 ch, ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr, u16 com1,
                    ptr<u32> fb_out, i64 fb_out_stride, i64 fb_out_width, i64 fb_out_height,
                    ptr<i64> fb_out_xp, ptr<i64> fb_out_yp,
@@ -2178,10 +2206,11 @@ fn line_apply_char(u8 ch, ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr, 
             len -= 1;
             cur -= 1;
             line_redraw(vga, rowp, colp, attr, *line_rowp, *line_colp, line, len, prev_len, cur);
-            prev_len = len;
             if (fb_out != ptr<u32>(0)) {
                 fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x08));
             }
+            line_redraw_serial(com1, line, len, prev_len, cur);
+            prev_len = len;
         }
         *lenp = len;
         *prev_lenp = prev_len;
@@ -2198,10 +2227,11 @@ fn line_apply_char(u8 ch, ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr, 
             }
             len -= 1;
             line_redraw(vga, rowp, colp, attr, *line_rowp, *line_colp, line, len, prev_len, cur);
-            prev_len = len;
             if (fb_out != ptr<u32>(0)) {
                 fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x7F));
             }
+            line_redraw_serial(com1, line, len, prev_len, cur);
+            prev_len = len;
         }
         *lenp = len;
         *prev_lenp = prev_len;
@@ -2255,11 +2285,11 @@ fn line_apply_char(u8 ch, ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr, 
     *(line + cur) = ch;
     len += 1;
     cur += 1;
-    serial_write_byte(com1, ch);
     if (fb_out != ptr<u32>(0)) {
         fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, ch);
     }
     line_redraw(vga, rowp, colp, attr, *line_rowp, *line_colp, line, len, prev_len, cur);
+    line_redraw_serial(com1, line, len, prev_len, cur);
     prev_len = len;
     *lenp = len;
     *prev_lenp = prev_len;
