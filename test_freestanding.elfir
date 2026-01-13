@@ -165,7 +165,7 @@ fn tty_write_hex_u64(ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr, u64 v
     }
 }
 
-fn u64 fb_glyph(u8 ch) {
+fn u64 fb_glyph(u8 ch) {    
     if (ch == u8(0x30)) { ret u64(0x003C666E7666663C); } // 0
     if (ch == u8(0x31)) { ret u64(0x003C181818183818); } // 1
     if (ch == u8(0x32)) { ret u64(0x007E60300C06663C); } // 2
@@ -202,10 +202,91 @@ fn u64 fb_glyph(u8 ch) {
     if (ch == u8(0x58)) { ret u64(0x0066663C183C6666); } // X
     if (ch == u8(0x59)) { ret u64(0x00181818183C6666); } // Y
     if (ch == u8(0x5A)) { ret u64(0x007E6030180C067E); } // Z
+    if (ch == u8(0x61)) { ret u64(0x003E663E063C0000); } // a
+    if (ch == u8(0x62)) { ret u64(0x007C6666667C6060); } // b
+    if (ch == u8(0x63)) { ret u64(0x003C6660663C0000); } // c
+    if (ch == u8(0x64)) { ret u64(0x003E6666663E0606); } // d
+    if (ch == u8(0x65)) { ret u64(0x003C607E663C0000); } // e
+    if (ch == u8(0x66)) { ret u64(0x003030307C30301C); } // f
+    if (ch == u8(0x67)) { ret u64(0x7C063E66663E0000); } // g
+    if (ch == u8(0x68)) { ret u64(0x00666666667C6060); } // h
+    if (ch == u8(0x69)) { ret u64(0x003C181818380018); } // i
+    if (ch == u8(0x6A)) { ret u64(0x386C0C0C0C1C000C); } // j
+    if (ch == u8(0x6B)) { ret u64(0x00666C786C666060); } // k
+    if (ch == u8(0x6C)) { ret u64(0x003C181818181838); } // l
+    if (ch == u8(0x6D)) { ret u64(0x00636B7E7E6C0000); } // m
+    if (ch == u8(0x6E)) { ret u64(0x00666666667C0000); } // n
+    if (ch == u8(0x6F)) { ret u64(0x003C6666663C0000); } // o
+    if (ch == u8(0x70)) { ret u64(0x60607C66667C0000); } // p
+    if (ch == u8(0x71)) { ret u64(0x06063E66663E0000); } // q
+    if (ch == u8(0x72)) { ret u64(0x00606060766C0000); } // r
+    if (ch == u8(0x73)) { ret u64(0x007C063C603E0000); } // s
+    if (ch == u8(0x74)) { ret u64(0x001C3030307C3030); } // t
+    if (ch == u8(0x75)) { ret u64(0x003E666666660000); } // u
+    if (ch == u8(0x76)) { ret u64(0x00183C6666660000); } // v
+    if (ch == u8(0x77)) { ret u64(0x00367F7F6B630000); } // w
+    if (ch == u8(0x78)) { ret u64(0x00663C183C660000); } // x
+    if (ch == u8(0x79)) { ret u64(0x7C063E6666660000); } // y
+    if (ch == u8(0x7A)) { ret u64(0x007E30180C7E0000); } // z
     if (ch == u8(0x5F)) { ret u64(0x007E000000000000); } // _
     if (ch == u8(0x3D)) { ret u64(0x00007E00007E0000); } // =
 	if (ch == u8(0x2D)) { ret u64(0x0000007E00000000); } // -
 	if (ch == u8(0x2B)) { ret u64(0x0018187E18181800); } // +
+	if (ch == u8(0x2A)) { ret u64(0x0000663CFF3C6600); } // *
+	if (ch == u8(0x5C)) { ret u64(0x0000060C18306000); } // /
+	if (ch == u8(0x2F)) { ret u64(0x00006030180C0600); } // \
+	if (ch == u8(0x28)) { ret u64(0x000C18303030180C); } // (
+	if (ch == u8(0x29)) { ret u64(0x0030180C0C0C1830); } // )
+	// space
+	if (ch == u8(0x20)) { ret u64(0x0000000000000000); } // ' '
+
+	// . , : ;
+	if (ch == u8(0x2E)) { ret u64(0x0018180000000000); } // .
+	if (ch == u8(0x2C)) { ret u64(0x3018180000000000); } // ,
+	if (ch == u8(0x3A)) { ret u64(0x1818000018180000); } // :
+	if (ch == u8(0x3B)) { ret u64(0x3018180000181800); } // ;
+
+	// ! ? ' "
+	if (ch == u8(0x21)) { ret u64(0x0018001818181800); } // !
+	if (ch == u8(0x3F)) { ret u64(0x001800180C06663C); } // ? 
+	if (ch == u8(0x27)) { ret u64(0x0000000018180000); } // '
+	if (ch == u8(0x22)) { ret u64(0x0000000066660000); } // "
+
+	// ( ) [ ] { }
+	if (ch == u8(0x28)) { ret u64(0x0C18303030180C00); } // (
+	if (ch == u8(0x29)) { ret u64(0x30180C0C0C183000); } // )
+	if (ch == u8(0x5B)) { ret u64(0x3C30303030303C00); } // [
+	if (ch == u8(0x5D)) { ret u64(0x3C0C0C0C0C0C3C00); } // ]
+	if (ch == u8(0x7B)) { ret u64(0x0E18187018180E00); } // {
+	if (ch == u8(0x7D)) { ret u64(0x7018180E18187000); } // }
+
+	// < >
+	if (ch == u8(0x3C)) { ret u64(0x0C18306030180C00); } // <
+	if (ch == u8(0x3E)) { ret u64(0x30180C060C183000); } // >
+
+	// / \ | _
+	if (ch == u8(0x5C)) { ret u64(0x006030180C060000); } // \   (как в Windows)
+	if (ch == u8(0x2F)) { ret u64(0x00060C1830600000); } // /
+	if (ch == u8(0x7C)) { ret u64(0x1818181818181800); } // |
+	if (ch == u8(0x5F)) { ret u64(0x7E00000000000000); } // _  (сверху, как у тебя)
+
+	// - + =  (плюс оставь свой рабочий; я не трогаю)
+	if (ch == u8(0x2D)) { ret u64(0x000000007E000000); } // -
+	if (ch == u8(0x2B)) { ret u64(0x0018187E18181800); } // +  (твой рабочий)
+	if (ch == u8(0x3D)) { ret u64(0x00007E00007E0000); } // =
+
+	// * % ^ ~
+	if (ch == u8(0x2A)) { ret u64(0x003C663C66000000); } // *
+	if (ch == u8(0x25)) { ret u64(0x00466630186C6600); } // %
+	if (ch == u8(0x5E)) { ret u64(0x00000000663C1800); } // ^
+	if (ch == u8(0x7E)) { ret u64(0x00006E3B00000000); } // ~
+	if (ch == u8(0x60)) { ret u64(0x30180C0000000000); } // `
+
+	// # & @ $
+	if (ch == u8(0x23)) { ret u64(0x367F36367F363600); } // #
+	if (ch == u8(0x26)) { ret u64(0x003B66663C386C38); } // &
+	if (ch == u8(0x40)) { ret u64(0x3C66606E76663C00); } // @
+	if (ch == u8(0x24)) { ret u64(0x187C063C603E1800); } // $
     ret u64(0);
 }
 
@@ -1588,6 +1669,8 @@ fn irq_xhci_evt() {
 fn dbg_mark(ptr<u32> fb_out, i64 fb_out_stride, i64 fb_out_width, i64 fb_out_height,
             ptr<i64> fb_out_xp, ptr<i64> fb_out_yp, u8 idx) {
     if (fb_out == ptr<u32>(0)) { ret; }
+    i64 dbg_marks_enable = 0;
+    if (dbg_marks_enable == 0) { ret; }
     if (idx == u8(0)) { // XHCI START
         fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x58)); // X
         fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x48)); // H
@@ -1686,6 +1769,8 @@ fn dbg_mark(ptr<u32> fb_out, i64 fb_out_stride, i64 fb_out_width, i64 fb_out_hei
 fn dbg_mark2(ptr<u32> fb_out, i64 fb_out_stride, i64 fb_out_width, i64 fb_out_height,
              ptr<i64> fb_out_xp, ptr<i64> fb_out_yp, u8 idx) {
     if (fb_out == ptr<u32>(0)) { ret; }
+    i64 dbg_marks_enable = 0;
+    if (dbg_marks_enable == 0) { ret; }
     if (idx == u8(0)) { // XFER ENQ
         fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
         fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x4E)); // N
@@ -2543,6 +2628,7 @@ fn _start() {
     i64 usb_dbg_tevt = 1;
     i64 usb_dbg_epctx = 1;
     i64 usb_dbg_epstate = 1;
+    i64 usb_dbg_print = 0;
     i64 usb_noevt = 0;
     i64 usb_evt_dumped = 0;
     i64 usb_evt_log = 0;
@@ -2551,6 +2637,7 @@ fn _start() {
     i64 usb_mark_tevt = 0;
     i64 usb_mark_ctx = 0;
     i64 usb_mark_d3 = 0;
+    i64 usb_port_override = 0;
 
     if (fb_base != u64(0)) {
         fb_out = ptr<u32>(fb_base);
@@ -2983,41 +3070,6 @@ fn _start() {
         u64 dboff_base = xhci_base + u64(dboff & u32(0xFFFFFFE0));
         ptr<u32> db0 = ptr<u32>(dboff_base);
         u32 slot_id = u32(0);
-        xhci_cmd_enqueue(cmd_ring, &cmd_idx, &cmd_cycle, u32(0), u32(0), u32(0), u32(9 << 10));
-        volatile_store(db0, u32(0));
-        i64 wait_cmd = 2000000;
-        i64 got_cmd = 0;
-        u32 ev_d0 = u32(0);
-        u32 ev_d1 = u32(0);
-        u32 ev_d2 = u32(0);
-        u32 ev_d3 = u32(0);
-        while (wait_cmd > 0 && got_cmd == 0) {
-            if (xhci_evt_poll(evt_ring, &evt_idx, &evt_cycle, &ev_d0, &ev_d1, &ev_d2, &ev_d3)) {
-                u32 ev_type = (ev_d3 >> u32(10)) & u32(0x3F);
-                u32 ev_slot = (ev_d3 >> u32(24)) & u32(0xFF);
-                u32 ev_ccode = (ev_d2 >> u32(24)) & u32(0xFF);
-                u64 erdp_val = u64(evt_ring) + u64(evt_idx) * u64(16);
-                volatile_store(erdp_reg, erdp_val | u64(0x8));
-                if (ev_type == u32(33)) {
-                    got_cmd = 1;
-                    slot_id = ev_slot;
-                    if (0) {
-                        fb_write_slot_label(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp);
-                        fb_write_hex_u64(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp, u64(ev_slot));
-                        fb_putc(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp, u8(0x20));
-                        fb_write_ccode_label(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp);
-                        fb_write_hex_u64(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp, u64(ev_ccode));
-                        fb_putc(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp, u8(0x0A));
-                    }
-                }
-            }
-            wait_cmd -= 1;
-        }
-        if (0 && got_cmd && fb_out != ptr<u32>(0)) {
-            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x55)); // U
-            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x53)); // S
-            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
-        }
 
         if (0) {
             i64 p = 1;
@@ -3069,7 +3121,7 @@ fn _start() {
                 first_port = pr;
                 first_ps = ps_done;
             }
-            if (ccs != u32(0) && ped != u32(0) && sel_port == 0) {
+            if (ccs != u32(0) && ped != u32(0)) {
                 sel_port = pr;
                 sel_spd = spd;
             }
@@ -3093,7 +3145,7 @@ fn _start() {
             }
             pr += 1;
         }
-        if (1 && first_port != 0 && fb_out != ptr<u32>(0)) {
+        if (usb_dbg_print && first_port != 0 && fb_out != ptr<u32>(0)) {
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x55)); // U
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
@@ -3105,6 +3157,14 @@ fn _start() {
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x20));
             fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(first_ps));
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+        }
+
+        if (usb_port_override != 0) {
+            sel_port = usb_port_override;
+            u64 portsc_addr_o = op_base2 + u64(0x400) + u64(sel_port - 1) * u64(0x10);
+            ptr<u32> portsc_reg_o = ptr<u32>(portsc_addr_o);
+            u32 ps_o = volatile_load(portsc_reg_o);
+            sel_spd = (ps_o >> u32(10)) & u32(0xF);
         }
 
         if (sel_port == 0) {
@@ -3152,25 +3212,121 @@ fn _start() {
                 }
                 scan_retry += 1;
             }
-            if (1 && sel_port != 0 && fb_out != ptr<u32>(0)) {
+            if (usb_dbg_print && sel_port != 0 && fb_out != ptr<u32>(0)) {
                 fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x55)); // U
                 fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x46)); // F
                 fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
             }
         }
 
-        if (1 && sel_port == 0 && fb_out != ptr<u32>(0)) {
+        if (usb_dbg_print && sel_port == 0 && fb_out != ptr<u32>(0)) {
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x55)); // U
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x4E)); // N
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
         }
-        if (1 && sel_port != 0 && fb_out != ptr<u32>(0)) {
+        if (usb_dbg_print && sel_port != 0 && fb_out != ptr<u32>(0)) {
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x55)); // U
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x50)); // P
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
         }
 
-        if (slot_id != u32(0) && sel_port != 0) {
+        i64 port_try = 1;
+        i64 port_end = i64(max_ports);
+        if (usb_port_override != 0) {
+            port_try = usb_port_override;
+            port_end = usb_port_override;
+        }
+        while (port_try <= port_end && usb_ready == 0) {
+            u64 portsc_addr_t = op_base2 + u64(0x400) + u64(port_try - 1) * u64(0x10);
+            ptr<u32> portsc_reg_t = ptr<u32>(portsc_addr_t);
+            u32 ps_t = volatile_load(portsc_reg_t);
+            u32 ccs_t = ps_t & u32(1);
+            u32 ped_t = (ps_t >> u32(1)) & u32(1);
+            u32 spd_t = (ps_t >> u32(10)) & u32(0xF);
+            if (ccs_t == u32(0)) {
+                port_try += 1;
+                continue;
+            }
+            if (ped_t == u32(0)) {
+                u32 ps_set = ps_t | u32(1 << 9) | rw1c_mask; // PP + clear RW1C
+                if (spd_t >= u32(4)) {
+                    ps_set = ps_set | u32(1 << 31); // WPR for SS
+                } else {
+                    ps_set = ps_set | u32(1 << 4); // PR for USB2
+                }
+                volatile_store(portsc_reg_t, ps_set);
+                i64 wpr2 = 2000000;
+                while (wpr2 > 0) {
+                    u32 psw = volatile_load(portsc_reg_t);
+                    if (spd_t >= u32(4)) {
+                        if ((psw & u32(1 << 31)) == u32(0)) { break; }
+                    } else {
+                        if ((psw & u32(1 << 4)) == u32(0)) { break; }
+                    }
+                    wpr2 -= 1;
+                }
+                i64 wped2 = 2000000;
+                while (wped2 > 0) {
+                    u32 psw2 = volatile_load(portsc_reg_t);
+                    if (((psw2 >> u32(1)) & u32(1)) != u32(0)) { break; }
+                    wped2 -= 1;
+                }
+                ps_t = volatile_load(portsc_reg_t);
+                ccs_t = ps_t & u32(1);
+                ped_t = (ps_t >> u32(1)) & u32(1);
+                spd_t = (ps_t >> u32(10)) & u32(0xF);
+                if (ccs_t == u32(0) || ped_t == u32(0)) {
+                    port_try += 1;
+                    continue;
+                }
+            }
+            sel_port = port_try;
+            sel_spd = spd_t;
+            usb_ep_addr = u32(0);
+            usb_ep_mps = u32(8);
+            usb_ep_interval = u32(10);
+            usb_if_num = u32(0);
+            usb_if_alt = u32(0);
+            usb_ep_id = u32(0);
+            ep_ctx_index = u32(0);
+
+            slot_id = u32(0);
+            xhci_cmd_enqueue(cmd_ring, &cmd_idx, &cmd_cycle, u32(0), u32(0), u32(0), u32(9 << 10));
+            volatile_store(db0, u32(0));
+            i64 wait_cmd = 2000000;
+            i64 got_cmd = 0;
+            u32 ev_d0 = u32(0);
+            u32 ev_d1 = u32(0);
+            u32 ev_d2 = u32(0);
+            u32 ev_d3 = u32(0);
+            while (wait_cmd > 0 && got_cmd == 0) {
+                if (xhci_evt_poll(evt_ring, &evt_idx, &evt_cycle, &ev_d0, &ev_d1, &ev_d2, &ev_d3)) {
+                    u32 ev_type = (ev_d3 >> u32(10)) & u32(0x3F);
+                    u32 ev_slot = (ev_d3 >> u32(24)) & u32(0xFF);
+                    u32 ev_ccode = (ev_d2 >> u32(24)) & u32(0xFF);
+                    u64 erdp_val = u64(evt_ring) + u64(evt_idx) * u64(16);
+                    volatile_store(erdp_reg, erdp_val | u64(0x8));
+                    if (ev_type == u32(33)) {
+                        got_cmd = 1;
+                        slot_id = ev_slot;
+                        if (0) {
+                            fb_write_slot_label(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp);
+                            fb_write_hex_u64(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp, u64(ev_slot));
+                            fb_putc(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp, u8(0x20));
+                            fb_write_ccode_label(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp);
+                            fb_write_hex_u64(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp, u64(ev_ccode));
+                            fb_putc(fb, i64(fb_stride), i64(fb_width), i64(fb_height), fxp, fyp, u8(0x0A));
+                        }
+                    }
+                }
+                wait_cmd -= 1;
+            }
+            if (slot_id == u32(0)) {
+                port_try += 1;
+                continue;
+            }
+
+            if (slot_id != u32(0) && sel_port != 0) {
             u32 ep0_cycle = u32(1);
             xhci_ring_init(ep0_ring, ep0_cycle);
             i64 ep0_idx = 0;
@@ -3234,7 +3390,7 @@ fn _start() {
             }
 
             if (got_addr) {
-                if (1 && fb_out != ptr<u32>(0)) {
+                if (usb_dbg_print && fb_out != ptr<u32>(0)) {
                     fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x55)); // U
                     fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x41)); // A
                     fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
@@ -3249,7 +3405,7 @@ fn _start() {
                     setup_gd = setup_gd | (u64(0x0200) << u64(16));
                     setup_gd = setup_gd | (u64(0x0000) << u64(32));
                     setup_gd = setup_gd | (u64(0x0009) << u64(48));
-                if (1 && fb_out != ptr<u32>(0)) {
+                if (usb_dbg_print && fb_out != ptr<u32>(0)) {
                     fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x47)); // G
                     fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30)); // 0
                     fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
@@ -3261,7 +3417,7 @@ fn _start() {
                                         fb_out_xp, fb_out_yp)) {
                         got_addr = 0;
                     }
-                    if (1 && got_addr && fb_out != ptr<u32>(0)) {
+                    if (usb_dbg_print && got_addr && fb_out != ptr<u32>(0)) {
                         fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x47)); // G
                         fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x31)); // 1
                         fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
@@ -3289,7 +3445,7 @@ fn _start() {
                                        db_slot, setup_gd2, usb_buf, req_len, 1,
                                        fb_out, fb_out_stride, fb_out_width, fb_out_height,
                                        fb_out_xp, fb_out_yp)) {
-                        if (1 && fb_out != ptr<u32>(0)) {
+                        if (usb_dbg_print && fb_out != ptr<u32>(0)) {
                             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x47)); // G
                             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x32)); // 2
                             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
@@ -3301,6 +3457,7 @@ fn _start() {
                         i64 cur_if_num = -1;
                         i64 cur_if_alt = -1;
                         i64 found_ep = 0;
+                        i64 kbd_found = 0;
                         u32 any_ep_addr = u32(0);
                         u32 any_ep_mps = u32(0);
                         u32 any_ep_interval = u32(0);
@@ -3333,22 +3490,16 @@ fn _start() {
                                         usb_ep_interval = u32(ep_intv_u8);
                                         if (cur_if_num >= 0) { usb_if_num = u32(cur_if_num); }
                                         if (cur_if_alt >= 0) { usb_if_alt = u32(cur_if_alt); }
+                                        kbd_found = 1;
                                         found_ep = 1;
                                     }
                                 }
                             }
                             off += i64(dlen);
                         }
-                            if (usb_ep_addr == u32(0) && any_ep_addr != u32(0)) {
-                                usb_ep_addr = any_ep_addr;
-                                usb_ep_mps = any_ep_mps;
-                                usb_ep_interval = any_ep_interval;
-                                if (0 && fb_out != ptr<u32>(0)) {
-                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x45)); // E
-                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x46)); // F
-                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
-                                }
-                            }
+                        if (kbd_found == 0) {
+                            got_addr = 0;
+                        }
                     }
                 }
                 u64 setup_cfg = u64(0);
@@ -3357,7 +3508,7 @@ fn _start() {
                 setup_cfg = setup_cfg | (u64(cfg_val) << u64(16));
                 setup_cfg = setup_cfg | (u64(0x0000) << u64(32));
                 setup_cfg = setup_cfg | (u64(0x0000) << u64(48));
-                if (1 && fb_out != ptr<u32>(0)) {
+                if (usb_dbg_print && fb_out != ptr<u32>(0)) {
                     fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x43)); // C
                     fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30)); // 0
                     fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
@@ -3814,6 +3965,32 @@ fn _start() {
                     }
                 }
             }
+            }
+            if (usb_ready == 0) {
+                u32 dis_d3 = (slot_id << u32(24)) | u32(10 << 10);
+                xhci_cmd_enqueue(cmd_ring, &cmd_idx, &cmd_cycle, u32(0), u32(0), u32(0), dis_d3);
+                volatile_store(db0, u32(0));
+                i64 wait_dis = 1000000;
+                u32 ev_dd0 = u32(0);
+                u32 ev_dd1 = u32(0);
+                u32 ev_dd2 = u32(0);
+                u32 ev_dd3 = u32(0);
+                while (wait_dis > 0) {
+                    if (xhci_evt_poll(evt_ring, &evt_idx, &evt_cycle, &ev_dd0, &ev_dd1, &ev_dd2, &ev_dd3)) {
+                        u32 ev_type_d = (ev_dd3 >> u32(10)) & u32(0x3F);
+                        u32 ev_slot_d = (ev_dd3 >> u32(24)) & u32(0xFF);
+                        u64 erdp_val_d = u64(evt_ring) + u64(evt_idx) * u64(16);
+                        volatile_store(erdp_reg, erdp_val_d | u64(0x8));
+                        if (ev_type_d == u32(33) && ev_slot_d == slot_id) {
+                            break;
+                        }
+                    }
+                    wait_dis -= 1;
+                }
+                port_try += 1;
+                continue;
+            }
+            break;
         }
 
         if (0) {
@@ -4233,6 +4410,11 @@ fn _start() {
                     u32 d3raw = *(ev32 + usb_evt_idx * 4 + 3);
                     if (d3raw == u32(0)) {
                         dbg_mark2(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(9));
+                        if (usb_evt_dumped == 0) {
+                            usb_evt_dumped = 1;
+                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
+                            dbg_dump_xhci_all(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp);
+                        }
                     } else {
                         u32 cyc = usb_evt_cycle & u32(1);
                         if ((d3raw & u32(1)) != cyc) {
@@ -4383,11 +4565,11 @@ fn _start() {
                                     fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
                                     fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(ev_ptr));
                                     fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
-                                    if (0) {
-                                        bj = 0;
-                                        while (bj < 8) {
-                                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x42)); // B
-                                            fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30) + u8(bj));
+                        if (0) {
+                            bj = 0;
+                            while (bj < 8) {
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x42)); // B
+                                fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x30) + u8(bj));
                                             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x3D));
                                             fb_write_hex_u64(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u64(*(rep + bj)));
                                             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, u8(0x0A));
@@ -4418,12 +4600,9 @@ fn _start() {
                             if (hid_keycode != u8(0) && !hid_key_in_prev(hid_keycode, prev)) {
                                 u8 usb_ch = hid_key_to_ascii(hid_keycode, sh);
                                 if (usb_ch != u8(0)) {
-                                    if (usb_ch >= u8(0x61) && usb_ch <= u8(0x7A)) {
-                                        usb_ch = usb_ch - u8(0x20);
-                                    }
-                                    if (fb_out != ptr<u32>(0)) {
-                                        fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, usb_ch);
-                                    }
+                                if (fb_out != ptr<u32>(0)) {
+                                    fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, usb_ch);
+                                }
                                 }
                             }
                             ki += 1;
@@ -4526,11 +4705,11 @@ fn _start() {
                                 serial_log_key_right(com1);
                                 cur += 1;
                                 line_redraw(vga, rowp, colp, attr, line_row, line_col, line, len, prev_len, cur);
-                            }
                         }
                     }
                 }
             }
+        }
             e0 = 0;
             continue;
         }
@@ -4549,9 +4728,6 @@ fn _start() {
         u8 ch = kbd_scancode_to_ascii(sc, shift);
         if (ch == u8(0)) {
             continue;
-        }
-        if (ch >= u8(0x61) && ch <= u8(0x7A)) {
-            ch = ch - u8(0x20);
         }
         if (fb_out != ptr<u32>(0)) {
             fb_putc(fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp, ch);

@@ -146,6 +146,12 @@ make uefi-iso
 
 This produces `elfir_uefi.iso` from the `uefi_usb/` layout. Requires `xorriso`, `dosfstools` (mkfs.fat), and `mtools` (mcopy/mmd).
 
+Build and run in QEMU (xHCI + USB keyboard):
+
+```bash
+make clean && make uefi-iso && ./qemu-xhci-device-usb-kbd.sh
+```
+
 Run the UEFI ISO in QEMU (xHCI + USB keyboard):
 
 ```bash
