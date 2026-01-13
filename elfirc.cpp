@@ -4283,37 +4283,59 @@ static GenResult genFunctionAsm(const Func& f, Mode mode, Type retType,
 
 enum class EntryKind { Main, MainI64, MainD64, Start };
 
-static std::string genOutAsm(const std::vector<Func>& funcs, const Func& entry, EntryKind kind,
-                             const std::unordered_map<std::string, FuncSig>& funcMap,
-                             const std::unordered_map<std::string, GlobalVar>& globals) {
+std::string genOutAsm(const std::vector<Func>& funcs, const Func* entryPtr, EntryKind kind,
+    const std::unordered_map<std::string, FuncSig>& funcMap,
+    const std::unordered_map<std::string, GlobalVar>& globals,
+    bool emitStart)
+{
+    if (!emitStart && entryPtr != nullptr) {
+        // это не ошибка, но в module режиме entryPtr обычно null
+    }
+    if (emitStart && !entryPtr && kind != EntryKind::Start) {
+        throw Error("Internal error: emitStart=true but entryPtr is null");
+    }
+
     std::ostringstream out;
     const bool isMainI64 = (kind == EntryKind::MainI64);
     const bool isMainD64 = (kind == EntryKind::MainD64);
     const bool isStart = (kind == EntryKind::Start);
     const Mode mode = isMainD64 ? Mode::D64Only : (isMainI64 ? Mode::I64Only : Mode::Mixed);
-    const Type retType = isStart ? entry.retType : (isMainD64 ? makeType(TypeKind::D64) : makeType(TypeKind::I64));
+    Type retType = isMainD64 ? makeType(TypeKind::D64) : makeType(TypeKind::I64);
+    if (isStart) {
+        if (!entryPtr) {
+            throw Error("Internal error: entryPtr is null for Start entry");
+        }
+        retType = entryPtr->retType;
+    }
 
-    out << "global _start\n";
+
+   
+    if (emitStart) out << "global _start\n";
+
     for (const auto& f : funcs) {
         if (!f.isExtern && f.name != "_start") {
             out << "global " << f.name << "\n";
         }
     }
-    out << "\n";
 
-    out << "extern rt_exit\n";
-    out << "extern rt_print_i64\n";
-    out << "extern rt_print_f64\n";
-    out << "extern rt_print_i64_raw\n";
-    out << "extern rt_print_f64_raw\n";
-    out << "extern rt_print_u64\n";
-    out << "extern rt_print_u64_raw\n";
-    out << "extern rt_print_hex_u64\n";
-    out << "extern rt_print_hex_u64_raw\n";
-    out << "extern rt_print_bytes\n";
-    out << "extern rt_str_concat\n";
-    out << "extern rt_str_copy\n";
-    out << "extern rt_str_free\n";
+
+    out << "\n";
+    if (emitStart) {
+        out << "extern rt_exit\n";
+        out << "extern rt_print_i64\n";
+        out << "extern rt_print_f64\n";
+        out << "extern rt_print_i64_raw\n";
+        out << "extern rt_print_f64_raw\n";
+        out << "extern rt_print_u64\n";
+        out << "extern rt_print_u64_raw\n";
+        out << "extern rt_print_hex_u64\n";
+        out << "extern rt_print_hex_u64_raw\n";
+        out << "extern rt_print_bytes\n";
+        out << "extern rt_str_concat\n";
+        out << "extern rt_str_copy\n";
+        out << "extern rt_str_free\n";
+    }
+
     for (const auto& f : funcs) {
         if (f.isExtern) {
             out << "extern " << f.name << "\n";
@@ -4327,8 +4349,10 @@ static std::string genOutAsm(const std::vector<Func>& funcs, const Func& entry, 
         if (f.isExtern) {
             continue;
         }
-        Mode fMode = (f.name == entry.name) ? mode : Mode::Mixed;
-        Type fRet = (f.name == entry.name) ? retType : f.retType;
+        const bool isEntry = (entryPtr && f.name == entryPtr->name);
+        Mode fMode = isEntry ? mode : Mode::Mixed;
+        Type fRet = isEntry ? retType : f.retType;
+
         gens.push_back(genFunctionAsm(f, fMode, fRet, funcMap, globals));
     }
 
@@ -4424,21 +4448,27 @@ static std::string genOutAsm(const std::vector<Func>& funcs, const Func& entry, 
         out << g.text << "\n";
     }
 
-    if (!isStart) {
+    if (emitStart && !isStart) {
+        if (!entryPtr) {
+            throw Error("Internal error: entryPtr is null for non-start entry");
+        }
+
         out << "_start:\n";
         out << "    and  rsp, -16\n";
-        out << "    call " << entry.name << "\n";
+        out << "    call " << entryPtr->name << "\n";
 
         if (isMainD64) {
             out << "    call rt_print_f64\n";
             out << "    xor  edi, edi\n";
             out << "    jmp  rt_exit\n";
-        } else if (isMainI64) {
+        }
+        else if (isMainI64) {
             out << "    mov  rdi, rax\n";
             out << "    call rt_print_i64\n";
             out << "    xor  edi, edi\n";
             out << "    jmp  rt_exit\n";
-        } else {
+        }
+        else {
             out << "    mov  rdi, rax\n";
             out << "    jmp  rt_exit\n";
         }
@@ -4450,21 +4480,31 @@ static std::string genOutAsm(const std::vector<Func>& funcs, const Func& entry, 
 int main(int argc, char** argv) {
     try {
         bool freestanding = false;
+        bool module = false;
         int argi = 1;
-        if (argi < argc && (std::string(argv[argi]) == "--freestanding")) {
-            freestanding = true;
-            ++argi;
+
+        while (argi < argc) {
+            std::string a = argv[argi];
+            if (a == "--freestanding") { freestanding = true; ++argi; continue; }
+            if (a == "--module") { module = true; ++argi; continue; }
+            break;
         }
+
+        if (freestanding && module) {
+            throw Error("Flags conflict: use either --freestanding or --module, not both.");
+        }
+
         if (argc - argi < 1) {
-            std::cerr << "Usage: " << argv[0] << " [--freestanding] <input.elfir> [out.asm]\n";
+            std::cerr << "Usage: " << argv[0] << " [--freestanding | --module] <input.elfir> [out.asm]\n";
             return 2;
         }
         std::string inPath = argv[argi++];
         std::string outPath = (argi < argc) ? argv[argi++] : "out.asm";
         if (argi < argc) {
-            std::cerr << "Usage: " << argv[0] << " [--freestanding] <input.elfir> [out.asm]\n";
+            std::cerr << "Usage: " << argv[0] << " [--freestanding | --module] <input.elfir> [out.asm]\n";
             return 2;
         }
+        const bool emitStart = !module;
 
         std::string src = readFile(inPath);
 
@@ -4491,61 +4531,87 @@ int main(int argc, char** argv) {
             globalMap.emplace(g.name, g);
         }
 
-        int mainIdx = -1;
-        int mainI64Idx = -1;
-        int mainD64Idx = -1;
-        int startIdx = -1;
-
-		for (int i = 0; i < (int)prog.funcs.size(); ++i) {
-			if (prog.funcs[i].name == "main") mainIdx = i;
-			else if (prog.funcs[i].name == "main_i64") mainI64Idx = i;
-            else if (prog.funcs[i].name == "main_d64") mainD64Idx = i;
-            else if (prog.funcs[i].name == "_start") startIdx = i;
-		}
-
         EntryKind kind = EntryKind::Main;
-        int entryIdx = mainIdx;
-        if (!freestanding) {
-            const int count = (mainIdx != -1) + (mainI64Idx != -1) + (mainD64Idx != -1);
-            if (count > 1) {
-                throw Error("Multiple entrypoints: only one of 'main', 'main_i64', 'main_d64' is allowed.");
-            }
-            if (count == 0) {
-                throw Error("Missing entrypoint: define one of 'fn main() { ... }', 'fn main_i64() { ... }', or 'fn main_d64() { ... }'.");
+        int entryIdx = -1;
+        Func* entryPtr = nullptr;
+
+        if (!module) {
+            int mainIdx = -1;
+            int mainI64Idx = -1;
+            int mainD64Idx = -1;
+            int startIdx = -1;
+
+            for (int i = 0; i < (int)prog.funcs.size(); ++i) {
+                if (prog.funcs[i].name == "main") mainIdx = i;
+                else if (prog.funcs[i].name == "main_i64") mainI64Idx = i;
+                else if (prog.funcs[i].name == "main_d64") mainD64Idx = i;
+                else if (prog.funcs[i].name == "_start") startIdx = i;
             }
 
-            if (mainI64Idx != -1) {
-                kind = EntryKind::MainI64;
-                entryIdx = mainI64Idx;
-            } else if (mainD64Idx != -1) {
-                kind = EntryKind::MainD64;
-                entryIdx = mainD64Idx;
-            }
-        } else {
-            if (startIdx == -1) {
-                throw Error("Missing entrypoint: define 'fn _start() { ... }' when using --freestanding.");
-            }
-            kind = EntryKind::Start;
-            entryIdx = startIdx;
-        }
+            kind = EntryKind::Main;
+            entryIdx = mainIdx;
 
-        Func& entry = prog.funcs[entryIdx];
-        if (!entry.params.empty()) {
-            throw Error("Entrypoint '" + entry.name + "' cannot have parameters");
-        }
-        if (entry.isExtern) {
-            throw Error("Entrypoint '" + entry.name + "' cannot be extern");
-        }
-        if (kind == EntryKind::Start) {
-            if (entry.retType.kind != TypeKind::Void) {
-                throw Error("Entrypoint '_start' must be void in --freestanding mode.");
+            if (!freestanding) {
+                const int count = (mainIdx != -1) + (mainI64Idx != -1) + (mainD64Idx != -1);
+                if (count > 1) {
+                    throw Error("Multiple entrypoints: only one of 'main', 'main_i64', 'main_d64' is allowed.");
+                }
+                if (count == 0) {
+                    throw Error("Missing entrypoint: define one of 'fn main() { ... }', 'fn main_i64() { ... }', or 'fn main_d64() { ... }'.");
+                }
+
+                if (mainI64Idx != -1) {
+                    kind = EntryKind::MainI64;
+                    entryIdx = mainI64Idx;
+                }
+                else if (mainD64Idx != -1) {
+                    kind = EntryKind::MainD64;
+                    entryIdx = mainD64Idx;
+                }
             }
-        } else {
-            Type entryRet = (kind == EntryKind::MainD64) ? makeType(TypeKind::D64) : makeType(TypeKind::I64);
-            if (entry.retType.kind == TypeKind::Void) {
-                entry.retType = entryRet;
-            } else if (entry.retType != entryRet) {
-                throw Error("Entrypoint '" + entry.name + "' must return " + typeName(entryRet));
+            else {
+                if (startIdx == -1) {
+                    throw Error("Missing entrypoint: define 'fn _start() { ... }' when using --freestanding.");
+                }
+                kind = EntryKind::Start;
+                entryIdx = startIdx;
+            }
+
+            Func& entry = prog.funcs[entryIdx];
+            entryPtr = &entry;
+
+            if (!entry.params.empty()) {
+                throw Error("Entrypoint '" + entry.name + "' cannot have parameters");
+            }
+            if (entry.isExtern) {
+                throw Error("Entrypoint '" + entry.name + "' cannot be extern");
+            }
+            if (kind == EntryKind::Start) {
+                if (entry.retType.kind != TypeKind::Void) {
+                    throw Error("Entrypoint '_start' must be void in --freestanding mode.");
+                }
+            }
+            else {
+                Type entryRet = (kind == EntryKind::MainD64) ? makeType(TypeKind::D64) : makeType(TypeKind::I64);
+                if (entry.retType.kind == TypeKind::Void) {
+                    entry.retType = entryRet;
+                }
+                else if (entry.retType != entryRet) {
+                    throw Error("Entrypoint '" + entry.name + "' must return " + typeName(entryRet));
+                }
+            }
+        }
+        else {
+            kind = EntryKind::Main; // можно оставить
+            entryIdx = -1;
+            entryPtr = nullptr;
+
+            // module: entrypoint НЕ НУЖЕН
+            // но запретим _start в модуле, иначе будет конфликт при линковке
+            for (const auto& f : prog.funcs) {
+                if (f.name == "_start" && !f.isExtern) {
+                    throw Error("Module must not define '_start'. Put _start only in the kernel file.");
+                }
             }
         }
 
@@ -4566,11 +4632,22 @@ int main(int argc, char** argv) {
             funcMap.emplace(f.name, std::move(sig));
         }
 
-        std::string asmText = genOutAsm(prog.funcs, entry, kind, funcMap, globalMap);
+        if (!module && entryPtr == nullptr) {
+            throw Error("Internal error: entryPtr is null");
+        }
+
+        std::string asmText = genOutAsm(prog.funcs, entryPtr, kind, funcMap, globalMap, emitStart);
+
         writeFile(outPath, asmText);
 
-        std::cerr << "OK: generated " << outPath
-                  << " (entrypoint: " << entry.name << ")\n";
+        if (!module) {
+            std::cerr << "OK: generated " << outPath
+                << " (entrypoint: " << entryPtr->name << ")\n";
+        }
+        else {
+            std::cerr << "OK: generated " << outPath << " (module)\n";
+        }
+
         return 0;
     } catch (const Error& e) {
         std::cerr << "elfirc error: " << e.what() << "\n";
