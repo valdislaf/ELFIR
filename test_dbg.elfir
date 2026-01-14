@@ -1369,6 +1369,226 @@ fn fb_write_usbsts_label(ptr<u32> fb, i64 stride, i64 width, i64 height, ptr<i64
     ret;
 }
 
+fn fb_label_xhci_base(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_xhci_base_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_caplen(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_caplen_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_hciver(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_hciver_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_hcs1(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_hcs1_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_hcs2(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_hcs2_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_hcs3(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_hcs3_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_dboff(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_dboff_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_rtsoff(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_rtsoff_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_ports(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_ports_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_portsc(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp, i64 port) {
+    fb_write_portsc_label(fb, fb_stride, fb_width, fb_height, xp, yp, port);
+}
+
+fn fb_label_portr(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp, i64 port) {
+    fb_write_portr_label(fb, fb_stride, fb_width, fb_height, xp, yp, port);
+}
+
+fn fb_label_portu(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp, i64 port) {
+    fb_write_portu_label(fb, fb_stride, fb_width, fb_height, xp, yp, port);
+}
+
+fn fb_label_slots(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_slots_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_hcc1(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_hcc1_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_ecp(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_ecp_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_leg(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_leg_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_bios(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_bios_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_os(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_os_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_spd1(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_spd1_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_spd2(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_spd2_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_poff(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_poff_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_pcnt(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_pcnt_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_slot(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_slot_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_ccode(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_ccode_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_addr(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_addr_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_ccs(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_ccs_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_ped(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_ped_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_pls(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_pls_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_spd(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_spd_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_cfg(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_cfg_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_dcbaap(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_dcbaap_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_crcr(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_crcr_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_erstba(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_erstba_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_erdp(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_erdp_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_iman(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_iman_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_usb_ready(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_label_usb_ready(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_ep_id(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_label_ep_id(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_ep_ctx(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_label_ep_ctx(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_ep_addr(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_label_ep_addr(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_ep_mps(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_label_ep_mps(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_ep_int(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_label_ep_int(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_if_num(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_label_if_num(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_alt_num(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_label_alt_num(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_db_slot(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_label_db_slot(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_db_reg(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_label_db_reg(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_db_target(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_label_db_target(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_ic_dw(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp, u8 idx) {
+    fb_write_label_ic_dw(fb, fb_stride, fb_width, fb_height, xp, yp, idx);
+}
+
+fn fb_label_dc_dw(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp, u8 idx) {
+    fb_write_label_dc_dw(fb, fb_stride, fb_width, fb_height, xp, yp, idx);
+}
+
+fn fb_label_evt_ring(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_label_evt_ring(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_erst_base(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_label_erst_base(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_erst_sz(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_label_erst_sz(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_erst_ba(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_label_erst_ba(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_port(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_port_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_usbcmd(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_usbcmd_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
+fn fb_label_usbsts(ptr<u32> fb, ptr<i64> xp, ptr<i64> yp) {
+    fb_write_usbsts_label(fb, fb_stride, fb_width, fb_height, xp, yp);
+}
+
 
 fn tty_write_xhci_base_label(ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr) {
     tty_putc(vga, rowp, colp, attr, u8(0x78)); // x
@@ -1618,6 +1838,27 @@ fn dbg_mark2(ptr<u32> fb_out, i64 fb_out_stride, i64 fb_out_width, i64 fb_out_he
         S();
     }
     spc();
+}
+
+fn dbg_mark_g(u8 idx) {
+    dbg_mark(fb_out, fb_stride, fb_width, fb_height, fb_xp, fb_yp, idx);
+}
+
+fn dbg_mark2_g(u8 idx) {
+    dbg_mark2(fb_out, fb_stride, fb_width, fb_height, fb_xp, fb_yp, idx);
+}
+
+fn dbg_dump_xhci_all_g() {
+    dbg_dump_xhci_all(fb_out, fb_stride, fb_width, fb_height, fb_xp, fb_yp);
+}
+
+fn dbg_boot_mark(u8 idx) {
+    if (fb_out == ptr<u32>(0)) { ret; }
+    i64 x = 0;
+    i64 y = i64(idx);
+    ptr<i64> xp = &x;
+    ptr<i64> yp = &y;
+    fb_putc(fb_out, fb_stride, fb_width, fb_height, xp, yp, u8(0x30) + idx);
 }
 
 fn u8 kbd_scancode_to_ascii(u8 sc, i64 shift) {

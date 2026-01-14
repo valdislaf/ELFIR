@@ -149,11 +149,70 @@ global fb_write_label_erdp
 global fb_write_port_label
 global fb_write_usbcmd_label
 global fb_write_usbsts_label
+global fb_label_xhci_base
+global fb_label_caplen
+global fb_label_hciver
+global fb_label_hcs1
+global fb_label_hcs2
+global fb_label_hcs3
+global fb_label_dboff
+global fb_label_rtsoff
+global fb_label_ports
+global fb_label_portsc
+global fb_label_portr
+global fb_label_portu
+global fb_label_slots
+global fb_label_hcc1
+global fb_label_ecp
+global fb_label_leg
+global fb_label_bios
+global fb_label_os
+global fb_label_spd1
+global fb_label_spd2
+global fb_label_poff
+global fb_label_pcnt
+global fb_label_slot
+global fb_label_ccode
+global fb_label_addr
+global fb_label_ccs
+global fb_label_ped
+global fb_label_pls
+global fb_label_spd
+global fb_label_cfg
+global fb_label_dcbaap
+global fb_label_crcr
+global fb_label_erstba
+global fb_label_erdp
+global fb_label_iman
+global fb_label_usb_ready
+global fb_label_ep_id
+global fb_label_ep_ctx
+global fb_label_ep_addr
+global fb_label_ep_mps
+global fb_label_ep_int
+global fb_label_if_num
+global fb_label_alt_num
+global fb_label_db_slot
+global fb_label_db_reg
+global fb_label_db_target
+global fb_label_ic_dw
+global fb_label_dc_dw
+global fb_label_evt_ring
+global fb_label_erst_base
+global fb_label_erst_sz
+global fb_label_erst_ba
+global fb_label_port
+global fb_label_usbcmd
+global fb_label_usbsts
 global tty_write_xhci_base_label
 global tty_write_caplen_label
 global tty_write_hciver_label
 global dbg_mark
 global dbg_mark2
+global dbg_mark_g
+global dbg_mark2_g
+global dbg_dump_xhci_all_g
+global dbg_boot_mark
 global kbd_scancode_to_ascii
 global tty_write_help
 global cmd_is_help
@@ -10649,6 +10708,1900 @@ fb_write_usbsts_label:
     leave
     ret
 
+fb_label_xhci_base:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_xhci_base_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_caplen:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_caplen_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_hciver:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_hciver_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_hcs1:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_hcs1_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_hcs2:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_hcs2_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_hcs3:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_hcs3_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_dboff:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_dboff_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_rtsoff:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_rtsoff_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_ports:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_ports_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_portsc:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    lea  rax, [rbp-32]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_portsc_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_portr:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    lea  rax, [rbp-32]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_portr_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_portu:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    mov  [rbp-32], rax
+    lea  rax, [rbp-32]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_portu_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_slots:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_slots_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_hcc1:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_hcc1_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_ecp:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_ecp_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_leg:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_leg_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_bios:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_bios_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_os:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_os_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_spd1:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_spd1_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_spd2:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_spd2_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_poff:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_poff_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_pcnt:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_pcnt_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_slot:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_slot_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_ccode:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_ccode_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_addr:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_addr_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_ccs:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_ccs_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_ped:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_ped_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_pls:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_pls_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_spd:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_spd_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_cfg:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_cfg_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_dcbaap:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_dcbaap_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_crcr:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_crcr_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_erstba:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_erstba_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_erdp:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_erdp_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_iman:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_iman_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_usb_ready:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_label_usb_ready
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_ep_id:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_label_ep_id
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_ep_ctx:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_label_ep_ctx
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_ep_addr:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_label_ep_addr
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_ep_mps:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_label_ep_mps
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_ep_int:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_label_ep_int
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_if_num:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_label_if_num
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_alt_num:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_label_alt_num
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_db_slot:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_label_db_slot
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_db_reg:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_label_db_reg
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_db_target:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_label_db_target
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_ic_dw:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    and  rax, 0xFF
+    mov  [rbp-32], rax
+    lea  rax, [rbp-32]
+    movzx eax, byte [rax]
+    and  rax, 0xFF
+    push rax
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_label_ic_dw
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_dc_dw:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    mov  rax, [rbp+40]
+    and  rax, 0xFF
+    mov  [rbp-32], rax
+    lea  rax, [rbp-32]
+    movzx eax, byte [rax]
+    and  rax, 0xFF
+    push rax
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_label_dc_dw
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_evt_ring:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_label_evt_ring
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_erst_base:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_label_erst_base
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_erst_sz:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_label_erst_sz
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_erst_ba:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_label_erst_ba
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_port:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_port_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_usbcmd:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_usbcmd_label
+    add  rsp, 56
+    leave
+    ret
+
+fb_label_usbsts:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 32
+    mov  rax, [rbp+16]
+    mov  [rbp-8], rax
+    mov  rax, [rbp+24]
+    mov  [rbp-16], rax
+    mov  rax, [rbp+32]
+    mov  [rbp-24], rax
+    sub  rsp, 8
+    lea  rax, [rbp-24]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-16]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-8]
+    mov  rax, qword [rax]
+    push rax
+    call fb_write_usbsts_label
+    add  rsp, 56
+    leave
+    ret
+
 tty_write_xhci_base_label:
     push rbp
     mov  rbp, rsp
@@ -12196,6 +14149,166 @@ dbg_mark2:
     sub  rsp, 8
     call spc
     add  rsp, 8
+    leave
+    ret
+
+dbg_mark_g:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 16
+    mov  rax, [rbp+16]
+    and  rax, 0xFF
+    mov  [rbp-8], rax
+    lea  rax, [rbp-8]
+    movzx eax, byte [rax]
+    and  rax, 0xFF
+    push rax
+    lea  rax, [rel fb_yp]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_xp]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_out]
+    mov  rax, qword [rax]
+    push rax
+    call dbg_mark
+    add  rsp, 56
+    leave
+    ret
+
+dbg_mark2_g:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 16
+    mov  rax, [rbp+16]
+    and  rax, 0xFF
+    mov  [rbp-8], rax
+    lea  rax, [rbp-8]
+    movzx eax, byte [rax]
+    and  rax, 0xFF
+    push rax
+    lea  rax, [rel fb_yp]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_xp]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_out]
+    mov  rax, qword [rax]
+    push rax
+    call dbg_mark2
+    add  rsp, 56
+    leave
+    ret
+
+dbg_dump_xhci_all_g:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 8
+    lea  rax, [rel fb_yp]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_xp]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_out]
+    mov  rax, qword [rax]
+    push rax
+    call dbg_dump_xhci_all
+    add  rsp, 56
+    leave
+    ret
+
+dbg_boot_mark:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 48
+    mov  rax, [rbp+16]
+    and  rax, 0xFF
+    mov  [rbp-8], rax
+    lea  rax, [rel fb_out]
+    mov  rax, qword [rax]
+    push rax
+    mov  rax, 0
+    pop  rcx
+    cmp  rcx, rax
+    sete al
+    movzx eax, al
+    cmp  rax, 0
+    je   .if_next_1
+    leave
+    ret
+    jmp  .if_end_0
+.if_next_1:
+.if_end_0:
+    mov  rax, 0
+    mov  [rbp-16], rax
+    lea  rax, [rbp-8]
+    movzx eax, byte [rax]
+    and  rax, 0xFF
+    mov  [rbp-24], rax
+    lea  rax, [rbp-16]
+    mov  [rbp-32], rax
+    lea  rax, [rbp-24]
+    mov  [rbp-40], rax
+    mov  rax, 0x30
+    and  rax, 0xFF
+    push rax
+    lea  rax, [rbp-8]
+    movzx eax, byte [rax]
+    and  rax, 0xFF
+    pop  rcx
+    add  rax, rcx
+    and  rax, 0xFF
+    push rax
+    lea  rax, [rbp-40]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rbp-32]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_height]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_width]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_stride]
+    mov  rax, qword [rax]
+    push rax
+    lea  rax, [rel fb_out]
+    mov  rax, qword [rax]
+    push rax
+    call fb_putc
+    add  rsp, 56
     leave
     ret
 
