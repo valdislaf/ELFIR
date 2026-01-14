@@ -5,9 +5,9 @@ Set-StrictMode -Version Latest
 
 $env:OPENAI_API_BASE = "http://localhost:1234/v1"
 $env:OPENAI_API_KEY  = "lm-studio"
-$env:OPENAI_API_TYPE = "open_ai"
-$env:LITELLM_STREAMING = "false"
 $env:LITELLM_FORCE_NON_STREAMING = "true"
+$env:LITELLM_STREAMING = "false"
+
 
 
 $files = @(
@@ -38,12 +38,11 @@ if (-not $modelId) { $modelId = $models.data[0].id }
 
 Write-Host "Using modelId: $modelId"
 aider `
-  --openai-api-base "http://localhost:1234/v1" `
-  --openai-api-key  "$env:OPENAI_API_KEY" `
-  --no-stream `
+  --model openai/qwen2.5-coder-32b-instruct `
+  --openai-api-base http://localhost:1234/v1 `
+  --openai-api-key lm-studio `
   --no-auto-commits `
   --no-git `
-  --model "openai/$modelId" `
   --edit-format diff `
   @files
 
