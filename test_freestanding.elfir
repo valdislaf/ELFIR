@@ -372,11 +372,196 @@ fn ptr<u8> usb_kbd_prev_ptr(ptr<u8> buf_pool, i64 idx) {
     ret usb_kbd_buf_ptr(buf_pool, idx) + u64(8);
 }
 
+fn i64 kbd_idx_ok(i64 idx) {
+    if (idx < 0) { ret 0; }
+    if (idx >= usb_kbd_max_devs()) { ret 0; }
+    ret 1;
+}
+
+fn ptr<u8> kbd_meta_ring(ptr<u8> meta_pool, i64 idx) {
+    ret ptr<u8>(usb_kbd_meta_load_u64(meta_pool, idx, usb_kbd_meta_ring_ptr_off()));
+}
+
+fn ptr<u8> kbd_meta_report_buf(ptr<u8> meta_pool, i64 idx) {
+    ret ptr<u8>(usb_kbd_meta_load_u64(meta_pool, idx, usb_kbd_meta_report_buf_off()));
+}
+
+fn u32 kbd_meta_report_len(ptr<u8> meta_pool, i64 idx) {
+    ret u32(usb_kbd_meta_load_u64(meta_pool, idx, usb_kbd_meta_report_len_off()));
+}
+
+fn ptr<u32> kbd_meta_db(ptr<u8> meta_pool, i64 idx) {
+    ret ptr<u32>(usb_kbd_meta_load_u64(meta_pool, idx, usb_kbd_meta_db_off()));
+}
+
+fn u32 kbd_meta_ep_id(ptr<u8> meta_pool, i64 idx) {
+    ret u32(usb_kbd_meta_load_u64(meta_pool, idx, usb_kbd_meta_ep_id_off()));
+}
+
+fn kbd_meta_set_in_flight(ptr<u8> meta_pool, i64 idx, i64 value) {
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_in_flight_off(), u64(value));
+    ret;
+}
+
+fn kbd_meta_set_has_report(ptr<u8> meta_pool, i64 idx, i64 value) {
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_has_report_off(), u64(value));
+    ret;
+}
+
+// High-level helpers hiding offset math; they guard index bounds.
+fn ptr<u8> kbd_meta_ptr(ptr<u8> meta_pool, i64 idx) {
+    if (!kbd_idx_ok(idx)) { dbg_mark2_g(u8(11)); ret ptr<u8>(0); }
+    ret meta_pool + u64(idx) * u64(usb_kbd_meta_stride());
+}
+
+fn ptr<u8> kbd_ring_ptr_h(ptr<u8> meta_pool, i64 idx) {
+    if (!kbd_idx_ok(idx)) { dbg_mark2_g(u8(11)); ret ptr<u8>(0); }
+    ret kbd_meta_ring(meta_pool, idx);
+}
+
+fn ptr<u8> kbd_report_buf_ptr(ptr<u8> meta_pool, i64 idx) {
+    if (!kbd_idx_ok(idx)) { dbg_mark2_g(u8(11)); ret ptr<u8>(0); }
+    ret kbd_meta_report_buf(meta_pool, idx);
+}
+
+fn ptr<u8> kbd_prev_report_ptr(ptr<u8> meta_pool, i64 idx) {
+    if (!kbd_idx_ok(idx)) { dbg_mark2_g(u8(11)); ret ptr<u8>(0); }
+    ret usb_kbd_meta_prev_ptr(meta_pool, idx);
+}
+
+fn kbd_set_inflight(ptr<u8> meta_pool, i64 idx, i64 value) {
+    if (!kbd_idx_ok(idx)) { dbg_mark2_g(u8(11)); ret; }
+    kbd_meta_set_in_flight(meta_pool, idx, value);
+}
+
+fn kbd_set_has_report(ptr<u8> meta_pool, i64 idx, i64 value) {
+    if (!kbd_idx_ok(idx)) { dbg_mark2_g(u8(11)); ret; }
+    kbd_meta_set_has_report(meta_pool, idx, value);
+}
+
+fn u64 kbd_inc_seq(ptr<u8> meta_pool, i64 idx) {
+    if (!kbd_idx_ok(idx)) { dbg_mark2_g(u8(11)); ret u64(0); }
+    u64 seq = usb_kbd_meta_load_u64(meta_pool, idx, usb_kbd_meta_seq_off()) + u64(1);
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_seq_off(), seq);
+    ret seq;
+}
+
+fn i64 kbd_find_by_epu(ptr<u8> meta_pool, i64 dev_cnt, u64 epu) {
+    ret usb_kbd_find_by_epu(meta_pool, dev_cnt, epu);
+}
+
+// Console entry point for a single HID keydown event.
+fn console_submit_key(i64 handle, u8 hid_keycode, u8 mods, i64 sh,
+    ptr<u16> vga, ptr<i64> rowp, ptr<i64> colp, u16 attr, u16 com1,
+    ptr<u32> fb_out, i64 fb_out_stride, i64 fb_out_width, i64 fb_out_height, ptr<i64> fb_out_xp, ptr<i64> fb_out_yp,
+    ptr<i64> fb_cursor_onp, ptr<i64> fb_cursor_xp, ptr<i64> fb_cursor_yp,
+    ptr<i64> fb_line_rowp, ptr<i64> fb_line_colp, ptr<i64> fb_line_setp,
+    ptr<u8> line, ptr<i64> lenp, ptr<i64> prev_lenp, ptr<i64> curp, i64 cap,
+    ptr<u8> last_line, ptr<i64> last_lenp,
+    ptr<u8> hist_base, ptr<u8> hist_len_base, ptr<i64> hist_headp, ptr<i64> hist_countp, ptr<i64> hist_navp,
+    ptr<i64> line_rowp, ptr<i64> line_colp) {
+    if (hid_keycode == u8(0x50)) { // left
+        if (*curp > 0) {
+            *curp -= 1;
+            line_redraw(vga, rowp, colp, attr, *line_rowp, *line_colp, line, *lenp, *prev_lenp, *curp);
+            fb_cursor_set_line(fb_out, fb_out_width, fb_out_xp, fb_out_yp, *fb_line_rowp, *fb_line_colp, *curp);
+            *prev_lenp = *lenp;
+        }
+        ret;
+    }
+    if (hid_keycode == u8(0x4F)) { // right
+        if (*curp < *lenp) {
+            *curp += 1;
+            line_redraw(vga, rowp, colp, attr, *line_rowp, *line_colp, line, *lenp, *prev_lenp, *curp);
+            fb_cursor_set_line(fb_out, fb_out_width, fb_out_xp, fb_out_yp, *fb_line_rowp, *fb_line_colp, *curp);
+            *prev_lenp = *lenp;
+        }
+        ret;
+    }
+    u8 usb_ch = hid_key_to_ascii(hid_keycode, sh);
+    if (usb_ch != u8(0)) {
+        line_apply_char(usb_ch, vga, rowp, colp, attr, com1,
+                        fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp,
+                        fb_cursor_onp, fb_cursor_xp, fb_cursor_yp,
+                        fb_line_rowp, fb_line_colp, fb_line_setp,
+                        line, lenp, prev_lenp, curp, cap,
+                        last_line, last_lenp,
+                        hist_base, hist_len_base, hist_headp, hist_countp, hist_navp,
+                        line_rowp, line_colp);
+    }
+    ret;
+}
+
+// Re-arm interrupt-IN endpoint for given keyboard handle.
+fn i64 kbd_rearm(ptr<u8> meta_pool, i64 idx) {
+    if (!kbd_idx_ok(idx)) { dbg_mark2_g(u8(11)); ret i64(0); }
+    ptr<u8> ring_h = kbd_ring_ptr_h(meta_pool, idx);
+    ptr<u32> db_h = kbd_meta_db(meta_pool, idx);
+    u32 ep_h = kbd_meta_ep_id(meta_pool, idx);
+    ptr<u8> buf_h = kbd_report_buf_ptr(meta_pool, idx);
+    u32 rep_len = kbd_meta_report_len(meta_pool, idx);
+    if (ring_h == ptr<u8>(0) || db_h == ptr<u32>(0) || buf_h == ptr<u8>(0) || rep_len == u32(0)) {
+        dbg_mark2_g(u8(12));
+        ret i64(0);
+    }
+    i64 idx_h = usb_kbd_meta_load_i64(meta_pool, idx, usb_kbd_meta_ring_idx_off());
+    u32 cyc_h = u32(usb_kbd_meta_load_u64(meta_pool, idx, usb_kbd_meta_ring_cycle_off()));
+    u64 rep_addr = u64(buf_h);
+    u32 nd0 = u32(rep_addr & u64(0xFFFFFFFF));
+    u32 nd1 = u32((rep_addr >> u64(32)) & u64(0xFFFFFFFF));
+    u32 nd2 = rep_len;
+    u32 nd3 = u32(0);
+    nd3 = nd3 | u32(1 << 2); // ISP
+    nd3 = nd3 | u32(1 << 5); // NS
+    nd3 = nd3 | u32(1 << 10); // IOC
+    xhci_xfer_enqueue(ring_h, &idx_h, &cyc_h, nd0, nd1, nd2, nd3);
+    xhci_ring_doorbell(db_h, ep_h);
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_ring_idx_off(), u64(idx_h));
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_ring_cycle_off(), u64(cyc_h));
+    kbd_set_inflight(meta_pool, idx, 1);
+    kbd_set_has_report(meta_pool, idx, 0);
+    if (0 && fb_out != ptr<u32>(0)) {
+        A();
+        R();
+        M();
+        spc();
+        H();
+        eq();
+        khex(u64(idx));
+        spc();
+        I();
+        D();
+        X();
+        eq();
+        khex(u64(idx_h));
+        spc();
+        C();
+        Y();
+        C();
+        eq();
+        khex(u64(cyc_h));
+        nl();
+    }
+    ret i64(1);
+}
+
 fn i64 usb_kbd_find_by_ep(ptr<u8> meta_pool, i64 dev_cnt, u64 ep_id) {
     i64 i = 0;
     while (i < dev_cnt) {
         if (usb_kbd_meta_load_u64(meta_pool, i, usb_kbd_meta_used_off()) != u64(0) &&
             usb_kbd_meta_load_u64(meta_pool, i, usb_kbd_meta_ep_id_off()) == ep_id) {
+            ret i;
+        }
+        i += 1;
+    }
+    ret i64(-1);
+}
+
+fn i64 usb_kbd_find_by_epu(ptr<u8> meta_pool, i64 dev_cnt, u64 epu) {
+    i64 i = 0;
+    while (i < dev_cnt) {
+        if (usb_kbd_meta_load_u64(meta_pool, i, usb_kbd_meta_used_off()) != u64(0) &&
+            usb_kbd_meta_load_u64(meta_pool, i, usb_kbd_meta_epu_off()) == epu) {
             ret i;
         }
         i += 1;
@@ -401,25 +586,124 @@ fn i64 usb_kbd_alloc_handle(ptr<u8> meta_pool, ptr<i64> dev_cnt) {
     usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_used_off(), u64(1));
     usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_ring_idx_off(), u64(0));
     usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_ring_cycle_off(), u64(1));
-    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_pending_off(), u64(0));
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_in_flight_off(), u64(0));
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_has_report_off(), u64(0));
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_seq_off(), u64(0));
     ret idx;
 }
 
 fn i64 usb_kbd_max_devs() { ret i64(4); }
 fn i64 usb_kbd_ring_size() { ret i64(4096); }
 fn i64 usb_kbd_buf_size() { ret i64(16); }
-fn i64 usb_kbd_meta_stride() { ret i64(88); }
+
+// kbd_meta layout (stride=128 bytes) stored inside rt_xHCI scratch buffer pool;
+// supports up to usb_kbd_max_devs() (currently 4) keyboards.
+// all offsets measured in bytes:
+//   0:  used flag (0/1)
+//   8:  slot_id
+//  16:  ep_id
+//  24:  ep_addr
+//  32:  epu
+//  40:  doorbell register pointer
+//  48:  interrupt-IN ring pointer
+//  56:  ring_idx
+//  64:  ring_cycle
+//  72:  report DMA buffer pointer
+//  80:  report_len
+//  88:  in_flight flag
+//  96:  has_report flag
+// 104:  seq
+// 112:  prev_report[0..7]
+fn i64 usb_kbd_meta_stride() { ret i64(128); }
 fn i64 usb_kbd_meta_used_off() { ret i64(0); }
-fn i64 usb_kbd_meta_ep_id_off() { ret i64(8); }
-fn i64 usb_kbd_meta_ep_addr_off() { ret i64(16); }
-fn i64 usb_kbd_meta_slot_id_off() { ret i64(24); }
-fn i64 usb_kbd_meta_port_id_off() { ret i64(32); }
+fn i64 usb_kbd_meta_slot_off() { ret i64(8); }
+fn i64 usb_kbd_meta_ep_id_off() { ret i64(16); }
+fn i64 usb_kbd_meta_ep_addr_off() { ret i64(24); }
+fn i64 usb_kbd_meta_epu_off() { ret i64(32); }
 fn i64 usb_kbd_meta_db_off() { ret i64(40); }
 fn i64 usb_kbd_meta_ring_ptr_off() { ret i64(48); }
-fn i64 usb_kbd_meta_buf_ptr_off() { ret i64(56); }
-fn i64 usb_kbd_meta_ring_idx_off() { ret i64(64); }
-fn i64 usb_kbd_meta_ring_cycle_off() { ret i64(72); }
-fn i64 usb_kbd_meta_pending_off() { ret i64(80); }
+fn i64 usb_kbd_meta_ring_idx_off() { ret i64(56); }
+fn i64 usb_kbd_meta_ring_cycle_off() { ret i64(64); }
+fn i64 usb_kbd_meta_report_buf_off() { ret i64(72); }
+fn i64 usb_kbd_meta_report_len_off() { ret i64(80); }
+fn i64 usb_kbd_meta_in_flight_off() { ret i64(88); }
+fn i64 usb_kbd_meta_has_report_off() { ret i64(96); }
+fn i64 usb_kbd_meta_seq_off() { ret i64(104); }
+fn i64 usb_kbd_meta_prev_off() { ret i64(112); }
+fn ptr<u8> usb_kbd_meta_prev_ptr(ptr<u8> meta_pool, i64 idx) {
+    ret ptr<u8>(u64(meta_pool) + u64(idx) * u64(usb_kbd_meta_stride()) + u64(usb_kbd_meta_prev_off()));
+}
+
+// Keyboard event queue (ring buffer) stored after meta pool.
+// entry layout (stride=40):
+//  0: type (i64)
+//  8: handle (i64)
+// 16: len (i64)
+// 24: status (i64)
+// 32: seq (i64, low bits of u64)
+fn i64 kbd_evt_cap() { ret i64(32); }
+fn i64 kbd_evt_stride() { ret i64(40); }
+
+fn ptr<u8> kbd_evt_pool(ptr<u8> scratch) {
+    ret usb_kbd_meta_pool(scratch) + usb_kbd_meta_stride() * usb_kbd_max_devs();
+}
+
+fn i64 kbd_evt_head_off() { ret kbd_evt_stride() * kbd_evt_cap(); }
+fn i64 kbd_evt_tail_off() { ret kbd_evt_head_off() + i64(8); }
+fn i64 kbd_evt_overflow_off() { ret kbd_evt_tail_off() + i64(8); }
+
+fn ptr<i64> kbd_evt_head_ptr(ptr<u8> scratch) {
+    ret ptr<i64>(u64(kbd_evt_pool(scratch)) + u64(kbd_evt_head_off()));
+}
+
+fn ptr<i64> kbd_evt_tail_ptr(ptr<u8> scratch) {
+    ret ptr<i64>(u64(kbd_evt_pool(scratch)) + u64(kbd_evt_tail_off()));
+}
+
+fn ptr<i64> kbd_evt_overflow_ptr(ptr<u8> scratch) {
+    ret ptr<i64>(u64(kbd_evt_pool(scratch)) + u64(kbd_evt_overflow_off()));
+}
+
+fn ptr<u8> kbd_evt_entry(ptr<u8> pool, i64 idx) {
+    ret pool + idx * kbd_evt_stride();
+}
+
+fn kbd_evt_push(ptr<u8> pool, ptr<i64> headp, ptr<i64> tailp, ptr<i64> overflowp,
+                i64 type, i64 handle, i64 len, i64 status, u64 seq) {
+    i64 head = *headp;
+    i64 tail = *tailp;
+    i64 next = (tail + 1) % kbd_evt_cap();
+    if (next == head) {
+        *overflowp = *overflowp + 1;
+        head = (head + 1) % kbd_evt_cap(); // overwrite oldest
+        dbg_mark2_g(u8(13));
+    }
+    ptr<u8> dst = kbd_evt_entry(pool, tail);
+    *(ptr<i64>(u64(dst) + u64(0))) = type;
+    *(ptr<i64>(u64(dst) + u64(8))) = handle;
+    *(ptr<i64>(u64(dst) + u64(16))) = len;
+    *(ptr<i64>(u64(dst) + u64(24))) = status;
+    *(ptr<u64>(u64(dst) + u64(32))) = seq;
+    *headp = head;
+    *tailp = next;
+    ret;
+}
+
+fn i64 kbd_evt_pop(ptr<u8> pool, ptr<i64> headp, ptr<i64> tailp,
+                   ptr<i64> typep, ptr<i64> handlep, ptr<i64> lenp, ptr<i64> statusp, ptr<u64> seqp) {
+    i64 head = *headp;
+    i64 tail = *tailp;
+    if (head == tail) { ret i64(0); }
+    ptr<u8> src = kbd_evt_entry(pool, head);
+    *typep = *(ptr<i64>(u64(src) + u64(0)));
+    *handlep = *(ptr<i64>(u64(src) + u64(8)));
+    *lenp = *(ptr<i64>(u64(src) + u64(16)));
+    *statusp = *(ptr<i64>(u64(src) + u64(24)));
+    *seqp = *(ptr<u64>(u64(src) + u64(32)));
+    head = (head + 1) % kbd_evt_cap();
+    *headp = head;
+    ret i64(1);
+}
 
 fn ptr<u8> usb_kbd_ring_pool(ptr<u8> scratch) {
     ret scratch;
@@ -431,6 +715,27 @@ fn ptr<u8> usb_kbd_buf_pool(ptr<u8> scratch) {
 
 fn ptr<u8> usb_kbd_meta_pool(ptr<u8> scratch) {
     ret usb_kbd_buf_pool(scratch) + usb_kbd_buf_size() * usb_kbd_max_devs();
+}
+
+fn kbd_meta_init(ptr<u8> meta_pool, i64 idx,
+                 ptr<u8> ring, ptr<u8> report_buf, u32 report_len,
+                 ptr<u32> db_reg, u32 slot_id, u32 ep_id, u32 ep_addr, u64 epu) {
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_used_off(), u64(1));
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_slot_off(), u64(slot_id));
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_ep_id_off(), u64(ep_id));
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_ep_addr_off(), u64(ep_addr));
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_epu_off(), u64(epu));
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_db_off(), u64(db_reg));
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_ring_ptr_off(), u64(ring));
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_ring_idx_off(), u64(0));
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_ring_cycle_off(), u64(1));
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_report_buf_off(), u64(report_buf));
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_report_len_off(), u64(report_len));
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_in_flight_off(), u64(0));
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_has_report_off(), u64(0));
+    usb_kbd_meta_store_u64(meta_pool, idx, usb_kbd_meta_seq_off(), u64(0));
+    ptr<u8> prev = usb_kbd_meta_prev_ptr(meta_pool, idx);
+    xhci_zero(prev, i64(8));
 }
 
 fn xhci_queue_noop(ptr<u8> ring, ptr<i64> idxp, ptr<u32> cyclep, ptr<u32> db_reg, u32 ep_id) {
@@ -1075,7 +1380,6 @@ fn _start() {
     ptr<i64> fb_out_xp = fb_xp;
     ptr<i64> fb_out_yp = fb_yp;
     i64 usb_ready = 0;
-    i64 usb_pending = 0;
     u32 usb_slot_id = u32(0);
     u32 usb_ep_id = u32(0);
     u32 ep_ctx_index = u32(0);
@@ -1091,7 +1395,6 @@ fn _start() {
     ptr<u64> usb_erdp_reg = ptr<u64>(0);
     ptr<u32> usb_db_reg = ptr<u32>(0);
     i64 usb_noop_done = 0;
-    ptr<u8> usb_kbd_ring = ptr<u8>(0);
     ptr<u32> usb_iman_reg = ptr<u32>(0);
     ptr<u32> usb_imod_reg = ptr<u32>(0);
     ptr<u32> usb_erstsz_reg = ptr<u32>(0);
@@ -1107,8 +1410,17 @@ fn _start() {
     ptr<u8> usb_kbd_ring_base = usb_kbd_ring_pool(usb_scratch_bufs);
     ptr<u8> usb_kbd_buf_base = usb_kbd_buf_pool(usb_scratch_bufs);
     ptr<u8> usb_kbd_meta_base = usb_kbd_meta_pool(usb_scratch_bufs);
-    ptr<u8> usb_kbd_buf = usb_scratch_bufs + i64(4096 * 31);
-    ptr<u8> usb_kbd_prev = usb_kbd_buf + 8;
+    // keyboard event queue after meta pool
+    ptr<u8> usb_kbd_evt_base = kbd_evt_pool(usb_scratch_bufs);
+    ptr<i64> usb_kbd_evt_head = kbd_evt_head_ptr(usb_scratch_bufs);
+    ptr<i64> usb_kbd_evt_tail = kbd_evt_tail_ptr(usb_scratch_bufs);
+    ptr<i64> usb_kbd_evt_overflow = kbd_evt_overflow_ptr(usb_scratch_bufs);
+    *usb_kbd_evt_head = 0;
+    *usb_kbd_evt_tail = 0;
+    *usb_kbd_evt_overflow = 0;
+    ptr<u8> usb_kbd_ring = ptr<u8>(0);
+    ptr<u8> usb_kbd_buf = ptr<u8>(0);
+    ptr<u8> usb_kbd_prev = ptr<u8>(0);
     ptr<u64> usb_irq_flag = rt_usb_irq_ptr();
     i64 usb_irq_mode = 0;
     u64 usb_irq_seen = u64(0);
@@ -1131,10 +1443,14 @@ fn _start() {
     i64 usb_mark_ctx = 0;
     i64 usb_mark_d3 = 0;
     i64 usb_port_override = 0;
-    u8 usb_repeat_key = u8(0);
-    i64 usb_repeat_count = 0;
-    i64 usb_repeat_delay = 800000;
-    i64 usb_repeat_rate = 150000;
+    i64 repeat_handle = i64(-1);
+    u8 repeat_key = u8(0);
+    i64 repeat_active = 0;
+    i64 repeat_deadline = 0;
+    u8 repeat_mods = u8(0);
+    i64 kbd_tick = 0;
+    i64 repeat_delay = 800000;
+    i64 repeat_rate = 150000;
 
     if (fb_base != u64(0)) {
         fb_out = ptr<u32>(fb_base);
@@ -2262,16 +2578,9 @@ fn _start() {
                         }
                         usb_ready = 1;
                         if (kbd_handle >= 0) {
-                            usb_kbd_meta_store_u64(usb_kbd_meta_base, kbd_handle, usb_kbd_meta_ep_id_off(), u64(usb_ep_id));
-                            usb_kbd_meta_store_u64(usb_kbd_meta_base, kbd_handle, usb_kbd_meta_ep_addr_off(), u64(usb_ep_addr));
-                            usb_kbd_meta_store_u64(usb_kbd_meta_base, kbd_handle, usb_kbd_meta_slot_id_off(), u64(slot_id));
-                            usb_kbd_meta_store_i64(usb_kbd_meta_base, kbd_handle, usb_kbd_meta_port_id_off(), port_try);
-                            usb_kbd_meta_store_u64(usb_kbd_meta_base, kbd_handle, usb_kbd_meta_db_off(), u64(db_slot));
-                            usb_kbd_meta_store_u64(usb_kbd_meta_base, kbd_handle, usb_kbd_meta_ring_ptr_off(), u64(kbd_ring));
-                            usb_kbd_meta_store_u64(usb_kbd_meta_base, kbd_handle, usb_kbd_meta_buf_ptr_off(), u64(kbd_buf));
-                            usb_kbd_meta_store_u64(usb_kbd_meta_base, kbd_handle, usb_kbd_meta_ring_idx_off(), u64(kbd_idx));
-                            usb_kbd_meta_store_u64(usb_kbd_meta_base, kbd_handle, usb_kbd_meta_ring_cycle_off(), u64(kbd_cycle));
-                            usb_kbd_meta_store_u64(usb_kbd_meta_base, kbd_handle, usb_kbd_meta_pending_off(), u64(0));
+                            kbd_meta_init(usb_kbd_meta_base, kbd_handle,
+                                          kbd_ring, kbd_buf, u32(8),
+                                          db_slot, slot_id, usb_ep_id, usb_ep_addr, u64(usb_ep_id));
                             if (fb_out != ptr<u32>(0)) {
                                 U();
                                 H();
@@ -2530,14 +2839,15 @@ fn _start() {
             }
             }
             if (kbd_registered == 0) {
-                if (kbd_handle >= 0) {
-                    usb_kbd_meta_store_u64(usb_kbd_meta_base, kbd_handle, usb_kbd_meta_used_off(), u64(0));
-                    usb_kbd_meta_store_u64(usb_kbd_meta_base, kbd_handle, usb_kbd_meta_ep_id_off(), u64(0));
-                    usb_kbd_meta_store_u64(usb_kbd_meta_base, kbd_handle, usb_kbd_meta_pending_off(), u64(0));
-                    if (kbd_handle == usb_kbd_dev_cnt - 1 && usb_kbd_dev_cnt > 0) {
-                        usb_kbd_dev_cnt -= 1;
+                    if (kbd_handle >= 0) {
+                        usb_kbd_meta_store_u64(usb_kbd_meta_base, kbd_handle, usb_kbd_meta_used_off(), u64(0));
+                        usb_kbd_meta_store_u64(usb_kbd_meta_base, kbd_handle, usb_kbd_meta_ep_id_off(), u64(0));
+                        usb_kbd_meta_store_u64(usb_kbd_meta_base, kbd_handle, usb_kbd_meta_in_flight_off(), u64(0));
+                        usb_kbd_meta_store_u64(usb_kbd_meta_base, kbd_handle, usb_kbd_meta_has_report_off(), u64(0));
+                        if (kbd_handle == usb_kbd_dev_cnt - 1 && usb_kbd_dev_cnt > 0) {
+                            usb_kbd_dev_cnt -= 1;
+                        }
                     }
-                }
                 u32 dis_d3 = (slot_id << u32(24)) | u32(10 << 10);
                 xhci_cmd_enqueue(cmd_ring, &cmd_idx, &cmd_cycle, u32(0), u32(0), u32(0), dis_d3);
                 volatile_store(db0, u32(0));
@@ -2865,12 +3175,12 @@ fn _start() {
             if (usb_noop_done == 0) {
                 i64 hn = 0;
                 while (hn < usb_kbd_dev_cnt) {
-                if (usb_kbd_meta_load_u64(usb_kbd_meta_base, hn, usb_kbd_meta_used_off()) != u64(0)) {
-                    ptr<u8> nring = usb_kbd_ring_ptr(usb_kbd_ring_base, hn);
-                    ptr<u32> ndb = ptr<u32>(usb_kbd_meta_load_u64(usb_kbd_meta_base, hn, usb_kbd_meta_db_off()));
-                    u32 nep = u32(usb_kbd_meta_load_u64(usb_kbd_meta_base, hn, usb_kbd_meta_ep_id_off()));
-                    i64 nidx = usb_kbd_meta_load_i64(usb_kbd_meta_base, hn, usb_kbd_meta_ring_idx_off());
-                    u32 ncyc = u32(usb_kbd_meta_load_u64(usb_kbd_meta_base, hn, usb_kbd_meta_ring_cycle_off()));
+                    if (usb_kbd_meta_load_u64(usb_kbd_meta_base, hn, usb_kbd_meta_used_off()) != u64(0)) {
+                        ptr<u8> nring = kbd_meta_ring(usb_kbd_meta_base, hn);
+                        ptr<u32> ndb = kbd_meta_db(usb_kbd_meta_base, hn);
+                        u32 nep = kbd_meta_ep_id(usb_kbd_meta_base, hn);
+                        i64 nidx = usb_kbd_meta_load_i64(usb_kbd_meta_base, hn, usb_kbd_meta_ring_idx_off());
+                        u32 ncyc = u32(usb_kbd_meta_load_u64(usb_kbd_meta_base, hn, usb_kbd_meta_ring_cycle_off()));
                         xhci_queue_noop(nring, &nidx, &ncyc, ndb, nep);
                         usb_kbd_meta_store_u64(usb_kbd_meta_base, hn, usb_kbd_meta_ring_idx_off(), u64(nidx));
                         usb_kbd_meta_store_u64(usb_kbd_meta_base, hn, usb_kbd_meta_ring_cycle_off(), u64(ncyc));
@@ -2889,46 +3199,31 @@ fn _start() {
                     h += 1;
                     continue;
                 }
-                if (usb_kbd_meta_load_i64(usb_kbd_meta_base, h, usb_kbd_meta_pending_off()) != i64(0)) {
+                if (usb_kbd_meta_load_i64(usb_kbd_meta_base, h, usb_kbd_meta_in_flight_off()) != i64(0)) {
                     h += 1;
                     continue;
                 }
-                ptr<u8> buf_h = usb_kbd_buf_ptr(usb_kbd_buf_base, h);
-                i64 bi = 0;
-                while (bi < 8) {
-                    *(buf_h + bi) = u8(0xAA);
-                    bi += 1;
-                }
-                u64 rep_addr = u64(buf_h);
-                u32 nd0 = u32(rep_addr & u64(0xFFFFFFFF));
-                u32 nd1 = u32((rep_addr >> u64(32)) & u64(0xFFFFFFFF));
-                u32 nd2 = u32(8);
-                u32 nd3 = u32(0);
-                nd3 = nd3 | u32(1 << 2); // ISP
-                nd3 = nd3 | u32(1 << 5);
-                nd3 = nd3 | u32(1 << 10);
-                ptr<u8> ring_h = usb_kbd_ring_ptr(usb_kbd_ring_base, h);
-                ptr<u32> db_h = ptr<u32>(usb_kbd_meta_load_u64(usb_kbd_meta_base, h, usb_kbd_meta_db_off()));
-                u32 ep_h = u32(usb_kbd_meta_load_u64(usb_kbd_meta_base, h, usb_kbd_meta_ep_id_off()));
-                i64 idx_h = usb_kbd_meta_load_i64(usb_kbd_meta_base, h, usb_kbd_meta_ring_idx_off());
-                u32 cyc_h = u32(usb_kbd_meta_load_u64(usb_kbd_meta_base, h, usb_kbd_meta_ring_cycle_off()));
-                i64 last_idx_h = idx_h;
                 if (usb_mark_enq == 0 && h == 0) {
                     usb_mark_enq = 1;
                     dbg_mark2_g(u8(0));
                 }
-                xhci_xfer_enqueue(ring_h, &idx_h, &cyc_h, nd0, nd1, nd2, nd3);
-                xhci_ring_doorbell(db_h, ep_h);
-                usb_kbd_meta_store_u64(usb_kbd_meta_base, h, usb_kbd_meta_ring_idx_off(), u64(idx_h));
-                usb_kbd_meta_store_u64(usb_kbd_meta_base, h, usb_kbd_meta_ring_cycle_off(), u64(cyc_h));
-                usb_kbd_meta_store_u64(usb_kbd_meta_base, h, usb_kbd_meta_pending_off(), u64(1));
-                if (h == 0) {
-                    usb_kbd_ring = ring_h;
-                    usb_kbd_last_idx = last_idx_h;
-                    usb_kbd_idx = idx_h;
-                    usb_kbd_cycle = cyc_h;
-                    usb_kbd_buf = buf_h;
-                    usb_kbd_prev = usb_kbd_prev_ptr(usb_kbd_buf_base, h);
+                // clear DMA buf pattern for debugging
+                ptr<u8> buf_h = kbd_report_buf_ptr(usb_kbd_meta_base, h);
+                i64 bi = 0;
+                while (bi < i64(kbd_meta_report_len(usb_kbd_meta_base, h))) {
+                    *(buf_h + bi) = u8(0xAA);
+                    bi += 1;
+                }
+                i64 rearm_ok = kbd_rearm(usb_kbd_meta_base, h);
+                if (rearm_ok == 0 && fb_out != ptr<u32>(0)) {
+                    A();
+                    R();
+                    M();
+                    spc();
+                    H();
+                    eq();
+                    khex(u64(h));
+                    nl();
                 }
                 if (usb_mark_enq == 1 && h == 0) {
                     usb_mark_enq = 2;
@@ -2936,58 +3231,6 @@ fn _start() {
                 }
                 if (usb_dbg_evt == 0) {
                     usb_dbg_evt = 1;
-                }
-                if (0 && usb_dbg_enq == 0 && fb_out != ptr<u32>(0) && h == 0) {
-                    usb_dbg_enq = 1;
-                    E();
-                    N();
-                    Q();
-                    nl();
-                    E();
-                    P();
-                    eq();
-                    khex(u64(ep_h));
-                    nl();
-                    K();
-                    B();
-                    D();
-                    eq();
-                    khex(u64(ring_h));
-                    nl();
-                    B();
-                    U();
-                    F();
-                    eq();
-                    khex(u64(rep_addr));
-                    nl();
-                    I();
-                    D();
-                    X();
-                    eq();
-                    khex(u64(last_idx_h));
-                    nl();
-                    ptr<u32> trb32 = ptr<u32>(u64(ring_h));
-                    ptr<u32> tbase = trb32 + last_idx_h * 4;
-                    T();
-                    d0();
-                    eq();
-                    khex(u64(*(tbase + 0)));
-                    nl();
-                    T();
-                    d1();
-                    eq();
-                    khex(u64(*(tbase + 1)));
-                    nl();
-                    T();
-                    d2();
-                    eq();
-                    khex(u64(*(tbase + 2)));
-                    nl();
-                    T();
-                    d3();
-                    eq();
-                    khex(u64(*(tbase + 3)));
-                    nl();
                 }
                 h += 1;
             }
@@ -3127,17 +3370,18 @@ fn _start() {
                     nl();
                 }
                 if (ev_typeu == u32(32)) {
-                    i64 h_evt = usb_kbd_find_by_ep(usb_kbd_meta_base, usb_kbd_dev_cnt, u64(ev_epu));
+                    i64 h_evt = kbd_find_by_epu(usb_kbd_meta_base, usb_kbd_dev_cnt, u64(ev_epu));
                     if (h_evt >= 0) {
-                        ptr<u8> ring_evt = usb_kbd_ring_ptr(usb_kbd_ring_base, h_evt);
-                        ptr<u8> rep = usb_kbd_buf_ptr(usb_kbd_buf_base, h_evt);
-                        ptr<u8> prev = usb_kbd_prev_ptr(usb_kbd_buf_base, h_evt);
-                        usb_kbd_ring = ring_evt;
-                        usb_kbd_buf = rep;
-                        usb_kbd_prev = prev;
-                        usb_kbd_meta_store_u64(usb_kbd_meta_base, h_evt, usb_kbd_meta_pending_off(), u64(0));
-                        usb_pending = 0;
-                        if (fb_out != ptr<u32>(0)) {
+                        kbd_set_inflight(usb_kbd_meta_base, h_evt, 0);
+                        kbd_set_has_report(usb_kbd_meta_base, h_evt, 1);
+                        u64 seq = kbd_inc_seq(usb_kbd_meta_base, h_evt);
+                        kbd_evt_push(usb_kbd_evt_base, usb_kbd_evt_head, usb_kbd_evt_tail, usb_kbd_evt_overflow,
+                                     i64(1), h_evt, i64(tr_len), i64(ccodeu), seq);
+                        i64 rearm_ok_evt = kbd_rearm(usb_kbd_meta_base, h_evt);
+                        if (0 && fb_out != ptr<u32>(0)) {
+                            T();
+                            E();
+                            spc();
                             E();
                             P();
                             eq();
@@ -3146,152 +3390,47 @@ fn _start() {
                             H();
                             eq();
                             khex(u64(h_evt));
+                            spc();
+                            S();
+                            E();
+                            Q();
+                            eq();
+                            khex(seq);
+                            spc();
+                            L();
+                            N();
+                            eq();
+                            khex(u64(tr_len));
+                            spc();
+                            C();
+                            C();
+                            eq();
+                            khex(u64(ccodeu));
+                            spc();
+                            A();
+                            R();
+                            M();
+                            eq();
+                            khex(u64(rearm_ok_evt));
                             nl();
                         }
                         if (usb_mark_tevt == 0) {
                             usb_mark_tevt = 1;
                             dbg_mark2_g(u8(3));
                         }
-                        if (ccodeu == u32(1)) {
-                            rt_wbinvd();
-                            i64 dma_missing = 1;
-                            i64 bj = 0;
-                            while (bj < 8) {
-                                if (*(rep + bj) != u8(0xAA)) { dma_missing = 0; }
-                                bj += 1;
-                            }
-                            if (fb_out != ptr<u32>(0)) {
-                                if (usb_irq_printed == 0 && usb_irq_seen != u64(0)) {
-                                    usb_irq_printed = 1;
-                                    I();
-                                    R();
-                                    Q();
-                                    eq();
-                                    khex(u64(usb_irq_seen));
-                                    nl();
-                                }
-                                if (dma_missing != 0) {
-                                    if (usb_dbg_evt == 1) {
-                                        usb_dbg_evt = 2;
-                                        D();
-                                        M();
-                                        A();
-                                        nl();
-                                        C();
-                                        C();
-                                        eq();
-                                        khex(u64(ccodeu));
-                                        nl();
-                                        T();
-                                        L();
-                                        eq();
-                                        khex(u64(tr_len));
-                                        nl();
-                                        B();
-                                        U();
-                                        F();
-                                        eq();
-                                        khex(u64(rep));
-                                        nl();
-                                        K();
-                                        B();
-                                        D();
-                                        eq();
-                                        khex(u64(ring_evt));
-                                        nl();
-                                        E();
-                                        V();
-                                        T();
-                                        eq();
-                                        khex(u64(usb_evt_ring));
-                                        nl();
-                                        u64 ev_ptr = u64(ev_d0u) | (u64(ev_d1u) << u64(32));
-                                        u64 trb_ptr = u64(ring_evt) + u64(usb_kbd_last_idx) * u64(16);
-                                        T();
-                                        R();
-                                        B();
-                                        eq();
-                                        khex(u64(trb_ptr));
-                                        nl();
-                                        E();
-                                        V();
-                                        P();
-                                        eq();
-                                        khex(u64(ev_ptr));
-                                        nl();
-                        if (0) {
-                            bj = 0;
-                            while (bj < 8) {
-                                B();
-                                kdigit(u8(bj));
-                                            eq();
-                                            khex(u64(*(rep + bj)));
-                                            nl();
-                                            bj += 1;
-                                        }
-                                    }
-                                }
-                                } else {
-                                    if (0) {
-                                        bj = 0;
-                                        while (bj < 8) {
-                                            B();
-                                            kdigit(u8(bj));
-                                            eq();
-                                            khex(u64(*(rep + bj)));
-                                            nl();
-                                            bj += 1;
-                                        }
-                                    }
-                                }
-                            }
-                            u8 mods = *(rep + 0);
-                            i64 sh = 0;
-                            if ((mods & u8(0x22)) != u8(0)) { sh = 1; }
-                            i64 ki = 2;
-                            while (ki < 8) {
-                                u8 hid_keycode = *(rep + ki);
-                                if (hid_keycode != u8(0) && !hid_key_in_prev(hid_keycode, prev)) {
-                                    if (hid_keycode == u8(0x50)) { // left
-                                        if (cur > 0) {
-                                            cur -= 1;
-                                            line_redraw(vga, rowp, colp, attr, line_row, line_col, line, len, prev_len, cur);
-                                            fb_cursor_set_line(fb_out, fb_out_width, fb_out_xp, fb_out_yp, fb_line_row, fb_line_col, cur);
-                                            prev_len = len;
-                                        }
-                                        ki += 1;
-                                        continue;
-                                    }
-                                    if (hid_keycode == u8(0x4F)) { // right
-                                        if (cur < len) {
-                                            cur += 1;
-                                            line_redraw(vga, rowp, colp, attr, line_row, line_col, line, len, prev_len, cur);
-                                            fb_cursor_set_line(fb_out, fb_out_width, fb_out_xp, fb_out_yp, fb_line_row, fb_line_col, cur);
-                                            prev_len = len;
-                                        }
-                                        ki += 1;
-                                        continue;
-                                    }
-                                    u8 usb_ch = hid_key_to_ascii(hid_keycode, sh);
-                                    if (usb_ch != u8(0)) {
-                                        line_apply_char(usb_ch, vga, rowp, colp, attr, com1,
-                                                        fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp,
-                                                        &fb_cursor_on, &fb_cursor_x, &fb_cursor_y,
-                                                        &fb_line_row, &fb_line_col, &fb_line_set,
-                                                        line, &len, &prev_len, &cur, cap,
-                                                        last_line, &last_len,
-                                                        hist_base, hist_len_base, &hist_head, &hist_count, &hist_nav,
-                                                        &line_row, &line_col);
-                                    }
-                                }
-                                ki += 1;
-                            }
-                            i64 ci = 0;
-                            while (ci < 8) {
-                                *(prev + ci) = *(rep + ci);
-                                ci += 1;
-                            }
-                            usb_kbd_prev = prev;
+                    } else {
+                        // unknown epu -> ignore safely
+                        if (fb_out != ptr<u32>(0)) {
+                            U();
+                            N();
+                            K();
+                            N();
+                            spc();
+                            E();
+                            P();
+                            eq();
+                            khex(u64(ev_epu));
+                            nl();
                         }
                     }
                 }
@@ -3308,59 +3447,101 @@ fn _start() {
                 }
             }
         }
-        if (usb_ready) {
-            ptr<u8> prev2 = usb_kbd_prev;
-            u8 held = hid_first_key(prev2);
-            if (held == u8(0)) {
-                usb_repeat_key = u8(0);
-                usb_repeat_count = 0;
-            } else {
-                if (held != usb_repeat_key) {
-                    usb_repeat_key = held;
-                    usb_repeat_count = 0;
-                } else {
-                    usb_repeat_count += 1;
-                    if (usb_repeat_count == usb_repeat_delay ||
-                        (usb_repeat_count > usb_repeat_delay &&
-                         ((usb_repeat_count - usb_repeat_delay) % usb_repeat_rate) == 0)) {
-                        i64 sh2 = 0;
-                        u8 mods2 = *(prev2 + 0);
-                        if ((mods2 & u8(0x22)) != u8(0)) { sh2 = 1; }
-                        if (held == u8(0x50)) { // left
-                            if (cur > 0) {
-                                cur -= 1;
-                                line_redraw(vga, rowp, colp, attr, line_row, line_col, line, len, prev_len, cur);
-                                fb_cursor_set_line(fb_out, fb_out_width, fb_out_xp, fb_out_yp, fb_line_row, fb_line_col, cur);
-                                prev_len = len;
-                            }
-                        } else {
-                            if (held == u8(0x4F)) { // right
-                                if (cur < len) {
-                                    cur += 1;
-                                    line_redraw(vga, rowp, colp, attr, line_row, line_col, line, len, prev_len, cur);
-                                    fb_cursor_set_line(fb_out, fb_out_width, fb_out_xp, fb_out_yp, fb_line_row, fb_line_col, cur);
-                                    prev_len = len;
-                                }
-                            } else {
-                                if (held != u8(0x28)) {
-                                    u8 usb_ch2 = hid_key_to_ascii(held, sh2);
-                                    if (usb_ch2 != u8(0)) {
-                                        line_apply_char(usb_ch2, vga, rowp, colp, attr, com1,
-                                                        fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp,
-                                                        &fb_cursor_on, &fb_cursor_x, &fb_cursor_y,
-                                                        &fb_line_row, &fb_line_col, &fb_line_set,
-                                                        line, &len, &prev_len, &cur, cap,
-                                                        last_line, &last_len,
-                                                        hist_base, hist_len_base, &hist_head, &hist_count, &hist_nav,
-                                                        &line_row, &line_col);
-                                    }
-                                }
-                            }
+        // process pending keyboard reports from queue (per-device)
+        i64 evt_type = 0;
+        i64 evt_handle = 0;
+        i64 evt_len = 0;
+        i64 evt_status = 0;
+        u64 evt_seq = u64(0);
+        while (kbd_evt_pop(usb_kbd_evt_base, usb_kbd_evt_head, usb_kbd_evt_tail,
+                           &evt_type, &evt_handle, &evt_len, &evt_status, &evt_seq) != i64(0)) {
+            i64 h_work = evt_handle;
+            if (h_work < 0 || h_work >= usb_kbd_dev_cnt) {
+                continue;
+            }
+            if (usb_kbd_meta_load_u64(usb_kbd_meta_base, h_work, usb_kbd_meta_used_off()) == u64(0)) {
+                continue;
+            }
+            ptr<u8> rep = kbd_report_buf_ptr(usb_kbd_meta_base, h_work);
+            ptr<u8> prev = kbd_prev_report_ptr(usb_kbd_meta_base, h_work);
+            // ensure DMA visible before parsing report
+            rt_wbinvd();
+            i64 lcap = i64(kbd_meta_report_len(usb_kbd_meta_base, h_work));
+            if (lcap <= 0 || lcap > 8) { lcap = 8; }
+            if (evt_len > 0 && evt_len < lcap) { lcap = evt_len; }
+            if (evt_type == i64(1)) { // report ready
+                u8 mods = *(rep + 0);
+                i64 sh = 0;
+                if ((mods & u8(0x22)) != u8(0)) { sh = 1; }
+                i64 ki = 2;
+                while (ki < lcap) {
+                    u8 hid_keycode = *(rep + ki);
+                    if (hid_keycode != u8(0) && !hid_key_in_prev(hid_keycode, prev)) {
+                        if (0 && fb_out != ptr<u32>(0)) { // RP log
+                            R(); P(); spc(); H(); eq(); khex(u64(h_work)); spc();
+                            S(); E(); Q(); eq(); khex(u64(evt_seq)); spc();
+                            K(); C(); eq(); khex(u64(hid_keycode)); spc();
+                            M(); O(); D(); S(); eq(); khex(u64(mods)); nl();
                         }
+                        console_submit_key(h_work, hid_keycode, mods, sh,
+                                           vga, rowp, colp, attr, com1,
+                                           fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp,
+                                           &fb_cursor_on, &fb_cursor_x, &fb_cursor_y,
+                                           &fb_line_row, &fb_line_col, &fb_line_set,
+                                           line, &len, &prev_len, &cur, cap,
+                                           last_line, &last_len,
+                                           hist_base, hist_len_base, &hist_head, &hist_count, &hist_nav,
+                                           &line_row, &line_col);
                     }
+                    ki += 1;
+                }
+                u8 held_now = hid_first_key(rep);
+                if (held_now == u8(0)) {
+                    repeat_active = 0;
+                    repeat_handle = i64(-1);
+                    repeat_key = u8(0);
+                    repeat_mods = u8(0);
+                } else {
+                    repeat_active = 1;
+                    repeat_handle = h_work;
+                    repeat_key = held_now;
+                    repeat_mods = mods;
+                    repeat_deadline = kbd_tick + repeat_delay;
+                }
+            }
+            i64 ci = 0;
+            while (ci < lcap) {
+                *(prev + ci) = *(rep + ci);
+                ci += 1;
+            }
+            usb_kbd_prev = prev;
+            usb_kbd_meta_store_u64(usb_kbd_meta_base, h_work, usb_kbd_meta_has_report_off(), u64(0));
+        }
+
+        // repeat ticker (polling, deadline-based)
+        if (repeat_active != 0) {
+            if (repeat_handle < 0 || repeat_handle >= usb_kbd_dev_cnt ||
+                usb_kbd_meta_load_u64(usb_kbd_meta_base, repeat_handle, usb_kbd_meta_used_off()) == u64(0)) {
+                repeat_active = 0;
+                repeat_handle = i64(-1);
+            } else {
+                if (kbd_tick >= repeat_deadline) {
+                    i64 sh2 = 0;
+                    if ((repeat_mods & u8(0x22)) != u8(0)) { sh2 = 1; }
+                    console_submit_key(repeat_handle, repeat_key, repeat_mods, sh2,
+                                       vga, rowp, colp, attr, com1,
+                                       fb_out, fb_out_stride, fb_out_width, fb_out_height, fb_out_xp, fb_out_yp,
+                                       &fb_cursor_on, &fb_cursor_x, &fb_cursor_y,
+                                       &fb_line_row, &fb_line_col, &fb_line_set,
+                                       line, &len, &prev_len, &cur, cap,
+                                       last_line, &last_len,
+                                       hist_base, hist_len_base, &hist_head, &hist_count, &hist_nav,
+                                       &line_row, &line_col);
+                    repeat_deadline = kbd_tick + repeat_rate;
                 }
             }
         }
+        kbd_tick += 1;
 
         u8 sc = u8(0);
         if (use_irq_kbd) {

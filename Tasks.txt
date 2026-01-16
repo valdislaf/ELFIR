@@ -1,3 +1,126 @@
+
+Задача 1/10 — Расширить kbd_meta[] до “взрослого” контекста устройства
+
+Промпт:
+«Добавь/обнови структуру kbd_meta[h] так, чтобы она полностью описывала конкретную клавиатуру: epu, slot_id, ep_addr/ep_id, doorbell, ring_ptr, ring_idx, cycle, report_buf_ptr, report_len, in_flight, has_report, seq, prev_report[] (размер под твой HID репорт). Размести массив метаданных и все буферы в rt_xhci_scratch_bufs (или другом выделенном пуле) без malloc. Документируй смещения, размер одного kbd_meta, и максимальное N (число клавиатур). Добавь функцию kbd_meta_init(h, …) которая заполняет поля при энумерации.»
+
+Задача 2/10 — Удалить глобальные состояния ввода и “текущие указатели”
+
+Промпт:
+«Найди и удали/запрети глобальные usb_pending, usb_pending_handle, usb_kbd_ring, usb_kbd_buf, usb_kbd_prev, usb_repeat_* и любые аналоги. Перепиши код так, чтобы все ссылки шли через kbd_meta[h].* для конкретного handle. Если где-то нужен “активный handle”, передавай h параметром (или получай из события/очереди), но не храни глобально.»
+
+
+
+ План (4 этапа, исходя из архитектуры)
+codex resume 019bbdcc-b706-7d52-92ce-8f2629da7243
+  1. Раздел “kbd_meta” → очередь/перезагрузка TRB
+      - Расширить kbd_meta[h] ещё на поля has_report, in_flight, seq, doorbell, report_buf, report_len (есть).
+      - Перенести логику на enqueue: цикл по h проверяет in_flight; если 0, готовит TRB на ring/report_buf, ставит
+        doorbell и выставляет in_flight=1. Старые usb_pending* — убрать.
+      - Убедиться, что каждый TRB сохраняет ring_idx/cycle внутри мета.
+
+  2. Event-обработчик → только completion + очередь событий
+      - Переписать обработку xhci_evt_poll: по ev_epu находим h, ставим kbd_meta[h].in_flight=0,
+        kbd_meta[h].has_report=1, kbd_meta[h].seq++, сохраняем длину и добавляем запись в kbd_event_queue.
+      - Из event loop убрать вызовы line_apply_char/reset глобальных буферов; event handler только помечает данные
+        готовыми.
+  3. Worker/основной цикл → разбирает HID report
+      - В основном цикле (или отдельной функции) обрабатывать kbd_event_queue: для каждого h читать report_buf,
+        сравнивать с prev_report (копировать + сплющивать), вызывать console_submit_key(h, key_event) и сбрасывать
+        has_report.
+      - При этом kbd_meta[h].prev_report[] служит history; console_submit_key возвращает struct {handle,keycode,action}.
+      - line_apply_char и repeat-интерфейс теперь вызываются через общий console_submit_key.
+  4. Repeat и “активный handle” → в консоли
+      - Удалить глобальные usb_repeat_*; вместо них хранить repeat_handle, repeat_key, repeat_deadline в консольном слое
+        (глобально, но с явной привязкой к handle).
+      - При console_submit_key обновлять repeat_handle/repeat_key.
+      - Повторную вставку символов производить только если repeat_handle == h (иначе сбрасывать), при этом
+        kbd_event_queue и обработка могут обслуживать несколько клавиатур независимо.
+
+  Дополнительно:
+
+  - Поведение “TRB всегда выставлен” (re-arm) реализовать в момент окончания обработки события (можно в event handler) —
+    следует сразу после has_report=1 ставить новый TRB.
+  - kbd_event_queue — ring/фifo/фиксированного размера (например, 16) — реализовать как массив struct {handle, seq}.
+
+  После каждого шага — тест (сборка и, по возможности, usb ввод). Готов начать с пункта 1?
+
+
+Задача 3/10 — Сделать слой helper-функций доступа к метаданным
+
+Промпт:
+«Реализуй функции-помощники, скрывающие арифметику и смещения: kbd_meta_ptr(h), kbd_ring_ptr(h), kbd_report_buf_ptr(h), kbd_prev_report_ptr(h), kbd_set_inflight(h, bool), kbd_set_has_report(h, bool), kbd_inc_seq(h), kbd_find_by_epu(epu). Все “железные” места (ring/TRB/buf) должны обращаться только через эти функции. Добавь assert/лог на выход за пределы N.»
+
+Задача 4/10 — Реализовать “железобетонный” kbd_rearm(h) для interrupt-IN
+
+Промпт:
+«Сделай функцию kbd_rearm(h), которая ставит Normal TRB на endpoint ring конкретного handle: DMA=kbd_meta[h].report_buf_ptr, LEN=report_len, IOC=1, корректные cycle/TOGGLE, обновление ring_idx/cycle, вызов doorbell для нужного endpoint/slot. По завершении выставь in_flight=true. Если re-arm не выполнен — печатай ARM h=.. ring_idx=.. cyc=.. db=.. и причину. Добавь обработку ошибок completion (STALL/short/ошибки) так, чтобы при необходимости делался re-arm/лог, но драйвер не “умирал”.»
+
+
+Задача 5/10 — Построить отображение epu → handle без глобальных переключений
+
+Промпт:
+«Сделай детерминированное сопоставление ev_epu → handle: либо таблица epu_map, либо поиск по kbd_meta[].epu (без глобалов). Добавь диагностику “unknown epu” и безопасный игнор события. Убедись, что epu заполняется при конфигурации endpoint и уникален на handle.»
+
+
+
+Задача 6/10 — Вынести события в очередь kbd_event_queue (кольцевой буфер)
+
+Промпт:
+«Реализуй kbd_event_queue как ring buffer фиксированного размера в scratch-памяти: запись {type, handle, seq, (опц. len/status)}. Добавь push_event(...) (из обработчика событий) и pop_event(...) (в worker). Очередь должна поддерживать несколько клавиатур и не терять события: если overflow — лог + счётчик. Обозначь правила синхронизации: если ISR/worker параллельны — нужны атомики/барьеры; если всё в одном потоке — явно это зафиксируй.»
+
+Задача 7/10 — Переделать обработчик xHCI Transfer Event в “ISR-style”: только meta + queue + re-arm
+
+Промпт:
+«Перепиши обработчик event ring: при Transfer Event для interrupt-IN достань ev_epu, найди h, обнови kbd_meta[h]: in_flight=false, has_report=true, seq++. Положи REPORT_READY(h, seq) в kbd_event_queue. Сразу вызови kbd_rearm(h) (или гарантированно после фиксации completion, но до выхода из handler). В обработчике не должно быть line_apply_char/консоли/повтора/парсинга HID. Добавь TE-лог: TE epu=.. h=.. seq=.. len/status=...»
+
+
+Задача 8/10 — Сделать worker loop: parse report → key_event → console_submit_key(h, event)
+
+Промпт:
+«В основном цикле/worker реализуй обработку kbd_event_queue: по REPORT_READY взять report_buf конкретного handle, сравнить с prev_report (или bitmap), сформировать события keydown/keyup + modifiers и вызвать console_submit_key(h, key_event). После обработки обнови prev_report, сбрось has_report=false. Добавь RP-лог: RP h=.. seq=.. kc=.. mods=... Никаких глобальных usb_pending.»
+
+
+Задача 9/10 — Реализовать input/console слой с корректным repeat (repeat живёт в консоли, не в USB)
+
+Промпт:
+«Сделай console_submit_key(handle, key_event) и храни repeat-состояние в консоли: repeat_handle, repeat_key, repeat_deadline, repeat_active. При новом keydown с другим handle — переключай repeat_handle и отменяй старый repeat. Реализуй тикер (IRQ0 или polling), который генерит повтор через console_submit_key(repeat_handle, ...) строго по deadline. Убедись, что repeat не может вернуть “фокус” на handle=0 без события.»
+
+
+
+
+
+
+
+Задача 10/10 — Трассировка, инварианты состояния и стресс-тест N клавиатур
+
+Промпт:
+«Добавь метки/лог: TE epu=.. h=.. seq=.. len/status=.., RP h=.. seq=.. kc=.., ARM h=.. ring_idx=.. cyc=.. db=... Введи инварианты переходов для каждого handle (in_flight/has_report), счётчики ошибок (unknown epu, queue overflow, missed rearm, bad completion). Проведи тест: 2–3 клавиатуры, одновременный ввод, быстрый набор, удержание клавиши (repeat), переключение между клавиатурами во время удержания. Критерий успеха: ни одно устройство не “прилипает”, re-arm всегда происходит, события приходят на правильный handle.»
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 План по этапам (на каждый можно сделать отдельную задачу)
 
   1. Добавить многопортовую структуру и вспомогательные функции
@@ -151,3 +274,288 @@
 - Ничего функционально не менять, только комментарии/метки/cleanup.
 
 Вывод: git diff.
+
+Цель
+
+Сделать многоклавиатурный USB HID (xHCI) ввод так, чтобы:
+
+любые N клавиатур работали параллельно,
+
+события обрабатывались строго по источнику (endpoint → handle),
+
+ввод и автоповтор были корректны и не блокировали другие устройства,
+
+отсутствие “глобального фокуса” на одной клавиатуре,
+
+TRB для interrupt-IN всегда перезаряжается, устройство никогда не “застревает”.
+
+0) Термины и сущности (зафиксировать)
+
+kbd_handle (h) — индекс устройства/инстанса клавиатуры.
+
+epu — endpoint pointer / identifier из xHCI event (то, по чему мы мапим событие на endpoint).
+
+kbd_meta[h] — состояние клавиатуры (endpoint, ring, буферы, флаги, тайминги).
+
+IN interrupt endpoint — единственный источник репортов клавиатуры.
+
+re-arm — постановка следующего Normal TRB на interrupt-IN ring + doorbell.
+
+1) Архитектура: убрать глобальные состояния ввода
+Требование
+
+Полностью удалить/запретить:
+
+usb_pending
+
+usb_pending_handle
+
+usb_repeat_* в глобале
+
+любые глобальные usb_kbd_ring/usb_kbd_buf/usb_kbd_prev, которые “переключаются”
+
+Вместо этого
+
+Ввести строго per-handle/per-endpoint state:
+
+kbd_meta[h] содержит минимум:
+
+Связь с железом:
+
+slot_id
+
+ep_id / ep_addr (или то, чем ты оперируешь при doorbell)
+
+epu (ключ для map epu→handle)
+
+Очередь и буферы:
+
+указатель на ring (TRB ring для interrupt-IN)
+
+ring_idx, cycle (или любые твои индексы)
+
+report_buf (куда DMA пишет репорт)
+
+report_len
+
+Синхронизация/состояние репортов:
+
+has_report (bool) — в буфере есть свежий репорт
+
+in_flight (bool) — TRB поставлен, ждём completion
+
+seq/gen (счётчик репортов, удобно для отладки)
+
+Логика клавиатуры:
+
+last_keycode / pressed_bitmap (опционально, но “взросло” — лучше bitmap)
+
+repeat структура (см. ниже)
+
+2) Контракт обработки событий xHCI (строго)
+Требование
+
+Обработчик event ring НЕ должен “печатать символы” и заниматься консолью напрямую (это как ISR/bottom-half).
+
+Он должен делать ровно:
+
+распознать тип события (Transfer Event),
+
+достать epu,
+
+найти h по epu,
+
+обновить kbd_meta[h]:
+
+has_report = true
+
+in_flight = false
+
+сохранить статус/len (если ты читаешь length из event TRB/status)
+
+немедленно запланировать обработку (work item / очередь событий).
+
+В драйверах это обычно:
+
+ISR → кладёт “completion record” в lock-free очередь
+
+worker thread → делает разбор HID и отдаёт в input subsystem
+
+3) Очередь событий (мульти-девайс)
+Требование
+
+Сделать общую очередь “kbd_event_queue”, куда кладутся записи вида:
+
+kbd_event { handle h, type=REPORT_READY, gen=seq, timestamp }
+
+Пуш делает event-обработчик.
+
+Поп делает worker/основной цикл консоли.
+
+Важно: очередь должна позволять несколько событий подряд от разных handle без потерь.
+
+4) Worker: обработка HID отчёта
+Требование
+
+Worker должен работать так:
+
+Для каждого REPORT_READY(h):
+
+взять meta = kbd_meta[h]
+
+прочитать report_buf (8 байт boot keyboard или по report descriptor если non-boot)
+
+преобразовать в “нажатия/отпускания”:
+
+минимум: определить keydown/keyup по сравнению с прошлым состоянием
+
+отправить символ(ы) в консоль через единый интерфейс (console_submit_key(h, key_event))
+
+Консольный интерфейс
+
+console_submit_key(handle, key_event) должен:
+
+быть независим от USB
+
+принимать “событие клавиши” (keycode + press/release + modifiers)
+
+5) Автоповтор “по-взрослому”
+Требование
+
+Повтор — не глобальный, а на уровне консоли или на уровне handle, но с правильной семантикой.
+
+Стандартная схема:
+
+повтор зависит от “последней активной клавиши”, но источник всё равно конкретный handle
+
+реализация хранит:
+
+repeat_handle
+
+repeat_key
+
+repeat_next_deadline_ticks
+
+repeat_active
+
+Где хранить:
+
+лучше в консоли (input layer), потому что repeat — часть UX, а не USB.
+
+но repeat_handle обязателен, чтобы не было залипания на handle=0.
+
+6) Re-arm TRB: железобетонное правило
+Требование (ключевое)
+
+Для каждого handle после completion (Transfer Event) нужно гарантированно:
+
+подготовить следующий Normal TRB на interrupt-IN endpoint ring:
+
+DMA addr = meta.report_buf
+
+len = meta.report_len
+
+IOC=1 (чтобы снова получить event)
+
+обновить ring_idx/cycle
+
+позвонить в doorbell нужному endpoint
+
+Это должно происходить:
+
+либо в event-обработчике (как “fast path”)
+
+либо в worker, но тогда in_flight должен быть защищён от гонок
+
+Взрослая гарантия: “в любой момент для каждого interrupt-IN endpoint либо стоит активный TRB (in_flight), либо он будет поставлен немедленно после обработки completion”.
+
+7) Map epu → handle (детерминированно)
+Требование
+
+Сделать структуру отображения:
+
+epu_map[epu] = handle (если epu небольшое/упакованное)
+или
+
+хеш/линейный поиск по kbd_meta[].epu, но тогда N маленькое и это осознанно
+
+И добавить проверки:
+
+если epu неизвестен → лог + игнор события (не падать)
+
+8) Состояния и инварианты (для отладки и стабильности)
+
+Определить и поддерживать инварианты:
+
+Для каждого handle h:
+
+in_flight == true ⇒ has_report == false (обычно)
+
+после Transfer Event: in_flight=false, has_report=true
+
+после обработки report: has_report=false
+
+после re-arm: in_flight=true
+
+Любое нарушение — печать диагностической метки.
+
+9) Трассировка “взрослая”, но точечная
+
+Добавить структурированный лог (fb-метки достаточно) в 3 местах:
+
+Transfer Event:
+TE epu=X h=Y len=L status=S inflight->0 has_report->1 seq++
+
+Worker parse:
+RP h=Y seq=... kc=.. mods=.. keys=..
+
+Re-arm:
+ARM h=Y ring_idx=.. cyc=.. db=.. inflight->1
+
+Это даст 100% доказательство, что:
+
+события приходят,
+
+на правильный handle,
+
+репорт реально обработан,
+
+TRB перезаряжен.
+
+10) План внедрения (по коммитам)
+
+Ввести kbd_meta[] (полные поля) + map epu→handle.
+
+Убрать глобальные usb_pending/usb_repeat/usb_kbd_*.
+
+Сделать очередь kbd_event_queue.
+
+Переделать event-обработчик: только completion → очередь.
+
+Сделать worker: parse report → console_submit_key.
+
+Реализовать repeat в консоли с repeat_handle.
+
+Встроить “железную” re-arm логику и инварианты.
+
+Стресс: 2–3 клавиатуры, быстрый набор, одновременные нажатия.
+
+
+Сейчас глобальные состояния (usb_pending, usb_kbd_ring, repeat и т.д.) всё ещё мешают параллельному вводу — обработка событий, очистка
+  буферов и re-arm привязаны к “первой” клавиатуре. Чтобы полностью перейти на описанную архитектуру, нужен крупный рефакторинг:
+
+  1. kbd_meta[h] нужно расширить (ring pointer, report buffer, ring indices, has_report, in_flight, seq, slot/ep, doorbell, состояние
+     repeat). Все текущие глобальные переменные должны быть удалены; вместо них нужно ссылаться на поля выбранного handle.
+  2. Event handler должен только сопоставлять ev_epu → handle, обновлять in_flight/has_report/seq и ставить kb_event_queue (например,
+     circular buffer ptr), где REPORT_READY хранит handle + seq. Никаких line_apply_char тут.
+  3. Worker loop (в основном цикле) должен вычитывать из kbd_event_queue события, читать report из kbd_meta[h].report_buf, сравнивать с
+     прошлым состоянием (bitmap/previous report), генерировать key_event и вызывать console_submit_key(h, key_event). После обработки
+     has_report = false.
+  4. Re-arm — сразу после получения completion (в обработчике) нужно подготовить Normal TRB (DMA = report_buf, len = report_len, IOC=1),
+     обновить ring_idx/cycle, звонить doorbell и выставить in_flight = true; если TRB не заряжен — печатать ARM лог.
+  5. console_submit_key должен хранить repeat-данные (handle, key, deadlines). Повтор не должен быть глобальным по клавиатуре: как только
+     придёт новый keydown с другим handle, repeat_handle переключается, предыдущая клавиатура теряет repeat.
+  6. Трассировка: добавить метки TE epu=.. h=.., RP h=.. seq=.. kc=.., ARM h=.. ring_idx=.. чтобы видеть весь путь.
+
+  Это объёмный рефакторинг, требующий переписывания событий/очереди, метаданных и repeat-логики. Если нужно, могу шаг за шагом реализовать
+  (kbd_meta расширение → очередь → worker → repeat → re-arm), но потребуется значительное время. Какой кусок сделать первым?
